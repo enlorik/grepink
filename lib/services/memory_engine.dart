@@ -128,6 +128,10 @@ class MemoryEngine {
       final semanticScore = semanticScores[id] ?? 0.0;
       final ftsScore = ftsScores[id] ?? 0.0;
       final combined = 0.6 * semanticScore + 0.4 * ftsScore;
+      // Include if combined score meets threshold OR if semantic score alone meets it.
+      // Spec: threshold applies to semantic similarity. High semantic match
+      // should always surface even if FTS score is 0 (no shared keywords).
+      // This is the core "zero shared keywords" use case of the Memory Engine.
       if (combined >= threshold || semanticScore >= threshold) {
         scored.add(_RankedResult(
           note: noteMap[id]!,

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../models/note.dart';
 import '../providers/notes_provider.dart';
+import '../services/database_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/grepink_fab.dart';
@@ -49,26 +50,20 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   }
 
   Future<void> _loadNote() async {
-    final notes = ref.read(notesProvider).valueOrNull ?? [];
-    final note = notes.firstWhere(
-      (n) => n.id == widget.noteId,
-      orElse: () => Note(
-        id: widget.noteId!,
-        title: '',
-        content: '',
-        tags: const [],
-        keywords: const [],
-        isPinned: false,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-        embeddingPending: false,
-      ),
-    );
+    // Try provider first, fall back to database
+    Note? note = (ref.read(notesProvider).valueOrNull ?? [])
+        .where((n) => n.id == widget.noteId)
+        .firstOrNull;
+
+    note ??= await DatabaseService.instance.getNoteById(widget.noteId!);
+
+    if (note == null || !mounted) return;
+
     _originalNote = note;
     _titleController.text = note.title;
     _contentController.text = note.content;
     setState(() {
-      _tags = List.from(note.tags);
+      _tags = List.from(note!.tags);
       _keywords = List.from(note.keywords);
     });
   }
@@ -93,7 +88,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
 
   List<String> _extractKeywords(String title, String content) {
     final text = '$title $content'.toLowerCase();
-    final words = text.split(RegExp(r'[\s\n\r\t,\.!?;:]+'));
+    final words = text.split(RegExp(r'[\s\n\r\t,.!?;:]+'));
     final stopWords = {
       'the', 'a', 'an', 'is', 'in', 'on', 'at', 'to', 'for', 'of', 'and',
       'or', 'but', 'with', 'it', 'this', 'that', 'was', 'are', 'be', 'i',

@@ -70,7 +70,14 @@ class _ExcerptQuoteCardState extends State<ExcerptQuoteCard>
     if (reduce) {
       _controller.value = 1.0;
     } else {
-      Future.microtask(() => _controller.forward());
+      // Only start animation in build to ensure context is available
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !MediaQuery.of(context).disableAnimations) {
+          _controller.forward();
+        } else if (mounted) {
+          _controller.value = 1.0;
+        }
+      });
     }
   }
 

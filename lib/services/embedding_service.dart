@@ -54,21 +54,23 @@ class EmbeddingService {
 
   String extractExcerpt(String content, String query, {int windowSize = 200}) {
     if (content.isEmpty) return '';
+    if (content.length <= windowSize) return content;
     if (query.isEmpty) {
-      return content.length > windowSize ? content.substring(0, windowSize) : content;
+      return '${content.substring(0, windowSize)}...';
     }
 
     final queryWords = query.toLowerCase().split(RegExp(r'\s+')).where((w) => w.length > 2).toList();
     if (queryWords.isEmpty) {
-      return content.length > windowSize ? '${content.substring(0, windowSize)}...' : content;
+      return '${content.substring(0, windowSize)}...';
     }
 
     final lowerContent = content.toLowerCase();
     int bestStart = 0;
     int bestScore = 0;
 
-    for (int i = 0; i < content.length - windowSize; i += 20) {
-      final window = lowerContent.substring(i, min(i + windowSize, lowerContent.length));
+    final maxStart = content.length - windowSize;
+    for (int i = 0; i <= maxStart; i += 20) {
+      final window = lowerContent.substring(i, i + windowSize);
       int score = 0;
       for (final word in queryWords) {
         if (window.contains(word)) score++;
@@ -82,7 +84,7 @@ class EmbeddingService {
     final end = min(bestStart + windowSize, content.length);
     final excerpt = content.substring(bestStart, end).trim();
     if (bestStart > 0 || end < content.length) {
-      return '...${excerpt}...';
+      return '...$excerpt...';
     }
     return excerpt;
   }
