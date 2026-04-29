@@ -36,21 +36,16 @@ class TagChip extends StatelessWidget {
             style: AppTextStyles.bodySmall.copyWith(color: AppColors.deepAction),
           ),
           if (isEditable && onDelete != null) ...[
-            const SizedBox(width: 4),
-            GestureDetector(
-              onTap: onDelete,
-              child: Container(
-                width: 16,
-                height: 16,
-                decoration: BoxDecoration(
-                  color: AppColors.deepAction.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.close,
-                  size: 10,
-                  color: AppColors.deepAction,
-                ),
+            const SizedBox(width: 2),
+            SizedBox(
+              width: 28,
+              height: 28,
+              child: IconButton(
+                padding: EdgeInsets.zero,
+                iconSize: 14,
+                tooltip: 'Remove tag',
+                onPressed: onDelete,
+                icon: const Icon(Icons.close, color: AppColors.deepAction),
               ),
             ),
           ],

@@ -8,9 +8,9 @@ class AiService {
 
   static const String _model = 'gpt-4o-mini';
   static const String _systemPrompt =
-      "You are Grepink AI, a personal knowledge assistant with a perfect memory. "
-      "Your job is to help the user recall what THEY have already learned and written. "
-      "When the user asks a question, look at the excerpts provided from their notes. "
+      'You are Grepink AI, a personal knowledge assistant with a perfect memory. '
+      'Your job is to help the user recall what THEY have already learned and written. '
+      'When the user asks a question, look at the excerpts provided from their notes. '
       "Always quote from their notes. Never invent information they didn't write. "
       "If their notes contain the answer, start with 'You've solved this before:'. "
       "If notes are partial, say 'You touched on this in your notes:'. "

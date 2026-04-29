@@ -51,9 +51,10 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
 
   Future<void> _loadNote() async {
     // Try provider first, fall back to database
-    Note? note = (ref.read(notesProvider).valueOrNull ?? [])
+    final candidates = (ref.read(notesProvider).valueOrNull ?? [])
         .where((n) => n.id == widget.noteId)
-        .firstOrNull;
+        .toList();
+    Note? note = candidates.isEmpty ? null : candidates.first;
 
     note ??= await DatabaseService.instance.getNoteById(widget.noteId!);
 

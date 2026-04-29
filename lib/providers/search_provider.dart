@@ -6,6 +6,7 @@ import 'settings_provider.dart';
 class SearchNotifier extends StateNotifier<SearchState> {
   final Ref _ref;
   bool _disposed = false;
+  int _searchId = 0;
 
   SearchNotifier(this._ref) : super(const SearchState());
 
@@ -20,6 +21,8 @@ class SearchNotifier extends StateNotifier<SearchState> {
       state = const SearchState();
       return;
     }
+
+    final id = ++_searchId;
 
     state = state.copyWith(
       query: query,
@@ -40,7 +43,7 @@ class SearchNotifier extends StateNotifier<SearchState> {
         aiEnabled: settings.aiEnabled,
         maxTokens: settings.maxTokens,
         onAiResponse: (aiResponse) {
-          if (!_disposed) {
+          if (!_disposed && _searchId == id) {
             state = state.copyWith(
               aiResponse: aiResponse,
               isAiLoading: false,
@@ -49,13 +52,13 @@ class SearchNotifier extends StateNotifier<SearchState> {
         },
       );
 
-      if (!_disposed) {
+      if (!_disposed && _searchId == id) {
         state = result.copyWith(
           isAiLoading: settings.aiEnabled && settings.apiKey.isNotEmpty,
         );
       }
     } catch (e) {
-      if (!_disposed) {
+      if (!_disposed && _searchId == id) {
         state = state.copyWith(
           isSearching: false,
           isAiLoading: false,

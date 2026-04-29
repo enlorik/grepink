@@ -12,6 +12,7 @@ class _MemoryPulseIndicatorState extends State<MemoryPulseIndicator>
     with TickerProviderStateMixin {
   final List<AnimationController> _controllers = [];
   final List<Animation<double>> _scales = [];
+  bool _animationsStarted = false;
 
   @override
   void initState() {
@@ -28,8 +29,16 @@ class _MemoryPulseIndicatorState extends State<MemoryPulseIndicator>
       _controllers.add(controller);
       _scales.add(scale);
     }
+  }
 
-    _startAnimations();
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final reduce = MediaQuery.of(context).disableAnimations;
+    if (!reduce && !_animationsStarted) {
+      _animationsStarted = true;
+      _startAnimations();
+    }
   }
 
   Future<void> _startAnimations() async {
@@ -97,6 +106,7 @@ class AiLoadingDots extends StatefulWidget {
 class _AiLoadingDotsState extends State<AiLoadingDots> with TickerProviderStateMixin {
   final List<AnimationController> _controllers = [];
   final List<Animation<double>> _scales = [];
+  bool _animationsStarted = false;
 
   @override
   void initState() {
@@ -112,7 +122,16 @@ class _AiLoadingDotsState extends State<AiLoadingDots> with TickerProviderStateM
       _controllers.add(c);
       _scales.add(scale);
     }
-    _startDots();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final reduce = MediaQuery.of(context).disableAnimations;
+    if (!reduce && !_animationsStarted) {
+      _animationsStarted = true;
+      _startDots();
+    }
   }
 
   Future<void> _startDots() async {
@@ -130,22 +149,23 @@ class _AiLoadingDotsState extends State<AiLoadingDots> with TickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
+    final reduce = MediaQuery.of(context).disableAnimations;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: List.generate(3, (i) {
+        final dot = Container(
+          width: 8,
+          height: 8,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            color: AppColors.primaryAccent,
+          ),
+        );
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 3),
-          child: ScaleTransition(
-            scale: _scales[i],
-            child: Container(
-              width: 8,
-              height: 8,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.primaryAccent,
-              ),
-            ),
-          ),
+          child: reduce
+              ? dot
+              : ScaleTransition(scale: _scales[i], child: dot),
         );
       }),
     );
