@@ -85,7 +85,7 @@ class NotesNotifier extends StateNotifier<AsyncValue<List<Note>>> {
     await loadNotes();
   }
 
-  void _triggerEmbedding(Note note) async {
+  Future<void> _triggerEmbedding(Note note) async {
     try {
       final settings = await _ref.read(settingsProvider.future);
       final apiKey = settings.apiKey;

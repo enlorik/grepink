@@ -32,7 +32,7 @@ class _MemoryPulseIndicatorState extends State<MemoryPulseIndicator>
     _startAnimations();
   }
 
-  void _startAnimations() async {
+  Future<void> _startAnimations() async {
     for (int i = 0; i < _controllers.length; i++) {
       await Future.delayed(Duration(milliseconds: i * 150));
       if (mounted) {
@@ -115,7 +115,7 @@ class _AiLoadingDotsState extends State<AiLoadingDots> with TickerProviderStateM
     _startDots();
   }
 
-  void _startDots() async {
+  Future<void> _startDots() async {
     for (int i = 0; i < _controllers.length; i++) {
       await Future.delayed(Duration(milliseconds: i * 150));
       if (mounted) _controllers[i].repeat(reverse: true);
