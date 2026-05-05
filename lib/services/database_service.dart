@@ -161,7 +161,7 @@ class DatabaseService {
     final db = await database;
     final maps = await db.query(
       'notes',
-      where: 'embedding IS NOT NULL',
+      where: 'embedding IS NOT NULL AND embedding_pending = 0',
     );
     return maps.map(Note.fromMap).toList();
   }

@@ -16,32 +16,12 @@ class GrepinkBottomNav extends StatefulWidget {
   State<GrepinkBottomNav> createState() => _GrepinkBottomNavState();
 }
 
-class _GrepinkBottomNavState extends State<GrepinkBottomNav>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _indicatorController;
-
-  @override
-  void initState() {
-    super.initState();
-    _indicatorController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 200),
-    );
-  }
-
-  @override
-  void dispose() {
-    _indicatorController.dispose();
-    super.dispose();
-  }
-
+class _GrepinkBottomNavState extends State<GrepinkBottomNav> {
   static const _items = [
     _NavItem(icon: Icons.home_outlined, activeIcon: Icons.home, label: 'Notes'),
     _NavItem(icon: Icons.search_outlined, activeIcon: Icons.search, label: 'Search'),
     _NavItem(icon: Icons.settings_outlined, activeIcon: Icons.settings, label: 'Settings'),
   ];
-
-  int _routeToNavIndex(int routeIndex) => routeIndex;
 
   @override
   Widget build(BuildContext context) {

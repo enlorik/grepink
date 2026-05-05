@@ -49,6 +49,7 @@ class NotesNotifier extends StateNotifier<AsyncValue<List<Note>>> {
     final updated = note.copyWith(
       updatedAt: DateTime.now(),
       embeddingPending: true,
+      clearEmbedding: true,
     );
     await DatabaseService.instance.updateNote(updated);
     await loadNotes();

@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AppSettings {
@@ -35,11 +36,13 @@ class SettingsNotifier extends AsyncNotifier<AppSettings> {
   static const _keyAiEnabled = 'ai_enabled';
   static const _keySimilarityThreshold = 'similarity_threshold';
 
+  static const _secureStorage = FlutterSecureStorage();
+
   @override
   Future<AppSettings> build() async {
     final prefs = await SharedPreferences.getInstance();
     return AppSettings(
-      apiKey: prefs.getString(_keyApiKey) ?? '',
+      apiKey: await _secureStorage.read(key: _keyApiKey) ?? '',
       maxTokens: prefs.getInt(_keyMaxTokens) ?? 120,
       aiEnabled: prefs.getBool(_keyAiEnabled) ?? true,
       similarityThreshold: prefs.getDouble(_keySimilarityThreshold) ?? 0.72,
@@ -47,8 +50,7 @@ class SettingsNotifier extends AsyncNotifier<AppSettings> {
   }
 
   Future<void> setApiKey(String key) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_keyApiKey, key);
+    await _secureStorage.write(key: _keyApiKey, value: key);
     state = AsyncData((await future).copyWith(apiKey: key));
   }
 

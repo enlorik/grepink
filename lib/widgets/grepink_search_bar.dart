@@ -47,7 +47,15 @@ class _GrepinkSearchBarState extends State<GrepinkSearchBar>
       value: 1.0,
     );
     _fadeAnimation = CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut);
-    _startRotation();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final reduce = MediaQuery.of(context).disableAnimations;
+    if (!reduce && _timer == null) {
+      _startRotation();
+    }
   }
 
   void _startRotation() {
@@ -133,16 +141,16 @@ class _GrepinkSearchBarState extends State<GrepinkSearchBar>
             ),
           ),
           if (_controller.text.isNotEmpty)
-            GestureDetector(
-              onTap: () {
+            IconButton(
+              icon: const Icon(Icons.close, color: AppColors.secondaryText, size: 18),
+              tooltip: 'Clear search',
+              onPressed: () {
                 _controller.clear();
                 setState(() {});
                 widget.onChanged?.call('');
               },
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 12),
-                child: Icon(Icons.close, color: AppColors.secondaryText, size: 18),
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
             )
           else
             const SizedBox(width: 16),

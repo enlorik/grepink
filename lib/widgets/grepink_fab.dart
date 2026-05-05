@@ -61,9 +61,9 @@ class _GrepinkFabState extends State<GrepinkFab>
   Widget build(BuildContext context) {
     final reduce = MediaQuery.of(context).disableAnimations;
 
-    Widget child;
+    Widget iconChild;
     if (widget.isSaving) {
-      child = const SizedBox(
+      iconChild = const SizedBox(
         width: 24,
         height: 24,
         child: CircularProgressIndicator(
@@ -72,15 +72,17 @@ class _GrepinkFabState extends State<GrepinkFab>
         ),
       );
     } else if (widget.showSuccess) {
-      child = const Icon(Icons.check, color: AppColors.surface, size: 28);
+      iconChild = const Icon(Icons.check, color: AppColors.surface, size: 28);
     } else {
-      child = Icon(widget.icon, color: AppColors.surface, size: 28);
+      iconChild = Icon(widget.icon, color: AppColors.surface, size: 28);
     }
 
-    final fab = GestureDetector(
-      onTap: widget.onPressed,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 400),
+    final fab = FloatingActionButton(
+      onPressed: widget.isSaving ? null : widget.onPressed,
+      tooltip: widget.showSuccess ? 'Saved' : 'Save',
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      child: Container(
         width: 56,
         height: 56,
         decoration: BoxDecoration(
@@ -98,7 +100,7 @@ class _GrepinkFabState extends State<GrepinkFab>
             ),
           ],
         ),
-        child: Center(child: child),
+        child: Center(child: iconChild),
       ),
     );
 
