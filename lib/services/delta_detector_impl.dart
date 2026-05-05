@@ -81,8 +81,8 @@ class DeltaDetectorImpl implements DeltaDetector {
   /// Returns true when [text] is an exact (case-insensitive, trimmed) match
   /// to any entry in [candidates].
   bool isExactDuplicate(String text, List<String> candidates) {
-    final normalised = text.trim().toLowerCase();
-    return candidates.any((c) => c.trim().toLowerCase() == normalised);
+    final normalized = text.trim().toLowerCase();
+    return candidates.any((c) => c.trim().toLowerCase() == normalized);
   }
 
   /// Jaccard similarity between two texts: |intersection| / |union| of word sets.
