@@ -44,6 +44,7 @@ class BraveEvidenceProvider implements WebEvidenceProvider {
   @override
   Future<List<EvidenceItem>> fetch(String question) async {
     if (question.trim().isEmpty) return [];
+    if (_apiKey.trim().isEmpty) return [];
 
     final uri = Uri.parse(_baseUrl).replace(
       queryParameters: {
@@ -54,43 +55,53 @@ class BraveEvidenceProvider implements WebEvidenceProvider {
       },
     );
 
-    final response = await _httpClient.get(
-      uri,
-      headers: {
-        'Accept': 'application/json',
-        'Accept-Encoding': 'gzip',
-        'X-Subscription-Token': _apiKey,
-      },
-    );
-
-    if (response.statusCode != 200) {
-      throw BraveApiException(
-        statusCode: response.statusCode,
-        body: response.body,
+    http.Response response;
+    try {
+      response = await _httpClient.get(
+        uri,
+        headers: {
+          'Accept': 'application/json',
+          'Accept-Encoding': 'gzip',
+          'X-Subscription-Token': _apiKey,
+        },
       );
+    } catch (_) {
+      return [];
     }
 
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode != 200) return [];
+
+    Map<String, dynamic> body;
+    try {
+      body = jsonDecode(response.body) as Map<String, dynamic>;
+    } catch (_) {
+      return [];
+    }
+
     final webBlock = body['web'] as Map<String, dynamic>?;
     final rawResults = webBlock?['results'] as List<dynamic>? ?? [];
 
-    return rawResults.indexed
-        .map((indexed) {
-          final i = indexed.$1;
-          final r = indexed.$2 as Map<String, dynamic>;
-          final url = r['url'] as String? ?? '';
-          final title = r['title'] as String? ?? '(no title)';
-          final description = r['description'] as String? ?? '';
+    final items = <EvidenceItem>[];
+    var rank = 0;
+    for (final raw in rawResults) {
+      final r = raw as Map<String, dynamic>;
+      final url = (r['url'] as String? ?? '').trim();
+      final title = (r['title'] as String? ?? '').trim();
+      final description = (r['description'] as String? ?? '').trim();
 
-          return EvidenceItem(
-            id: 'brave_${i}_${url.hashCode.abs()}',
-            type: EvidenceType.webSearch,
-            title: title,
-            content: description,
-            sourceUrl: url.isNotEmpty ? url : null,
-          );
-        })
-        .toList();
+      if (url.isEmpty || title.isEmpty || description.isEmpty) continue;
+
+      items.add(EvidenceItem(
+        id: 'brave_${rank}_${url.hashCode.abs()}',
+        type: EvidenceType.webSearch,
+        title: title,
+        content: description,
+        sourceUrl: url,
+        relevanceScore: (1.0 - rank * 0.1).clamp(0.1, 1.0),
+      ));
+      rank++;
+    }
+    return items;
   }
 }
 

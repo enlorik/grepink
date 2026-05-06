@@ -130,34 +130,96 @@ void main() {
       expect(ids, hasLength(results.length));
     });
 
-    test('missing description falls back to empty string', () async {
+    test('missing description is skipped', () async {
       final provider = _provider((_) async => _braveResponse([
             {'title': 'No desc', 'url': 'https://a.com'},
           ]));
 
       final results = await provider.fetch('q');
 
-      expect(results.first.content, '');
+      expect(results, isEmpty);
     });
 
-    test('missing url sets sourceUrl to null', () async {
+    test('blank description is skipped', () async {
+      final provider = _provider((_) async => _braveResponse([
+            {'title': 'Blank desc', 'url': 'https://a.com', 'description': '   '},
+          ]));
+
+      final results = await provider.fetch('q');
+
+      expect(results, isEmpty);
+    });
+
+    test('missing url is skipped', () async {
       final provider = _provider((_) async => _braveResponse([
             {'title': 'No URL', 'description': 'Some description'},
           ]));
 
       final results = await provider.fetch('q');
 
-      expect(results.first.sourceUrl, isNull);
+      expect(results, isEmpty);
     });
 
-    test('missing title falls back to (no title)', () async {
+    test('blank url is skipped', () async {
+      final provider = _provider((_) async => _braveResponse([
+            {'title': 'Blank URL', 'url': '   ', 'description': 'Some description'},
+          ]));
+
+      final results = await provider.fetch('q');
+
+      expect(results, isEmpty);
+    });
+
+    test('missing title is skipped', () async {
       final provider = _provider((_) async => _braveResponse([
             {'url': 'https://a.com', 'description': 'desc'},
           ]));
 
       final results = await provider.fetch('q');
 
-      expect(results.first.title, '(no title)');
+      expect(results, isEmpty);
+    });
+
+    test('blank title is skipped', () async {
+      final provider = _provider((_) async => _braveResponse([
+            {'title': '   ', 'url': 'https://a.com', 'description': 'desc'},
+          ]));
+
+      final results = await provider.fetch('q');
+
+      expect(results, isEmpty);
+    });
+
+    test('only valid entries are returned when mixed with invalid ones', () async {
+      final provider = _provider((_) async => _braveResponse([
+            {'title': 'Valid', 'url': 'https://a.com', 'description': 'good desc'},
+            {'title': 'No URL', 'description': 'missing url'},
+            {'title': 'Also Valid', 'url': 'https://b.com', 'description': 'also good'},
+          ]));
+
+      final results = await provider.fetch('q');
+
+      expect(results, hasLength(2));
+      expect(results[0].title, 'Valid');
+      expect(results[1].title, 'Also Valid');
+    });
+
+    test('relevanceScore is assigned in descending order', () async {
+      final provider = _provider((_) async => _braveResponse([
+            {'title': 'First', 'url': 'https://a.com', 'description': 'desc a'},
+            {'title': 'Second', 'url': 'https://b.com', 'description': 'desc b'},
+            {'title': 'Third', 'url': 'https://c.com', 'description': 'desc c'},
+          ]));
+
+      final results = await provider.fetch('q');
+
+      expect(results[0].relevanceScore, closeTo(1.0, 0.001));
+      expect(results[1].relevanceScore, closeTo(0.9, 0.001));
+      expect(results[2].relevanceScore, closeTo(0.8, 0.001));
+      expect(results[0].relevanceScore,
+          greaterThan(results[1].relevanceScore));
+      expect(results[1].relevanceScore,
+          greaterThan(results[2].relevanceScore));
     });
   });
 
@@ -252,21 +314,52 @@ void main() {
   });
 
   group('BraveEvidenceProvider – error handling', () {
-    test('throws BraveApiException on non-200 response', () async {
+    test('empty API key returns empty list without HTTP call', () async {
+      var called = false;
+      final provider = BraveEvidenceProvider(
+        apiKey: '   ',
+        httpClient: _FakeHttpClient((_) async {
+          called = true;
+          return _braveResponse([]);
+        }),
+      );
+
+      final results = await provider.fetch('test');
+
+      expect(results, isEmpty);
+      expect(called, isFalse);
+    });
+
+    test('non-200 response returns empty list', () async {
       final provider = _provider((_) async => http.Response(
             '{"error":"unauthorized"}',
             401,
             headers: {'content-type': 'application/json'},
           ));
 
-      await expectLater(
-        provider.fetch('test'),
-        throwsA(isA<BraveApiException>().having(
-          (e) => e.statusCode,
-          'statusCode',
-          401,
-        )),
-      );
+      final results = await provider.fetch('test');
+
+      expect(results, isEmpty);
+    });
+
+    test('malformed JSON returns empty list', () async {
+      final provider = _provider((_) async => http.Response(
+            'not-valid-json{{{',
+            200,
+            headers: {'content-type': 'application/json'},
+          ));
+
+      final results = await provider.fetch('test');
+
+      expect(results, isEmpty);
+    });
+
+    test('network exception returns empty list', () async {
+      final provider = _provider((_) async => throw Exception('Network error'));
+
+      final results = await provider.fetch('test');
+
+      expect(results, isEmpty);
     });
 
     test('BraveApiException toString includes status code', () {
