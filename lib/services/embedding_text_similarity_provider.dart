@@ -22,6 +22,11 @@ class EmbeddingTextSimilarityProvider implements TextSimilarityProvider {
         _embeddingService = embeddingService ?? EmbeddingService.instance,
         _fallback = fallback ?? const JaccardTextSimilarityProvider();
 
+  // Dart's single-threaded event loop makes putIfAbsent safe for concurrent
+  // async callers: the factory is called synchronously, so the Future is
+  // stored before any awaiting code can re-enter. The cache is intentionally
+  // kept simple (no eviction) per the "lightweight caching" requirement; for
+  // long-running use-cases a bounded LRU cache could be substituted here.
   Future<List<double>> _embed(String text) =>
       _cache.putIfAbsent(text, () => _embeddingService.embed(text, _apiKey));
 
