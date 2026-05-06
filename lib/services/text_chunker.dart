@@ -24,28 +24,25 @@ class TextChunker {
   /// Returns a list of non-empty [TextChunk]s derived from [item].
   ///
   /// Strategy:
-  /// 1. Split on blank-line paragraph boundaries first.
-  /// 2. If any resulting segment is still longer than [_maxChunkLength],
+  /// 1. Return [] immediately if [item.content] is empty or whitespace-only.
+  /// 2. Split on blank-line paragraph boundaries first.
+  /// 3. If any resulting segment is still longer than [_maxChunkLength],
   ///    split further on sentence-ending punctuation (`. `, `? `, `! `).
-  /// 3. Empty or whitespace-only chunks are ignored.
+  /// 4. If any segment is still longer than [_maxChunkLength], hard-wrap on
+  ///    whitespace near the boundary (or at exactly [_maxChunkLength] when no
+  ///    whitespace is nearby).
+  /// 5. Empty or whitespace-only chunks are ignored.
   List<TextChunk> chunk(EvidenceItem item) {
+    if (item.content.trim().isEmpty) return [];
+
     final id = item.sourceNoteId ?? item.id;
     final segments = _splitIntoParagraphs(item.content)
         .expand((para) => _splitLongSegment(para))
+        .expand((seg) => _hardWrap(seg))
         .where((s) => s.trim().isNotEmpty)
         .toList();
 
-    if (segments.isEmpty) {
-      // Fall back to the whole content as a single chunk when nothing is splittable.
-      return [
-        TextChunk(
-          content: item.content.trim(),
-          sourceNoteId: id,
-          sourceTitle: item.title,
-          sourceUrl: item.sourceUrl,
-        ),
-      ];
-    }
+    if (segments.isEmpty) return [];
 
     return segments
         .map((s) => TextChunk(
@@ -80,5 +77,24 @@ class TextChunker {
 
     if (buffer.isNotEmpty) chunks.add(buffer.toString().trim());
     return chunks.isEmpty ? [segment] : chunks;
+  }
+
+  List<String> _hardWrap(String segment) {
+    if (segment.length <= _maxChunkLength) return [segment];
+
+    final chunks = <String>[];
+    var remaining = segment;
+    while (remaining.length > _maxChunkLength) {
+      // Try to break on the last whitespace at or before the limit.
+      var breakAt = remaining.lastIndexOf(RegExp(r'\s'), _maxChunkLength);
+      if (breakAt <= 0) {
+        // No whitespace found; hard-cut at the limit.
+        breakAt = _maxChunkLength;
+      }
+      chunks.add(remaining.substring(0, breakAt).trimRight());
+      remaining = remaining.substring(breakAt).trimLeft();
+    }
+    if (remaining.isNotEmpty) chunks.add(remaining);
+    return chunks;
   }
 }

@@ -33,12 +33,5 @@ class JaccardTextSimilarityProvider implements TextSimilarityProvider {
   }
 }
 
-/// Test-only similarity provider that always returns a fixed score.
-class FakeTextSimilarityProvider implements TextSimilarityProvider {
-  final double _score;
-
-  const FakeTextSimilarityProvider(this._score);
-
-  @override
-  Future<double> similarity(String a, String b) async => _score;
-}
+// FakeTextSimilarityProvider has been moved to test/helpers/fake_text_similarity_provider.dart.
+// It is test/demo-only and should not be used in production code.
