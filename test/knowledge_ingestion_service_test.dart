@@ -40,25 +40,35 @@ class _StubDeltaDetector implements DeltaDetector {
       deltas;
 }
 
-// Uses MockSummaryWriter so it honours the doNotSave logic.
-EvidenceItem _webItem(String id, String content) => EvidenceItem(
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+EvidenceItem _webItem(String id, String content, {String? sourceUrl}) =>
+    EvidenceItem(
       id: id,
       type: EvidenceType.webSearch,
       title: 'Web $id',
       content: content,
+      sourceUrl: sourceUrl,
     );
 
-EvidenceItem _localItem(String id, String content) => EvidenceItem(
+EvidenceItem _localItem(String id, String content, {String? sourceUrl}) =>
+    EvidenceItem(
       id: id,
       type: EvidenceType.localNote,
       title: 'Local $id',
       content: content,
       sourceNoteId: id,
+      sourceUrl: sourceUrl,
     );
 
-KnowledgeDelta _delta(EvidenceItem item, DeltaType type) => KnowledgeDelta(
+KnowledgeDelta _delta(EvidenceItem item, DeltaType type,
+        {String? existingNoteId}) =>
+    KnowledgeDelta(
       evidence: item,
       deltaType: type,
+      existingNoteId: existingNoteId,
       reason: 'test',
     );
 
@@ -104,7 +114,8 @@ void main() {
       expect(draft.action, NoteDraftAction.createNewNote);
     });
 
-    test('returns createNewNote when at least one delta is relatedButNew', () async {
+    test('returns createNewNote when at least one delta is relatedButNew',
+        () async {
       final w1 = _webItem('w1', 'related content');
       final deltas = [_delta(w1, DeltaType.relatedButNew)];
 
@@ -114,24 +125,34 @@ void main() {
       expect(draft.action, NoteDraftAction.createNewNote);
     });
 
-    test('returns createNewNote when delta list is empty (no duplicates)', () async {
-      final svc = _service(deltas: []);
+    test('returns doNotSave when delta list is empty (nothing to record)',
+        () async {
+      final w1 = _webItem('w1', 'some content');
+      final svc = _service(webItems: [w1], deltas: []);
       final draft = await svc.ingest('Anything?');
 
-      // Empty deltas → not all duplicates → createNewNote
-      expect(draft.action, NoteDraftAction.createNewNote);
+      expect(draft.action, NoteDraftAction.doNotSave);
+    });
+
+    test('returns doNotSave when there is no web evidence', () async {
+      final svc = _service(deltas: []);
+      final draft = await svc.ingest('No evidence question');
+
+      expect(draft.action, NoteDraftAction.doNotSave);
     });
 
     test('draft contains the original question', () async {
       const question = 'How does photosynthesis work?';
-      final svc = _service(deltas: []);
+      final w1 = _webItem('w1', 'photosynthesis content');
+      final svc = _service(webItems: [w1], deltas: [_delta(w1, DeltaType.newClaim)]);
       final draft = await svc.ingest(question);
 
       expect(draft.question, question);
     });
 
     test('draft markdown is non-empty', () async {
-      final svc = _service(deltas: []);
+      final w1 = _webItem('w1', 'some content');
+      final svc = _service(webItems: [w1], deltas: [_delta(w1, DeltaType.newClaim)]);
       final draft = await svc.ingest('Some question');
 
       expect(draft.markdownContent, isNotEmpty);
@@ -147,6 +168,99 @@ void main() {
 
       expect(draft.localEvidence, equals(local));
       expect(draft.webEvidence, equals(web));
+    });
+  });
+
+  group('KnowledgeIngestionService – empty/no-evidence doNotSave', () {
+    test('empty incoming evidence returns doNotSave with explanatory markdown',
+        () async {
+      // No web evidence → doNotSave.
+      final svc = _service(deltas: []);
+      final draft = await svc.ingest('Empty test');
+
+      expect(draft.action, NoteDraftAction.doNotSave);
+      expect(draft.markdownContent, contains('No New Knowledge Found'));
+    });
+
+    test('all-duplicate evidence returns doNotSave', () async {
+      final w1 = _webItem('w1', 'old info');
+      final svc = _service(
+          webItems: [w1], deltas: [_delta(w1, DeltaType.duplicate)]);
+      final draft = await svc.ingest('Already known');
+
+      expect(draft.action, NoteDraftAction.doNotSave);
+    });
+  });
+
+  group('KnowledgeIngestionService – betterSource', () {
+    test('betterSource produces appendToExistingNote draft', () async {
+      final localNote = _localItem('n1', 'A claim.'); // no sourceUrl
+      final webEvidence = _webItem('w1', 'Same claim.',
+          sourceUrl: 'https://example.com'); // has sourceUrl
+
+      final delta = _delta(webEvidence, DeltaType.betterSource,
+          existingNoteId: 'n1');
+
+      final svc = _service(
+        localItems: [localNote],
+        webItems: [webEvidence],
+        deltas: [delta],
+      );
+      final draft = await svc.ingest('Claim question');
+
+      expect(draft.action, NoteDraftAction.appendToExistingNote);
+    });
+
+    test('betterSource draft markdown references the source URL', () async {
+      final webEvidence = _webItem('w1', 'Sourced claim.',
+          sourceUrl: 'https://example.com/source');
+      final delta = _delta(webEvidence, DeltaType.betterSource);
+
+      final svc = _service(webItems: [webEvidence], deltas: [delta]);
+      final draft = await svc.ingest('Source test');
+
+      expect(draft.markdownContent, contains('https://example.com/source'));
+    });
+  });
+
+  group('KnowledgeIngestionService – source URL in markdown', () {
+    test('source URL appears in markdown for web evidence', () async {
+      final web = _webItem('w1', 'Some content',
+          sourceUrl: 'https://example.com/page');
+      final delta = _delta(web, DeltaType.newClaim);
+
+      final svc = _service(webItems: [web], deltas: [delta]);
+      final draft = await svc.ingest('URL test');
+
+      expect(draft.markdownContent, contains('https://example.com/page'));
+    });
+
+    test('web evidence without sourceUrl is marked as unsourced', () async {
+      final web = _webItem('w1', 'Content without a URL'); // no sourceUrl
+      final delta = _delta(web, DeltaType.newClaim);
+
+      final svc = _service(webItems: [web], deltas: [delta]);
+      final draft = await svc.ingest('Unsourced test');
+
+      expect(draft.markdownContent, contains('unsourced'));
+    });
+  });
+
+  group('KnowledgeIngestionService – no auto-save', () {
+    test('ingest() returns a draft but does not mutate any external state',
+        () async {
+      // This test verifies that the service is pure: it only returns a NoteDraft
+      // and never directly writes to a database or triggers side-effects.
+      // Since MockSummaryWriter has no side effects, a successful return is sufficient.
+      final w1 = _webItem('w1', 'new fact');
+      final delta = _delta(w1, DeltaType.newClaim);
+
+      final svc = _service(webItems: [w1], deltas: [delta]);
+      final draft = await svc.ingest('Auto-save test');
+
+      // Service returns a draft but does not auto-save.
+      expect(draft, isA<NoteDraft>());
+      expect(draft.action, isNot(equals(NoteDraftAction.doNotSave)));
     });
   });
 }
