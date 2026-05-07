@@ -210,7 +210,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 border: Border.all(color: AppColors.dividerBorder),
               ),
               child: isAiLoading && aiResponse == null
-                  ? Row(
+                  ? const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         const MemoryPulseIndicator(),
