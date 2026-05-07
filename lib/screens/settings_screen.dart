@@ -109,7 +109,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     child: Text('v1.1', style: AppTextStyles.bodySmall.copyWith(color: AppColors.deepAction)),
                 ),
                 const SizedBox(width: 8),
-                Switch(
+                const Switch(
                   value: false,
                   onChanged: null,
                   activeThumbColor: AppColors.primaryAction,

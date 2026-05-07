@@ -220,7 +220,7 @@ void main() {
           'Photosynthesis is the process by which plants convert sunlight '
           'into chemical energy. Chlorophyll absorbs light and drives the '
           'conversion of carbon dioxide and water into glucose and oxygen.';
-      final longNoteContent = '$intro\n\n$relevantParagraph';
+      const longNoteContent = '$intro\n\n$relevantParagraph';
 
       // The fake score of 0.91 simulates embedding similarity finding the right paragraph.
       final detector =
