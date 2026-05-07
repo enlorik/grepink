@@ -30,7 +30,7 @@ class _GrepinkBottomNavState extends State<GrepinkBottomNav> {
         color: AppColors.surface,
         boxShadow: [
           BoxShadow(
-            color: AppColors.primaryAccent.withOpacity(0.12),
+            color: AppColors.primaryAccent.withValues(alpha: 0.12),
             blurRadius: 16,
             offset: const Offset(0, -4),
           ),

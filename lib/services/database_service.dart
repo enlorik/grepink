@@ -190,11 +190,11 @@ class DatabaseService {
   Future<void> clearAll() async {
     final db = await database;
     await db.delete('notes');
-    await db.execute("DELETE FROM notes_fts");
+    await db.execute('DELETE FROM notes_fts');
   }
 
   Future<void> reindexFts() async {
     final db = await database;
-    await db.execute("INSERT INTO notes_fts(notes_fts) VALUES('rebuild')");
+    await db.execute('INSERT INTO notes_fts(notes_fts) VALUES(\'rebuild\')');
   }
 }

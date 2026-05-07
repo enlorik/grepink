@@ -75,7 +75,7 @@ class _MemoryPulseIndicatorState extends State<MemoryPulseIndicator>
               height: size,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.memoryPulse.withOpacity(0.3 - i * 0.08),
+                color: AppColors.memoryPulse.withValues(alpha: 0.3 - i * 0.08),
               ),
             );
           }
@@ -86,7 +86,7 @@ class _MemoryPulseIndicatorState extends State<MemoryPulseIndicator>
               height: size,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.memoryPulse.withOpacity(0.3 - i * 0.08),
+                color: AppColors.memoryPulse.withValues(alpha: 0.3 - i * 0.08),
               ),
             ),
           );
@@ -137,13 +137,17 @@ class _AiLoadingDotsState extends State<AiLoadingDots> with TickerProviderStateM
   Future<void> _startDots() async {
     for (int i = 0; i < _controllers.length; i++) {
       await Future.delayed(Duration(milliseconds: i * 150));
-      if (mounted) _controllers[i].repeat(reverse: true);
+      if (mounted) {
+        _controllers[i].repeat(reverse: true);
+      }
     }
   }
 
   @override
   void dispose() {
-    for (final c in _controllers) c.dispose();
+    for (final c in _controllers) {
+      c.dispose();
+    }
     super.dispose();
   }
 

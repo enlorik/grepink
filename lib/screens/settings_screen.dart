@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../models/note.dart';
 import '../providers/notes_provider.dart';
 import '../providers/settings_provider.dart';
 import '../services/database_service.dart';
@@ -102,18 +101,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppColors.warning.withOpacity(0.3),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text('v1.1', style: AppTextStyles.bodySmall.copyWith(color: AppColors.deepAction)),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.warning.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text('v1.1', style: AppTextStyles.bodySmall.copyWith(color: AppColors.deepAction)),
                 ),
                 const SizedBox(width: 8),
                 Switch(
                   value: false,
                   onChanged: null,
-                  activeColor: AppColors.primaryAction,
+                  activeThumbColor: AppColors.primaryAction,
                 ),
               ],
             ),
@@ -179,7 +178,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               onChanged: (v) {
                 ref.read(settingsProvider.notifier).setAiEnabled(v);
               },
-              activeColor: AppColors.primaryAction,
+              activeThumbColor: AppColors.primaryAction,
             ),
           ),
           _buildSettingRow(
@@ -273,7 +272,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _buildSettingRow(
             title: 'Clear All Notes',
             trailing: const Icon(Icons.delete_outline, color: AppColors.error),
-            onTap: () => _confirmClearAll(context),
+            onTap: _confirmClearAll,
           ),
         ]),
 
@@ -378,7 +377,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  Future<void> _confirmClearAll(BuildContext context) async {
+  Future<void> _confirmClearAll() async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -400,14 +399,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     );
 
-    if (confirm == true && mounted) {
-      await DatabaseService.instance.clearAll();
-      await ref.read(notesProvider.notifier).loadNotes();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('All notes cleared')),
-        );
-      }
+    if (confirm != true) {
+      return;
     }
+
+    await DatabaseService.instance.clearAll();
+    await ref.read(notesProvider.notifier).loadNotes();
+    if (!mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('All notes cleared')),
+    );
   }
 }

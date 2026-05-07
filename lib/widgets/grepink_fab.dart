@@ -94,7 +94,7 @@ class _GrepinkFabState extends State<GrepinkFab>
           ),
           boxShadow: [
             BoxShadow(
-              color: AppColors.primaryAction.withOpacity(0.4),
+              color: AppColors.primaryAction.withValues(alpha: 0.4),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),

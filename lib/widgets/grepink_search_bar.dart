@@ -91,7 +91,7 @@ class _GrepinkSearchBarState extends State<GrepinkSearchBar>
         border: Border.all(color: AppColors.dividerBorder),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primaryAccent.withOpacity(0.08),
+            color: AppColors.primaryAccent.withValues(alpha: 0.08),
             blurRadius: 12,
             offset: const Offset(0, 2),
           ),
