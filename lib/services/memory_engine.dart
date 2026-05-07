@@ -120,8 +120,12 @@ class MemoryEngine {
     // Collect all unique note IDs
     final allIds = {...semanticScores.keys, ...ftsScores.keys};
     final Map<String, Note> noteMap = {};
-    for (final r in semanticResults) noteMap[r.note.id] = r.note;
-    for (final r in ftsResults) noteMap[r.note.id] = r.note;
+    for (final r in semanticResults) {
+      noteMap[r.note.id] = r.note;
+    }
+    for (final r in ftsResults) {
+      noteMap[r.note.id] = r.note;
+    }
 
     final scored = <_RankedResult>[];
     for (final id in allIds) {

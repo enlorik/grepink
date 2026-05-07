@@ -19,7 +19,7 @@ class NotesListScreen extends ConsumerStatefulWidget {
 class _NotesListScreenState extends ConsumerState<NotesListScreen> {
   final Map<String, bool> _deletingIds = {};
 
-  int _navIndex = 0;
+  final int _navIndex = 0;
 
   void _onNavTap(int index) {
     if (index == 0) return;

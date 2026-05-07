@@ -195,7 +195,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   Widget build(BuildContext context) {
     return PopScope(
       canPop: false,
-      onPopInvoked: (didPop) async {
+      onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
         if (await _onWillPop() && context.mounted) {
           context.pop();
@@ -257,7 +257,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           IconButton(
             icon: const Icon(Icons.arrow_back, color: AppColors.deepAction),
             onPressed: () async {
-              if (await _onWillPop()) context.pop();
+              if (await _onWillPop() && mounted) {
+                context.pop();
+              }
             },
           ),
           Expanded(
@@ -373,11 +375,11 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           runSpacing: 6,
           children: _keywords.map((kw) => Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: AppColors.keywordHighlight.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.keywordHighlight.withOpacity(0.5)),
-            ),
+             decoration: BoxDecoration(
+               color: AppColors.keywordHighlight.withValues(alpha: 0.2),
+               borderRadius: BorderRadius.circular(20),
+               border: Border.all(color: AppColors.keywordHighlight.withValues(alpha: 0.5)),
+             ),
             child: Text(
               kw,
               style: AppTextStyles.bodySmall.copyWith(color: AppColors.deepAction),

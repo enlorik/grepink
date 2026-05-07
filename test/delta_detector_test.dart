@@ -2,7 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:grepink/models/evidence_item.dart';
 import 'package:grepink/models/knowledge_delta.dart';
 import 'package:grepink/services/delta_detector_impl.dart';
-import 'package:grepink/services/text_similarity_provider.dart';
 import 'helpers/fake_text_similarity_provider.dart';
 
 EvidenceItem _item(

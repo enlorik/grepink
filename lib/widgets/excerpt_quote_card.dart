@@ -110,9 +110,9 @@ class _ExcerptQuoteCardState extends State<ExcerptQuoteCard>
           borderRadius: BorderRadius.circular(12),
           border: Border(
             left: const BorderSide(color: AppColors.excerptQuoteBorder, width: 3),
-            top: BorderSide(color: AppColors.excerptQuoteBorder.withOpacity(0.3)),
-            right: BorderSide(color: AppColors.excerptQuoteBorder.withOpacity(0.3)),
-            bottom: BorderSide(color: AppColors.excerptQuoteBorder.withOpacity(0.3)),
+            top: BorderSide(color: AppColors.excerptQuoteBorder.withValues(alpha: 0.3)),
+            right: BorderSide(color: AppColors.excerptQuoteBorder.withValues(alpha: 0.3)),
+            bottom: BorderSide(color: AppColors.excerptQuoteBorder.withValues(alpha: 0.3)),
           ),
         ),
         padding: const EdgeInsets.all(16),
