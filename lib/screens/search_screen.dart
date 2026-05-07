@@ -213,9 +213,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   ? const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const MemoryPulseIndicator(),
-                        const SizedBox(width: 12),
-                        const AiLoadingDots(),
+                        MemoryPulseIndicator(),
+                        SizedBox(width: 12),
+                        AiLoadingDots(),
                       ],
                     )
                   : aiResponse != null
