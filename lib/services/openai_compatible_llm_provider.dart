@@ -22,6 +22,7 @@ class OpenAICompatibleLlmProvider implements LlmProvider {
 
   @override
   Future<LlmResponse> complete(LlmRequest request) async {
+    final apiKey = _apiKey.trim();
     http.Response response;
     try {
       response = await _httpClient.post(
@@ -29,7 +30,7 @@ class OpenAICompatibleLlmProvider implements LlmProvider {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          if (_apiKey.trim().isNotEmpty) 'Authorization': 'Bearer ${_apiKey.trim()}',
+          if (apiKey.isNotEmpty) 'Authorization': 'Bearer $apiKey',
         },
         body: jsonEncode({
           'model': _model,

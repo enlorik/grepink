@@ -135,7 +135,8 @@ class StructuredSummaryWriter implements SummaryWriter {
     buffer.writeln('- Include a section for new knowledge or state that there is none.');
     buffer.writeln('- Include a section for better sources/citations.');
     buffer.writeln('- Include a final "Suggested markdown to save" section.');
-    buffer.writeln('- Preserve source URLs in the suggested markdown when claims come from web evidence.');
+    buffer.writeln(
+        '- preserve source URLs in the suggested markdown when claims come from web evidence.');
     return buffer.toString().trimRight();
   }
 

@@ -3,14 +3,12 @@ class LlmRequest {
   final String userPrompt;
   final int maxTokens;
   final double temperature;
-  final bool expectsJson;
 
   LlmRequest({
     required this.systemPrompt,
     required this.userPrompt,
     this.maxTokens = 800,
     this.temperature = 0.2,
-    this.expectsJson = false,
   });
 }
 
@@ -26,7 +24,9 @@ class LlmResponse {
     required this.model,
     Map<String, Object?>? rawMetadata,
   }) : rawMetadata =
-            rawMetadata == null ? null : Map<String, Object?>.unmodifiable(rawMetadata);
+            rawMetadata == null
+                ? null
+                : Map<String, Object?>.unmodifiable(rawMetadata);
 
   factory LlmResponse.empty({
     required String providerName,
