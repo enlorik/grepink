@@ -18,12 +18,17 @@ class LlmProviderConfig {
 
   /// Base URL for OpenAI-compatible providers.
   ///
+  /// Ignored for [LlmProviderKind.mock].
+  ///
   /// Examples:
   ///   - https://api.openai.com/v1   (OpenAI)
   ///   - http://localhost:1234/v1     (local llama.cpp / LM Studio)
   ///   - http://127.0.0.1:11434/v1   (Ollama)
   final String baseUrl;
 
+  /// Model identifier forwarded to the provider (e.g. `gpt-4o-mini`).
+  ///
+  /// Ignored for [LlmProviderKind.mock].
   final String model;
 
   /// Maximum tokens to request.  Clamped to [kMinTokens]..[kMaxTokens].
