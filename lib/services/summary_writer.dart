@@ -11,6 +11,28 @@ abstract class SummaryWriter {
   });
 }
 
+NoteDraftAction chooseNoteDraftAction({
+  required List<EvidenceItem> webEvidence,
+  required List<KnowledgeDelta> deltas,
+}) {
+  if (webEvidence.isEmpty) return NoteDraftAction.doNotSave;
+  if (deltas.isEmpty) return NoteDraftAction.doNotSave;
+
+  final allDuplicates = deltas.every((d) => d.deltaType == DeltaType.duplicate);
+  if (allDuplicates) return NoteDraftAction.doNotSave;
+
+  final hasNewContent = deltas.any((d) =>
+      d.deltaType == DeltaType.newClaim ||
+      d.deltaType == DeltaType.relatedButNew);
+  if (hasNewContent) return NoteDraftAction.createNewNote;
+
+  final hasBetterSource =
+      deltas.any((d) => d.deltaType == DeltaType.betterSource);
+  if (hasBetterSource) return NoteDraftAction.appendToExistingNote;
+
+  return NoteDraftAction.doNotSave;
+}
+
 class MockSummaryWriter implements SummaryWriter {
   @override
   Future<NoteDraft> write({
@@ -19,7 +41,10 @@ class MockSummaryWriter implements SummaryWriter {
     required List<EvidenceItem> webEvidence,
     required List<KnowledgeDelta> deltas,
   }) async {
-    final action = _chooseAction(webEvidence, deltas);
+    final action = chooseNoteDraftAction(
+      webEvidence: webEvidence,
+      deltas: deltas,
+    );
 
     final markdown = action == NoteDraftAction.doNotSave
         ? _buildNoKnowledgeMarkdown(question)
@@ -38,39 +63,6 @@ class MockSummaryWriter implements SummaryWriter {
       localEvidence: localEvidence,
       webEvidence: webEvidence,
     );
-  }
-
-  // ---------------------------------------------------------------------------
-  // Action selection
-  // ---------------------------------------------------------------------------
-
-  NoteDraftAction _chooseAction(
-    List<EvidenceItem> webEvidence,
-    List<KnowledgeDelta> deltas,
-  ) {
-    // No web evidence → nothing useful to save.
-    if (webEvidence.isEmpty) return NoteDraftAction.doNotSave;
-
-    // No deltas → nothing to record.
-    if (deltas.isEmpty) return NoteDraftAction.doNotSave;
-
-    // All duplicates → already known, do not save.
-    final allDuplicates =
-        deltas.every((d) => d.deltaType == DeltaType.duplicate);
-    if (allDuplicates) return NoteDraftAction.doNotSave;
-
-    // Any new claim or related-but-new → create a new note.
-    final hasNewContent = deltas.any((d) =>
-        d.deltaType == DeltaType.newClaim ||
-        d.deltaType == DeltaType.relatedButNew);
-    if (hasNewContent) return NoteDraftAction.createNewNote;
-
-    // Only betterSource deltas → append source info to existing note.
-    final hasBetterSource =
-        deltas.any((d) => d.deltaType == DeltaType.betterSource);
-    if (hasBetterSource) return NoteDraftAction.appendToExistingNote;
-
-    return NoteDraftAction.doNotSave;
   }
 
   // ---------------------------------------------------------------------------
