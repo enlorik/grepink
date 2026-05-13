@@ -8,6 +8,7 @@ import '../services/database_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/grepink_bottom_nav.dart';
+import '../widgets/llm_provider_settings_section.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -195,6 +196,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ),
         ]),
+
+        const SizedBox(height: 8),
+
+        // AI PROVIDER
+        const LlmProviderSettingsSection(),
 
         const SizedBox(height: 8),
 
