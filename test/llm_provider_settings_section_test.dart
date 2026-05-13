@@ -140,7 +140,7 @@ void main() {
     // OpenAI-compatible provider
     // -----------------------------------------------------------------------
     group('openAICompatible provider', () {
-      Future<LlmSettingsService> _makeOpenAiService() async {
+      Future<LlmSettingsService> makeOpenAiService() async {
         SharedPreferences.setMockInitialValues({});
         final prefs = await SharedPreferences.getInstance();
         final service = LlmSettingsService(
@@ -159,7 +159,7 @@ void main() {
       }
 
       testWidgets('shows Base URL field', (tester) async {
-        final service = await _makeOpenAiService();
+        final service = await makeOpenAiService();
         await tester.pumpWidget(_buildApp(service));
         await tester.pumpAndSettle();
 
@@ -167,7 +167,7 @@ void main() {
       });
 
       testWidgets('shows Model field', (tester) async {
-        final service = await _makeOpenAiService();
+        final service = await makeOpenAiService();
         await tester.pumpWidget(_buildApp(service));
         await tester.pumpAndSettle();
 
@@ -175,7 +175,7 @@ void main() {
       });
 
       testWidgets('shows API Key field', (tester) async {
-        final service = await _makeOpenAiService();
+        final service = await makeOpenAiService();
         await tester.pumpWidget(_buildApp(service));
         await tester.pumpAndSettle();
 
@@ -183,7 +183,7 @@ void main() {
       });
 
       testWidgets('shows Max Tokens slider', (tester) async {
-        final service = await _makeOpenAiService();
+        final service = await makeOpenAiService();
         await tester.pumpWidget(_buildApp(service));
         await tester.pumpAndSettle();
 
@@ -191,7 +191,7 @@ void main() {
       });
 
       testWidgets('shows Temperature slider', (tester) async {
-        final service = await _makeOpenAiService();
+        final service = await makeOpenAiService();
         await tester.pumpWidget(_buildApp(service));
         await tester.pumpAndSettle();
 
@@ -199,7 +199,7 @@ void main() {
       });
 
       testWidgets('shows Save and Clear buttons for API key', (tester) async {
-        final service = await _makeOpenAiService();
+        final service = await makeOpenAiService();
         await tester.pumpWidget(_buildApp(service));
         await tester.pumpAndSettle();
 
@@ -209,7 +209,7 @@ void main() {
 
       testWidgets('shows "No API key saved" when no key is stored',
           (tester) async {
-        final service = await _makeOpenAiService();
+        final service = await makeOpenAiService();
         await tester.pumpWidget(_buildApp(service));
         await tester.pumpAndSettle();
 
@@ -217,7 +217,7 @@ void main() {
       });
 
       testWidgets('shows "API key saved" after saving a key', (tester) async {
-        final service = await _makeOpenAiService();
+        final service = await makeOpenAiService();
         await service.saveApiKey('sk-test');
 
         await tester.pumpWidget(_buildApp(service));
@@ -227,7 +227,7 @@ void main() {
       });
 
       testWidgets('does not show mock provider note', (tester) async {
-        final service = await _makeOpenAiService();
+        final service = await makeOpenAiService();
         await tester.pumpWidget(_buildApp(service));
         await tester.pumpAndSettle();
 

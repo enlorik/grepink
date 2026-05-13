@@ -171,7 +171,7 @@ class _LlmProviderSettingsSectionState
 
   Widget _buildProviderSelector(LlmProviderConfig config) {
     return DropdownButtonFormField<LlmProviderKind>(
-      value: config.providerKind,
+      initialValue: config.providerKind,
       decoration: const InputDecoration(
         contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         isDense: true,
