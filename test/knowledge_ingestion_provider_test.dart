@@ -6,6 +6,7 @@ import 'package:grepink/models/knowledge_ingestion_state.dart';
 import 'package:grepink/models/note_draft.dart';
 import 'package:grepink/providers/knowledge_ingestion_provider.dart';
 import 'package:grepink/services/knowledge_ingestion_service.dart';
+import 'package:grepink/services/web_evidence_provider.dart';
 
 class _FakeKnowledgeIngestionService implements KnowledgeIngestionService {
   final NoteDraft? draft;
@@ -54,6 +55,18 @@ NoteDraft _draft({
 }
 
 void main() {
+  group('knowledgeWebEvidenceProvider', () {
+    test('uses empty provider by default', () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final provider = container.read(knowledgeWebEvidenceProvider);
+      final evidence = await provider.fetch('any question');
+      expect(provider, isA<EmptyWebEvidenceProvider>());
+      expect(evidence, isEmpty);
+    });
+  });
+
   group('KnowledgeIngestionNotifier', () {
     test('starts idle with no question or draft', () {
       final container = ProviderContainer(
