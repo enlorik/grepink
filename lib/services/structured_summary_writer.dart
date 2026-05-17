@@ -6,10 +6,16 @@ import 'summary_writer.dart';
 
 class StructuredSummaryWriter implements SummaryWriter {
   final LlmProvider _llmProvider;
+  final int _maxTokens;
+  final double _temperature;
 
   StructuredSummaryWriter({
     required LlmProvider llmProvider,
-  }) : _llmProvider = llmProvider;
+    int maxTokens = 900,
+    double temperature = 0.2,
+  })  : _llmProvider = llmProvider,
+        _maxTokens = maxTokens,
+        _temperature = temperature;
 
   @override
   Future<NoteDraft> write({
@@ -43,8 +49,8 @@ class StructuredSummaryWriter implements SummaryWriter {
         deltas: deltas,
         action: action,
       ),
-      maxTokens: 900,
-      temperature: 0.2,
+      maxTokens: _maxTokens,
+      temperature: _temperature,
     );
 
     final response = await _llmProvider.complete(request);
