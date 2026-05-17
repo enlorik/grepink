@@ -16,7 +16,7 @@ final localEvidenceRetrieverProvider = Provider<LocalEvidenceRetriever>(
 );
 
 final knowledgeWebEvidenceProvider = Provider<WebEvidenceProvider>(
-  (ref) => MockWebEvidenceProvider(),
+  (ref) => EmptyWebEvidenceProvider(),
 );
 
 final deltaDetectorProvider = Provider<DeltaDetector>(

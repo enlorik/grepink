@@ -4,6 +4,13 @@ abstract class WebEvidenceProvider {
   Future<List<EvidenceItem>> fetch(String question);
 }
 
+class EmptyWebEvidenceProvider implements WebEvidenceProvider {
+  @override
+  Future<List<EvidenceItem>> fetch(String question) async {
+    return const [];
+  }
+}
+
 class MockWebEvidenceProvider implements WebEvidenceProvider {
   @override
   Future<List<EvidenceItem>> fetch(String question) async {
