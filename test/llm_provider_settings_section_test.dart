@@ -121,7 +121,7 @@ void main() {
         final prefs = await SharedPreferences.getInstance();
         final service = LlmSettingsService(
           prefs: prefs,
-          secureStorage: _FakeSecureStorage(),
+          secureStorage: FakeSecureStorage(),
         );
         const config = LlmProviderConfig(
           providerKind: LlmProviderKind.openAICompatible,
@@ -252,7 +252,7 @@ void main() {
         final prefs = await SharedPreferences.getInstance();
         final service = LlmSettingsService(
           prefs: prefs,
-          secureStorage: _FakeSecureStorage(),
+          secureStorage: FakeSecureStorage(),
         );
         // Save a config that is openAICompatible but has empty baseUrl
         const config = LlmProviderConfig(
@@ -281,7 +281,7 @@ void main() {
       testWidgets('Save button calls saveApiKey on notifier', (tester) async {
         SharedPreferences.setMockInitialValues({});
         final prefs = await SharedPreferences.getInstance();
-        final secureStorage = _FakeSecureStorage();
+        final secureStorage = FakeSecureStorage();
         final service = LlmSettingsService(
           prefs: prefs,
           secureStorage: secureStorage,
@@ -319,7 +319,7 @@ void main() {
       testWidgets('Clear button calls clearApiKey on notifier', (tester) async {
         SharedPreferences.setMockInitialValues({});
         final prefs = await SharedPreferences.getInstance();
-        final secureStorage = _FakeSecureStorage();
+        final secureStorage = FakeSecureStorage();
         final service = LlmSettingsService(
           prefs: prefs,
           secureStorage: secureStorage,

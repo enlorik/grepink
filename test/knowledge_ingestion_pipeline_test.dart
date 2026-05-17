@@ -3,6 +3,7 @@ import 'package:grepink/models/evidence_item.dart';
 import 'package:grepink/models/note_draft.dart';
 import 'package:grepink/services/delta_detector_impl.dart';
 import 'package:grepink/services/knowledge_ingestion_service.dart';
+import 'package:grepink/services/llm_provider.dart';
 import 'package:grepink/services/structured_summary_writer.dart';
 
 import 'helpers/fake_ingestion_sources.dart';
