@@ -2,43 +2,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:grepink/models/llm_provider_config.dart';
 import 'package:grepink/services/llm_settings_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-// ---------------------------------------------------------------------------
-// In-memory fake for SecureKeyValueStore — no native channels required.
-// ---------------------------------------------------------------------------
-
-class _FakeSecureStorage implements SecureKeyValueStore {
-  final Map<String, String> _data = {};
-
-  @override
-  Future<void> write({required String key, required String? value}) async {
-    if (value == null) {
-      _data.remove(key);
-    } else {
-      _data[key] = value;
-    }
-  }
-
-  @override
-  Future<String?> read({required String key}) async => _data[key];
-
-  @override
-  Future<void> delete({required String key}) async => _data.remove(key);
-
-  /// Exposes raw backing map for test assertions.
-  Map<String, String> get data => Map<String, String>.unmodifiable(_data);
-}
+import 'helpers/fake_secure_storage.dart';
 
 void main() {
   group('LlmSettingsService', () {
     late SharedPreferences prefs;
-    late _FakeSecureStorage secureStorage;
+    late FakeSecureStorage secureStorage;
     late LlmSettingsService service;
 
     setUp(() async {
       SharedPreferences.setMockInitialValues({});
       prefs = await SharedPreferences.getInstance();
-      secureStorage = _FakeSecureStorage();
+      secureStorage = FakeSecureStorage();
       service = LlmSettingsService(
         prefs: prefs,
         secureStorage: secureStorage,

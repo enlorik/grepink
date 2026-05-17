@@ -8,39 +8,8 @@ import 'package:grepink/services/llm_provider_factory.dart';
 import 'package:grepink/services/llm_settings_service.dart';
 import 'package:grepink/services/structured_summary_writer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-class _FakeSecureStorage implements SecureKeyValueStore {
-  final Map<String, String> _data = {};
-
-  @override
-  Future<void> delete({required String key}) async => _data.remove(key);
-
-  @override
-  Future<String?> read({required String key}) async => _data[key];
-
-  @override
-  Future<void> write({required String key, required String? value}) async {
-    if (value == null) {
-      _data.remove(key);
-      return;
-    }
-    _data[key] = value;
-  }
-}
-
-class _RecordingLlmProvider implements LlmProvider {
-  final List<LlmRequest> requests = <LlmRequest>[];
-
-  @override
-  Future<LlmResponse> complete(LlmRequest request) async {
-    requests.add(request);
-    return LlmResponse(
-      text: '# Draft',
-      providerName: 'recording',
-      model: 'recording-model',
-    );
-  }
-}
+import 'helpers/fake_secure_storage.dart';
+import 'helpers/recording_llm_provider.dart';
 
 class _RecordingLlmProviderFactory extends LlmProviderFactory {
   final LlmProvider provider;
@@ -75,13 +44,13 @@ KnowledgeDelta _newClaim(EvidenceItem item) => KnowledgeDelta(
 void main() {
   group('ConfiguredSummaryWriterFactory', () {
     late SharedPreferences prefs;
-    late _FakeSecureStorage secureStorage;
+    late FakeSecureStorage secureStorage;
     late LlmSettingsService settingsService;
 
     setUp(() async {
       SharedPreferences.setMockInitialValues({});
       prefs = await SharedPreferences.getInstance();
-      secureStorage = _FakeSecureStorage();
+      secureStorage = FakeSecureStorage();
       settingsService = LlmSettingsService(
         prefs: prefs,
         secureStorage: secureStorage,
@@ -136,7 +105,7 @@ void main() {
       await settingsService.saveConfig(config);
       await settingsService.saveApiKey('sk-secure-only');
 
-      final recordingProvider = _RecordingLlmProvider();
+      final recordingProvider = RecordingLlmProvider();
       final recordingFactory = _RecordingLlmProviderFactory(recordingProvider);
       final writer = await ConfiguredSummaryWriterFactory(
         settingsService: settingsService,
