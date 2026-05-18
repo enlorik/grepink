@@ -142,7 +142,7 @@ void main() {
       await settingsService.saveConfig(invalidConfig);
       await settingsService.saveApiKey('sk-should-not-be-used');
 
-      final recordingProvider = _RecordingLlmProvider();
+      final recordingProvider = RecordingLlmProvider();
       final recordingFactory = _RecordingLlmProviderFactory(recordingProvider);
       final writer = await ConfiguredSummaryWriterFactory(
         settingsService: settingsService,
