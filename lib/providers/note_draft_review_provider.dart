@@ -105,7 +105,11 @@ class NoteDraftReviewNotifier extends StateNotifier<NoteDraftReviewState> {
     final note = Note(
       id: _uuid.v4(),
       title: _titleFor(draft),
-      content: draft.markdownContent.trim(),
+      content: _buildGeneratedNoteMarkdown(
+        draft,
+        action: NoteDraftAction.createNewNote,
+        generatedAt: now,
+      ),
       tags: const [],
       keywords: const [],
       isPinned: false,
@@ -155,9 +159,14 @@ class NoteDraftReviewNotifier extends StateNotifier<NoteDraftReviewState> {
         return null;
       }
 
+      final now = DateTime.now();
       final updatedNote = existingNote.copyWith(
-        content: _appendDraftMarkdown(existingNote.content, draft),
-        updatedAt: DateTime.now(),
+        content: _appendDraftMarkdown(
+          existingNote.content,
+          draft,
+          generatedAt: now,
+        ),
+        updatedAt: now,
         embeddingPending: true,
         clearEmbedding: true,
       );
@@ -201,16 +210,62 @@ class NoteDraftReviewNotifier extends StateNotifier<NoteDraftReviewState> {
     return '${compactQuestion.substring(0, 77)}...';
   }
 
-  String _appendDraftMarkdown(String existingContent, NoteDraft draft) {
+  String _buildGeneratedNoteMarkdown(
+    NoteDraft draft, {
+    required NoteDraftAction action,
+    required DateTime generatedAt,
+  }) {
+    final trimmedDraft = draft.markdownContent.trim();
+    final metadataComment = _buildGeneratedMetadataComment(
+      draft,
+      action: action,
+      generatedAt: generatedAt,
+    );
+
+    return '$metadataComment\n\n$trimmedDraft';
+  }
+
+  String _buildGeneratedMetadataComment(
+    NoteDraft draft, {
+    required NoteDraftAction action,
+    required DateTime generatedAt,
+  }) {
+    final sanitizedQuestion = _sanitizeMetadataValue(draft.question);
+    final generatedAtValue = generatedAt.toUtc().toIso8601String();
+    final sourceCount = draft.localEvidence.length + draft.webEvidence.length;
+
+    return '''<!-- grepink-generated-note
+question: $sanitizedQuestion
+generated_at: $generatedAtValue
+action: ${action.name}
+source_count: $sourceCount
+-->''';
+  }
+
+  String _sanitizeMetadataValue(String value) {
+    final compactValue = value.replaceAll(RegExp(r'\s+'), ' ').trim();
+    return compactValue.replaceAll('--', '- -');
+  }
+
+  String _appendDraftMarkdown(
+    String existingContent,
+    NoteDraft draft, {
+    required DateTime generatedAt,
+  }) {
     final trimmedExisting = existingContent.trimRight();
     final trimmedDraft = draft.markdownContent.trim();
     final updateHeader = '## Update from question: ${draft.question.trim()}';
+    final metadataComment = _buildGeneratedMetadataComment(
+      draft,
+      action: NoteDraftAction.appendToExistingNote,
+      generatedAt: generatedAt,
+    );
 
     if (trimmedExisting.isEmpty) {
-      return '$updateHeader\n\n$trimmedDraft';
+      return '$metadataComment\n\n$updateHeader\n\n$trimmedDraft';
     }
 
-    return '$trimmedExisting\n\n---\n\n$updateHeader\n\n$trimmedDraft';
+    return '$trimmedExisting\n\n---\n\n$metadataComment\n\n$updateHeader\n\n$trimmedDraft';
   }
 }
 
