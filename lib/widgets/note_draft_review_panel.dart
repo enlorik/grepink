@@ -42,7 +42,8 @@ class NoteDraftReviewPanel extends StatelessWidget {
     final duplicateEvidence = noteDraft.deltas
         .where((delta) => delta.deltaType == DeltaType.duplicate)
         .map((delta) => delta.evidence)
-        .toList();
+        .toList()
+      ..sort(_compareEvidenceByQuality);
     final isSaving = status == NoteDraftReviewStatus.saving;
     final isActionBlocked = status == NoteDraftReviewStatus.saving ||
         status == NoteDraftReviewStatus.saved ||
@@ -202,21 +203,38 @@ class NoteDraftReviewPanel extends StatelessWidget {
   }
 
   Map<String, List<EvidenceItem>> _groupSources(NoteDraft draft) {
-    final localNotes = [...draft.localEvidence]..sort(EvidenceSourceQuality.compare);
-    final webSources = draft.webEvidence
-        .where((item) => item.type == EvidenceType.webSearch)
-        .toList()
-      ..sort(EvidenceSourceQuality.compare);
-    final groundedAnswers = draft.webEvidence
-        .where((item) => item.type == EvidenceType.aiGroundedAnswer)
-        .toList()
-      ..sort(EvidenceSourceQuality.compare);
+    final localNotes = _sortByQuality(draft.localEvidence);
+    final webSources = _sortByQuality(
+      draft.webEvidence.where((item) => item.type == EvidenceType.webSearch),
+    );
+    final groundedAnswers = _sortByQuality(
+      draft.webEvidence.where((item) => item.type == EvidenceType.aiGroundedAnswer),
+    );
 
     return {
       if (localNotes.isNotEmpty) 'Local notes': localNotes,
       if (webSources.isNotEmpty) 'Web search results': webSources,
       if (groundedAnswers.isNotEmpty) 'Grounded AI answer sources': groundedAnswers,
     };
+  }
+
+  List<EvidenceItem> _sortByQuality(Iterable<EvidenceItem> items) {
+    final indexedItems = items.toList().asMap().entries.toList()
+      ..sort((left, right) {
+        final scoreComparison = EvidenceSourceQuality.score(right.value)
+            .compareTo(EvidenceSourceQuality.score(left.value));
+        if (scoreComparison != 0) {
+          return scoreComparison;
+        }
+
+        return left.key.compareTo(right.key);
+      });
+
+    return indexedItems.map((entry) => entry.value).toList();
+  }
+
+  int _compareEvidenceByQuality(EvidenceItem left, EvidenceItem right) {
+    return EvidenceSourceQuality.compare(left, right);
   }
 }
 
