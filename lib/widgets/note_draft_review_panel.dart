@@ -68,16 +68,18 @@ class NoteDraftReviewPanel extends StatelessWidget {
                 selectable: true,
               ),
             ),
-            const SizedBox(height: 16),
-            Text('Sources', style: AppTextStyles.titleMedium),
-            const SizedBox(height: 8),
-            ...groupedSources.entries.map(
-              (entry) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _SourceSection(title: entry.key, items: entry.value),
+            if (groupedSources.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Text('Sources', style: AppTextStyles.titleMedium),
+              const SizedBox(height: 8),
+              ...groupedSources.entries.map(
+                (entry) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _SourceSection(title: entry.key, items: entry.value),
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
+            ],
+            const SizedBox(height: 16),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -165,6 +167,9 @@ class _DeltaCountsRow extends StatelessWidget {
           .length,
       'Better sources': deltas
           .where((delta) => delta.deltaType == DeltaType.betterSource)
+          .length,
+      'Contradictions': deltas
+          .where((delta) => delta.deltaType == DeltaType.contradiction)
           .length,
       'Duplicates ignored': deltas
           .where((delta) => delta.deltaType == DeltaType.duplicate)

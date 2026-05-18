@@ -38,12 +38,28 @@ NoteDraft _draft() {
       ),
       KnowledgeDelta(
         evidence: webEvidence,
+        deltaType: DeltaType.contradiction,
+        reason: 'contradiction',
+      ),
+      KnowledgeDelta(
+        evidence: webEvidence,
         deltaType: DeltaType.duplicate,
         reason: 'duplicate',
       ),
     ],
     localEvidence: [localEvidence],
     webEvidence: [webEvidence],
+  );
+}
+
+NoteDraft _draftWithoutSources() {
+  return const NoteDraft(
+    question: 'Question with no sources',
+    markdownContent: 'No sources available.',
+    action: NoteDraftAction.doNotSave,
+    deltas: [],
+    localEvidence: [],
+    webEvidence: [],
   );
 }
 
@@ -80,6 +96,7 @@ void main() {
           findsOneWidget);
       expect(find.text('New claims: 1'), findsOneWidget);
       expect(find.text('Better sources: 1'), findsOneWidget);
+      expect(find.text('Contradictions: 1'), findsOneWidget);
       expect(find.text('Duplicates ignored: 1'), findsOneWidget);
       expect(find.text('Local notes'), findsOneWidget);
       expect(find.text('Web search results'), findsOneWidget);
@@ -114,6 +131,16 @@ void main() {
       expect(saveTapped, 1);
       expect(appendTapped, 1);
       expect(discardTapped, 1);
+    });
+
+    testWidgets('hides sources section when there are no grouped sources',
+        (tester) async {
+      await tester.pumpWidget(_buildWidget(draft: _draftWithoutSources()));
+
+      expect(find.text('Sources'), findsNothing);
+      expect(find.text('Local notes'), findsNothing);
+      expect(find.text('Web search results'), findsNothing);
+      expect(find.text('Grounded AI answer sources'), findsNothing);
     });
   });
 }
