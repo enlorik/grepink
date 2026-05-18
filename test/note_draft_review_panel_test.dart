@@ -49,6 +49,47 @@ NoteDraft _draft() {
   );
 }
 
+NoteDraft _draftWithMixedSourceQuality() {
+  const localEvidence = EvidenceItem(
+    id: 'local-1',
+    type: EvidenceType.localNote,
+    title: 'Existing local note',
+    content: 'Existing knowledge',
+    sourceNoteId: 'note-1',
+    relevanceScore: 0.8,
+  );
+  const sourcedWebEvidence = EvidenceItem(
+    id: 'web-1',
+    type: EvidenceType.webSearch,
+    title: 'Sourced web result',
+    content: 'Useful sourced claim',
+    sourceUrl: 'https://example.com/source',
+    relevanceScore: 0.9,
+  );
+  const unsourcedWebEvidence = EvidenceItem(
+    id: 'web-2',
+    type: EvidenceType.webSearch,
+    title: 'Unsourced web result',
+    content: 'Claim without citation',
+    relevanceScore: 0.9,
+  );
+
+  return const NoteDraft(
+    question: 'What changed?',
+    markdownContent: '# Suggested draft\n\n- Useful sourced claim',
+    action: NoteDraftAction.createNewNote,
+    deltas: [
+      KnowledgeDelta(
+        evidence: sourcedWebEvidence,
+        deltaType: DeltaType.newClaim,
+        reason: 'new',
+      ),
+    ],
+    localEvidence: [localEvidence],
+    webEvidence: [unsourcedWebEvidence, sourcedWebEvidence],
+  );
+}
+
 Widget _buildWidget({
   required NoteDraft draft,
   VoidCallback? onSaveAsNewNote,
@@ -191,6 +232,28 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(selectedTarget, targetNote.id);
+    });
+
+    testWidgets('orders web sources by quality while keeping local notes separate',
+        (tester) async {
+      await tester.pumpWidget(
+        _buildWidget(
+          draft: _draftWithMixedSourceQuality(),
+          availableNotes: [targetNote],
+        ),
+      );
+
+      expect(find.text('Local notes (1)'), findsOneWidget);
+      expect(find.text('Web search results (2)'), findsOneWidget);
+      expect(find.text('https://example.com/source'), findsWidgets);
+
+      final sourcedTitle = find.text('Sourced web result').first;
+      final unsourcedTitle = find.text('Unsourced web result').first;
+
+      expect(
+        tester.getTopLeft(sourcedTitle).dy,
+        lessThan(tester.getTopLeft(unsourcedTitle).dy),
+      );
     });
   });
 }
