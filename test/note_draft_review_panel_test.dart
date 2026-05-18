@@ -112,9 +112,12 @@ void main() {
       expect(find.text('New claims: 1'), findsOneWidget);
       expect(find.text('Better sources: 1'), findsOneWidget);
       expect(find.text('Duplicates ignored: 1'), findsOneWidget);
-      expect(find.text('Local notes'), findsOneWidget);
-      expect(find.text('Web search results'), findsOneWidget);
-      expect(find.text('https://example.com/source'), findsOneWidget);
+      expect(find.text('Local notes (1)'), findsOneWidget);
+      expect(find.text('Web search results (1)'), findsOneWidget);
+      expect(find.text('Ignored duplicates (1)'), findsOneWidget);
+      expect(find.text('Existing local note'), findsWidgets);
+      expect(find.text('Fresh sourced claim'), findsWidgets);
+      expect(find.text('https://example.com/source'), findsWidgets);
       expect(find.text('Append target'), findsOneWidget);
       expect(find.text('Select a target note before append is enabled.'),
           findsOneWidget);
