@@ -41,6 +41,10 @@ class NoteDraftReviewPanel extends StatelessWidget {
     final isSaving = status == NoteDraftReviewStatus.saving;
     final hasTarget =
         selectedTargetNoteId != null && selectedTargetNoteId!.trim().isNotEmpty;
+    final selectedTarget = availableNotes.cast<Note?>().firstWhere(
+          (note) => note?.id == selectedTargetNoteId,
+          orElse: () => null,
+        );
     final canAppend = availableNotes.isNotEmpty && hasTarget && !isSaving;
 
     return Container(
@@ -105,6 +109,14 @@ class NoteDraftReviewPanel extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text('Append target', style: AppTextStyles.titleMedium),
+            const SizedBox(height: 8),
+            _AppendTargetStatus(
+              hasAvailableNotes: availableNotes.isNotEmpty,
+              selectedTargetTitle: selectedTarget?.title,
+              isSaving: isSaving,
+              status: status,
+              errorMessage: errorMessage,
+            ),
             const SizedBox(height: 8),
             if (availableNotes.isEmpty)
               Text(
@@ -189,6 +201,49 @@ class NoteDraftReviewPanel extends StatelessWidget {
       if (webSources.isNotEmpty) 'Web search results': webSources,
       if (groundedAnswers.isNotEmpty) 'Grounded AI answer sources': groundedAnswers,
     };
+  }
+}
+
+class _AppendTargetStatus extends StatelessWidget {
+  final bool hasAvailableNotes;
+  final String? selectedTargetTitle;
+  final bool isSaving;
+  final NoteDraftReviewStatus status;
+  final String? errorMessage;
+
+  const _AppendTargetStatus({
+    required this.hasAvailableNotes,
+    required this.selectedTargetTitle,
+    required this.isSaving,
+    required this.status,
+    required this.errorMessage,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final message =
+        switch ((hasAvailableNotes, selectedTargetTitle, isSaving, status)) {
+      (false, _, _, _) => 'No valid append targets are available.',
+      (true, null, _, _) =>
+        'No target selected. Append stays blocked until you choose a note.',
+      (true, String title, true, _) => 'Append in progress for "$title".',
+      (true, String title, _, NoteDraftReviewStatus.saved) =>
+        'Append success for "$title".',
+      (true, String _, _, NoteDraftReviewStatus.error) =>
+        errorMessage ?? 'Append error. Select a valid note and try again.',
+      (true, String title, _, _) => 'Target selected: "$title".',
+    };
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppColors.aiResponseBackground,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.dividerBorder),
+      ),
+      child: Text(message, style: AppTextStyles.bodyMedium),
+    );
   }
 }
 

@@ -116,6 +116,10 @@ void main() {
       expect(find.text('Web search results'), findsOneWidget);
       expect(find.text('https://example.com/source'), findsOneWidget);
       expect(find.text('Append target'), findsOneWidget);
+      expect(
+        find.text('No target selected. Append stays blocked until you choose a note.'),
+        findsOneWidget,
+      );
       expect(find.text('Select a target note before append is enabled.'),
           findsOneWidget);
       expect(find.text('Save as new note'), findsOneWidget);
@@ -171,6 +175,7 @@ void main() {
         _buildWidget(
           draft: _draft(),
           availableNotes: [targetNote, alternateNote],
+          selectedTargetNoteId: targetNote.id,
           status: NoteDraftReviewStatus.saved,
           selectedDecision: NoteDraftReviewDecision.appendToExistingNote,
           onTargetNoteSelected: (value) => selectedTarget = value,
@@ -178,16 +183,48 @@ void main() {
       );
 
       expect(find.text('Update appended successfully.'), findsOneWidget);
-      expect(find.text('Select a target note before append is enabled.'),
+      expect(find.text('Append success for "Existing target note".'),
+          findsOneWidget);
+      expect(find.text('Append will update the selected note only.'),
           findsOneWidget);
 
       await tester.ensureVisible(find.byType(DropdownButtonFormField<String>));
       await tester.tap(find.byType(DropdownButtonFormField<String>));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Existing target note'));
+      await tester.tap(find.text('Existing target note').last);
       await tester.pumpAndSettle();
 
       expect(selectedTarget, targetNote.id);
+    });
+
+    testWidgets('append button stays disabled until a target note is selected',
+        (tester) async {
+      await tester.pumpWidget(
+        _buildWidget(
+          draft: _draft(),
+          availableNotes: [targetNote],
+        ),
+      );
+
+      final appendButton = tester.widget<OutlinedButton>(
+        find.widgetWithText(OutlinedButton, 'Append to existing note'),
+      );
+      expect(appendButton.onPressed, isNull);
+
+      await tester.pumpWidget(
+        _buildWidget(
+          draft: _draft(),
+          availableNotes: [targetNote],
+          selectedTargetNoteId: targetNote.id,
+          onAppendToExistingNote: () {},
+        ),
+      );
+
+      final enabledAppendButton = tester.widget<OutlinedButton>(
+        find.widgetWithText(OutlinedButton, 'Append to existing note'),
+      );
+      expect(enabledAppendButton.onPressed, isNotNull);
+      expect(find.text('Target selected: "Existing target note".'), findsOneWidget);
     });
   });
 }
