@@ -233,10 +233,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  FilledButton.icon(
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final askButton = FilledButton.icon(
                     key: const Key('ask-question-button'),
                     onPressed: askDisabled || _askController.text.trim().isEmpty
                         ? null
@@ -251,15 +250,37 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     label: Text(
                       knowledgeState.isLoading ? 'Generating draft...' : 'Ask Grepink',
                     ),
-                  ),
-                  if (knowledgeState.isLoading) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      'Building a note draft from your existing knowledge.',
-                      style: AppTextStyles.bodySmall,
-                    ),
-                  ],
-                ],
+                  );
+
+                  if (!knowledgeState.isLoading) {
+                    return askButton;
+                  }
+
+                  final helperText = Text(
+                    'Building a note draft from your existing knowledge.',
+                    style: AppTextStyles.bodySmall,
+                  );
+                  final useCompactLayout = constraints.maxWidth < 480;
+
+                  if (useCompactLayout) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        askButton,
+                        const SizedBox(height: 12),
+                        helperText,
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    children: [
+                      askButton,
+                      const SizedBox(width: 12),
+                      Expanded(child: helperText),
+                    ],
+                  );
+                },
               ),
             ],
           ),
@@ -321,26 +342,42 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   Widget _buildHeader(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      child: Row(
-        children: [
-          IconButton(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final backButton = IconButton(
             icon: const Icon(Icons.arrow_back, color: AppColors.deepAction),
             onPressed: () {
               ref.read(searchProvider.notifier).clearSearch();
               context.pop();
             },
-          ),
-          Expanded(
-            child: GrepinkSearchBar(
-              controller: _searchController,
-              focusNode: _focusNode,
-              onChanged: (v) {
-                if (v.isEmpty) ref.read(searchProvider.notifier).clearSearch();
-              },
-              onSubmitted: _onSearch,
-            ),
-          ),
-        ],
+          );
+          final searchBar = GrepinkSearchBar(
+            controller: _searchController,
+            focusNode: _focusNode,
+            onChanged: (v) {
+              if (v.isEmpty) ref.read(searchProvider.notifier).clearSearch();
+            },
+            onSubmitted: _onSearch,
+          );
+
+          if (constraints.maxWidth < 480) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                backButton,
+                const SizedBox(height: 8),
+                searchBar,
+              ],
+            );
+          }
+
+          return Row(
+            children: [
+              backButton,
+              Expanded(child: searchBar),
+            ],
+          );
+        },
       ),
     );
   }

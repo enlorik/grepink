@@ -362,33 +362,15 @@ class _SourceSection extends StatelessWidget {
         const SizedBox(height: 6),
         ...items.map(
           (item) => Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Container(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: SizedBox(
               width: double.infinity,
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: AppColors.aiResponseBackground,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.dividerBorder),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(item.title, style: AppTextStyles.bodyLarge),
-                  if (item.content.trim().isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(item.content, style: AppTextStyles.bodyMedium),
-                  ],
-                  const SizedBox(height: 6),
-                  Text(
-                    item.type == EvidenceType.localNote
-                        ? 'Local note'
-                        : (item.sourceUrl ?? 'Unsourced evidence'),
-                    style: AppTextStyles.bodySmall.copyWith(
-                      color: AppColors.deepAction,
-                    ),
-                  ),
-                ],
+              child: Text(
+                item.sourceUrl ?? item.title,
+                softWrap: true,
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: AppColors.deepAction,
+                ),
               ),
             ),
           ),
