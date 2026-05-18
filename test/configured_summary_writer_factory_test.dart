@@ -129,5 +129,44 @@ void main() {
       expect(recordingProvider.requests.single.maxTokens, 1500);
       expect(recordingProvider.requests.single.temperature, 0.6);
     });
+
+    test('invalid openAI-compatible config falls back to mock provider config',
+        () async {
+      const invalidConfig = LlmProviderConfig(
+        providerKind: LlmProviderKind.openAICompatible,
+        baseUrl: '',
+        model: '',
+        maxTokens: 1234,
+        temperature: 0.7,
+      );
+      await settingsService.saveConfig(invalidConfig);
+      await settingsService.saveApiKey('sk-should-not-be-used');
+
+      final recordingProvider = _RecordingLlmProvider();
+      final recordingFactory = _RecordingLlmProviderFactory(recordingProvider);
+      final writer = await ConfiguredSummaryWriterFactory(
+        settingsService: settingsService,
+        providerFactory: recordingFactory,
+      ).create();
+
+      final webEvidence = [_webItem('w1')];
+      await writer.write(
+        question: 'Fallback please',
+        localEvidence: const [],
+        webEvidence: webEvidence,
+        deltas: [_newClaim(webEvidence.first)],
+      );
+
+      expect(
+        recordingFactory.capturedConfig,
+        LlmProviderConfig.defaults.copyWith(
+          maxTokens: 1234,
+          temperature: 0.7,
+        ),
+      );
+      expect(recordingFactory.capturedApiKey, isNull);
+      expect(recordingProvider.requests.single.maxTokens, 1234);
+      expect(recordingProvider.requests.single.temperature, 0.7);
+    });
   });
 }
