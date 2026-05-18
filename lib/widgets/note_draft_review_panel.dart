@@ -3,7 +3,9 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 
 import '../models/evidence_item.dart';
 import '../models/knowledge_delta.dart';
+import '../models/note.dart';
 import '../models/note_draft.dart';
+import '../models/note_draft_review_state.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 
@@ -12,6 +14,12 @@ class NoteDraftReviewPanel extends StatelessWidget {
   final VoidCallback? onSaveAsNewNote;
   final VoidCallback? onAppendToExistingNote;
   final VoidCallback? onDiscard;
+  final List<Note> availableNotes;
+  final String? selectedTargetNoteId;
+  final ValueChanged<String?>? onTargetNoteSelected;
+  final NoteDraftReviewStatus status;
+  final NoteDraftReviewDecision? selectedDecision;
+  final String? errorMessage;
 
   const NoteDraftReviewPanel({
     super.key,
@@ -19,11 +27,21 @@ class NoteDraftReviewPanel extends StatelessWidget {
     this.onSaveAsNewNote,
     this.onAppendToExistingNote,
     this.onDiscard,
+    this.availableNotes = const [],
+    this.selectedTargetNoteId,
+    this.onTargetNoteSelected,
+    this.status = NoteDraftReviewStatus.reviewing,
+    this.selectedDecision,
+    this.errorMessage,
   });
 
   @override
   Widget build(BuildContext context) {
     final groupedSources = _groupSources(noteDraft);
+    final isSaving = status == NoteDraftReviewStatus.saving;
+    final hasTarget =
+        selectedTargetNoteId != null && selectedTargetNoteId!.trim().isNotEmpty;
+    final canAppend = availableNotes.isNotEmpty && hasTarget && !isSaving;
 
     return Container(
       decoration: BoxDecoration(
@@ -45,6 +63,14 @@ class NoteDraftReviewPanel extends StatelessWidget {
           children: [
             Text('Draft Review', style: AppTextStyles.titleLarge),
             const SizedBox(height: 12),
+            if (status != NoteDraftReviewStatus.reviewing) ...[
+              _ReviewStatusBanner(
+                status: status,
+                selectedDecision: selectedDecision,
+                errorMessage: errorMessage,
+              ),
+              const SizedBox(height: 16),
+            ],
             Text('Question', style: AppTextStyles.titleMedium),
             const SizedBox(height: 4),
             Text(noteDraft.question, style: AppTextStyles.bodyLarge),
@@ -78,20 +104,68 @@ class NoteDraftReviewPanel extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
+            Text('Append target', style: AppTextStyles.titleMedium),
+            const SizedBox(height: 8),
+            if (availableNotes.isEmpty)
+              Text(
+                'No existing notes are available to append yet.',
+                style: AppTextStyles.bodyMedium,
+              )
+            else ...[
+              DropdownButtonFormField<String>(
+                key: ValueKey<String>('append-target-${selectedTargetNoteId ?? 'none'}'),
+                initialValue: availableNotes.any((note) => note.id == selectedTargetNoteId)
+                    ? selectedTargetNoteId
+                    : null,
+                onChanged: isSaving ? null : onTargetNoteSelected,
+                items: availableNotes
+                    .map(
+                      (note) => DropdownMenuItem<String>(
+                        value: note.id,
+                        child: Text(
+                          note.title,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    )
+                    .toList(),
+                decoration: InputDecoration(
+                  hintText: 'Select a note to append to',
+                  helperText: hasTarget
+                      ? 'Append will update the selected note only.'
+                      : 'Select a target note before append is enabled.',
+                  filled: true,
+                  fillColor: AppColors.aiResponseBackground,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.dividerBorder),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.dividerBorder),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.primaryAccent),
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 8),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
                 FilledButton(
-                  onPressed: onSaveAsNewNote,
+                  onPressed: isSaving ? null : onSaveAsNewNote,
                   child: const Text('Save as new note'),
                 ),
                 OutlinedButton(
-                  onPressed: onAppendToExistingNote,
+                  onPressed: canAppend ? onAppendToExistingNote : null,
                   child: const Text('Append to existing note'),
                 ),
                 TextButton(
-                  onPressed: onDiscard,
+                  onPressed: isSaving ? null : onDiscard,
                   child: const Text('Discard'),
                 ),
               ],
@@ -144,7 +218,71 @@ class _RecommendationCard extends StatelessWidget {
     return switch (action) {
       NoteDraftAction.createNewNote => 'Save as new note',
       NoteDraftAction.appendToExistingNote => 'Append to existing note',
-      NoteDraftAction.doNotSave => 'Discard',
+      NoteDraftAction.doNotSave => 'Do not save yet',
+    };
+  }
+}
+
+class _ReviewStatusBanner extends StatelessWidget {
+  final NoteDraftReviewStatus status;
+  final NoteDraftReviewDecision? selectedDecision;
+  final String? errorMessage;
+
+  const _ReviewStatusBanner({
+    required this.status,
+    required this.selectedDecision,
+    required this.errorMessage,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final (backgroundColor, borderColor, message) = _styleForStatus();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderColor),
+      ),
+      child: Text(
+        message,
+        style: AppTextStyles.bodyMedium.copyWith(color: AppColors.deepAction),
+      ),
+    );
+  }
+
+  (Color, Color, String) _styleForStatus() {
+    return switch (status) {
+      NoteDraftReviewStatus.saving => (
+          AppColors.aiResponseBackground,
+          AppColors.dividerBorder,
+          switch (selectedDecision) {
+            NoteDraftReviewDecision.appendToExistingNote =>
+              'Appending this draft to the selected note...',
+            _ => 'Saving this draft as a note...',
+          },
+        ),
+      NoteDraftReviewStatus.saved => (
+          AppColors.tagBackground,
+          AppColors.tagBorder,
+          switch (selectedDecision) {
+            NoteDraftReviewDecision.appendToExistingNote =>
+              'Update appended successfully.',
+            _ => 'Draft saved successfully.',
+          },
+        ),
+      NoteDraftReviewStatus.error => (
+          AppColors.aiResponseBackground,
+          AppColors.pinHighlight.withValues(alpha: 0.45),
+          errorMessage ?? 'Something went wrong while saving this draft.',
+        ),
+      _ => (
+          AppColors.aiResponseBackground,
+          AppColors.dividerBorder,
+          '',
+        ),
     };
   }
 }
