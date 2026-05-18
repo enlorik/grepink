@@ -4,29 +4,12 @@ import 'package:grepink/models/knowledge_delta.dart';
 import 'package:grepink/models/note_draft.dart';
 import 'package:grepink/services/delta_detector.dart';
 import 'package:grepink/services/knowledge_ingestion_service.dart';
-import 'package:grepink/services/local_evidence_retriever.dart';
 import 'package:grepink/services/summary_writer.dart';
-import 'package:grepink/services/web_evidence_provider.dart';
+import 'helpers/fake_ingestion_sources.dart';
 
 // ---------------------------------------------------------------------------
 // Minimal in-test fakes – no Mockito required
 // ---------------------------------------------------------------------------
-
-class _StubLocalRetriever implements LocalEvidenceRetriever {
-  final List<EvidenceItem> items;
-  _StubLocalRetriever(this.items);
-
-  @override
-  Future<List<EvidenceItem>> retrieve(String question) async => items;
-}
-
-class _StubWebProvider implements WebEvidenceProvider {
-  final List<EvidenceItem> items;
-  _StubWebProvider(this.items);
-
-  @override
-  Future<List<EvidenceItem>> fetch(String question) async => items;
-}
 
 class _StubDeltaDetector implements DeltaDetector {
   final List<KnowledgeDelta> deltas;
@@ -78,8 +61,8 @@ KnowledgeIngestionServiceImpl _service({
   required List<KnowledgeDelta> deltas,
 }) {
   return KnowledgeIngestionServiceImpl(
-    localRetriever: _StubLocalRetriever(localItems),
-    webProvider: _StubWebProvider(webItems),
+    localRetriever: FakeLocalEvidenceRetriever(localItems),
+    webProvider: FakeWebEvidenceProvider(webItems),
     deltaDetector: _StubDeltaDetector(deltas),
     summaryWriter: MockSummaryWriter(),
   );

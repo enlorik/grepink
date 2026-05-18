@@ -6,42 +6,18 @@ import 'package:grepink/providers/llm_settings_provider.dart';
 import 'package:grepink/services/llm_settings_service.dart';
 import 'package:grepink/widgets/llm_provider_settings_section.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-// ---------------------------------------------------------------------------
-// Fake secure storage
-// ---------------------------------------------------------------------------
-
-class _FakeSecureStorage implements SecureKeyValueStore {
-  final Map<String, String> _data = {};
-
-  @override
-  Future<void> write({required String key, required String? value}) async {
-    if (value == null) {
-      _data.remove(key);
-    } else {
-      _data[key] = value;
-    }
-  }
-
-  @override
-  Future<String?> read({required String key}) async => _data[key];
-
-  @override
-  Future<void> delete({required String key}) async => _data.remove(key);
-
-  Map<String, String> get data => Map<String, String>.unmodifiable(_data);
-}
+import 'helpers/fake_secure_storage.dart';
 
 // ---------------------------------------------------------------------------
 // Test helpers
 // ---------------------------------------------------------------------------
 
-Future<(LlmSettingsService, _FakeSecureStorage)> _makeService({
+Future<(LlmSettingsService, FakeSecureStorage)> _makeService({
   Map<String, Object> prefsValues = const {},
 }) async {
   SharedPreferences.setMockInitialValues(prefsValues);
   final prefs = await SharedPreferences.getInstance();
-  final secureStorage = _FakeSecureStorage();
+  final secureStorage = FakeSecureStorage();
   final service = LlmSettingsService(
     prefs: prefs,
     secureStorage: secureStorage,
@@ -145,7 +121,7 @@ void main() {
         final prefs = await SharedPreferences.getInstance();
         final service = LlmSettingsService(
           prefs: prefs,
-          secureStorage: _FakeSecureStorage(),
+          secureStorage: FakeSecureStorage(),
         );
         const config = LlmProviderConfig(
           providerKind: LlmProviderKind.openAICompatible,
@@ -276,7 +252,7 @@ void main() {
         final prefs = await SharedPreferences.getInstance();
         final service = LlmSettingsService(
           prefs: prefs,
-          secureStorage: _FakeSecureStorage(),
+          secureStorage: FakeSecureStorage(),
         );
         // Save a config that is openAICompatible but has empty baseUrl
         const config = LlmProviderConfig(
@@ -305,7 +281,7 @@ void main() {
       testWidgets('Save button calls saveApiKey on notifier', (tester) async {
         SharedPreferences.setMockInitialValues({});
         final prefs = await SharedPreferences.getInstance();
-        final secureStorage = _FakeSecureStorage();
+        final secureStorage = FakeSecureStorage();
         final service = LlmSettingsService(
           prefs: prefs,
           secureStorage: secureStorage,
@@ -343,7 +319,7 @@ void main() {
       testWidgets('Clear button calls clearApiKey on notifier', (tester) async {
         SharedPreferences.setMockInitialValues({});
         final prefs = await SharedPreferences.getInstance();
-        final secureStorage = _FakeSecureStorage();
+        final secureStorage = FakeSecureStorage();
         final service = LlmSettingsService(
           prefs: prefs,
           secureStorage: secureStorage,
