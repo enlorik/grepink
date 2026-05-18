@@ -114,6 +114,7 @@ class NoteDraftReviewPanel extends StatelessWidget {
             else ...[
               DropdownButtonFormField<String>(
                 key: ValueKey<String>('append-target-${selectedTargetNoteId ?? 'none'}'),
+                isExpanded: true,
                 initialValue: availableNotes.any((note) => note.id == selectedTargetNoteId)
                     ? selectedTargetNoteId
                     : null,
@@ -353,10 +354,14 @@ class _SourceSection extends StatelessWidget {
         ...items.map(
           (item) => Padding(
             padding: const EdgeInsets.only(bottom: 6),
-            child: Text(
-              item.sourceUrl ?? item.title,
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: AppColors.deepAction,
+            child: SizedBox(
+              width: double.infinity,
+              child: Text(
+                item.sourceUrl ?? item.title,
+                softWrap: true,
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: AppColors.deepAction,
+                ),
               ),
             ),
           ),

@@ -129,6 +129,16 @@ Future<void> _askQuestion(WidgetTester tester, String question) async {
   await tester.pump();
 }
 
+Future<void> _setSurfaceSize(WidgetTester tester, Size size) async {
+  await tester.binding.setSurfaceSize(size);
+  addTearDown(() => tester.binding.setSurfaceSize(null));
+}
+
+void _expectNoOverflow(WidgetTester tester) {
+  final exception = tester.takeException();
+  expect(exception, isNull);
+}
+
 void main() {
   group('SearchScreen ask flow', () {
     testWidgets('shows loading and then the draft review panel',
@@ -302,6 +312,126 @@ void main() {
       expect(repository.updatedNotes, 0);
       expect(find.text('Draft Review'), findsNothing);
       expect(find.text('Draft discarded. Nothing was saved.'), findsOneWidget);
+    });
+
+    testWidgets('renders the ask and review flow on iPhone 13 portrait',
+        (tester) async {
+      await _setSurfaceSize(tester, const Size(390, 844));
+      final repository = _FakeNoteDraftReviewRepository();
+      repository.notesById['note-1'] = _note(
+        id: 'note-1',
+        title: 'Existing note',
+        content: 'Existing content',
+      );
+
+      await _pumpSearchScreen(
+        tester,
+        ingestionService: _FakeKnowledgeIngestionService(
+          (_) async => _draft(
+            question: 'Layout test',
+            action: NoteDraftAction.appendToExistingNote,
+          ),
+        ),
+        repository: repository,
+        notes: [
+          _note(
+            id: 'note-1',
+            title: 'Existing note',
+            content: 'Existing content',
+          ),
+        ],
+      );
+
+      await tester.ensureVisible(find.byKey(const Key('ask-question-button')));
+      await _askQuestion(tester, 'Layout test');
+      await tester.pumpAndSettle();
+
+      _expectNoOverflow(tester);
+      expect(find.byKey(const Key('ask-question-button')), findsOneWidget);
+      await tester.ensureVisible(find.text('Save as new note'));
+      await tester.ensureVisible(find.text('Append to existing note'));
+      await tester.ensureVisible(find.text('Discard'));
+      _expectNoOverflow(tester);
+    });
+
+    testWidgets('renders the ask and review flow on tablet landscape',
+        (tester) async {
+      await _setSurfaceSize(tester, const Size(1024, 768));
+      final repository = _FakeNoteDraftReviewRepository();
+      repository.notesById['note-1'] = _note(
+        id: 'note-1',
+        title: 'Existing note',
+        content: 'Existing content',
+      );
+
+      await _pumpSearchScreen(
+        tester,
+        ingestionService: _FakeKnowledgeIngestionService(
+          (_) async => _draft(
+            question: 'Tablet layout test',
+            action: NoteDraftAction.appendToExistingNote,
+          ),
+        ),
+        repository: repository,
+        notes: [
+          _note(
+            id: 'note-1',
+            title: 'Existing note',
+            content: 'Existing content',
+          ),
+        ],
+      );
+
+      await tester.ensureVisible(find.byKey(const Key('ask-question-button')));
+      await _askQuestion(tester, 'Tablet layout test');
+      await tester.pumpAndSettle();
+
+      _expectNoOverflow(tester);
+      expect(find.byKey(const Key('ask-question-button')), findsOneWidget);
+      await tester.ensureVisible(find.text('Save as new note'));
+      await tester.ensureVisible(find.text('Append to existing note'));
+      await tester.ensureVisible(find.text('Discard'));
+      _expectNoOverflow(tester);
+    });
+
+    testWidgets('renders the ask and review flow on desktop layout',
+        (tester) async {
+      await _setSurfaceSize(tester, const Size(1440, 900));
+      final repository = _FakeNoteDraftReviewRepository();
+      repository.notesById['note-1'] = _note(
+        id: 'note-1',
+        title: 'Existing note',
+        content: 'Existing content',
+      );
+
+      await _pumpSearchScreen(
+        tester,
+        ingestionService: _FakeKnowledgeIngestionService(
+          (_) async => _draft(
+            question: 'Desktop layout test',
+            action: NoteDraftAction.appendToExistingNote,
+          ),
+        ),
+        repository: repository,
+        notes: [
+          _note(
+            id: 'note-1',
+            title: 'Existing note',
+            content: 'Existing content',
+          ),
+        ],
+      );
+
+      await tester.ensureVisible(find.byKey(const Key('ask-question-button')));
+      await _askQuestion(tester, 'Desktop layout test');
+      await tester.pumpAndSettle();
+
+      _expectNoOverflow(tester);
+      expect(find.byKey(const Key('ask-question-button')), findsOneWidget);
+      await tester.ensureVisible(find.text('Save as new note'));
+      await tester.ensureVisible(find.text('Append to existing note'));
+      await tester.ensureVisible(find.text('Discard'));
+      _expectNoOverflow(tester);
     });
   });
 }
