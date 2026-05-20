@@ -81,11 +81,19 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     await ref.read(refreshNotesProvider)();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Saved "${note.title}" as a new note.')),
+      const SnackBar(content: Text('Draft saved successfully.')),
     );
   }
 
   Future<void> _appendToExistingNote() async {
+    final reviewState = ref.read(noteDraftReviewProvider);
+    if (reviewState.targetNoteId == null || reviewState.targetNoteId!.isEmpty) {
+      ref
+          .read(noteDraftReviewProvider.notifier)
+          .setError('Select a target note before appending.');
+      return;
+    }
+
     final note =
         await ref.read(noteDraftReviewProvider.notifier).appendToExistingNote();
     if (note == null) return;
@@ -93,7 +101,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     await ref.read(refreshNotesProvider)();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Appended this draft to "${note.title}".')),
+      const SnackBar(content: Text('Update appended successfully.')),
     );
   }
 
@@ -101,7 +109,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     ref.read(noteDraftReviewProvider.notifier).discard();
     ref.read(knowledgeIngestionProvider.notifier).reset();
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Draft discarded.')),
+      const SnackBar(content: Text('Draft discarded. Nothing was saved.')),
     );
   }
 
@@ -133,7 +141,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildAskSection(
-                        context,
                         knowledgeState: knowledgeState,
                         reviewState: reviewState,
                         availableNotes: allNotes,
@@ -163,8 +170,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     );
   }
 
-  Widget _buildAskSection(
-    BuildContext context, {
+  Widget _buildAskSection({
     required KnowledgeIngestionState knowledgeState,
     required NoteDraftReviewState reviewState,
     required List<Note> availableNotes,
@@ -273,22 +279,29 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 'No new knowledge was detected, so Grepink recommends not saving this draft unless you want it anyway.',
           ),
         ],
+        if (reviewState.errorMessage != null) ...[
+          const SizedBox(height: 12),
+          _buildStatusCard(
+            message: reviewState.errorMessage!,
+            borderColor: AppColors.pinHighlight.withValues(alpha: 0.45),
+          ),
+        ],
         if (reviewState.status == NoteDraftReviewStatus.discarded) ...[
           const SizedBox(height: 12),
           _buildStatusCard(message: 'Draft discarded. Nothing was saved.'),
         ],
         if (reviewState.noteDraft != null) ...[
+          const SizedBox(height: 12),
+          _buildAppendTargetSelector(
+            availableNotes: availableNotes,
+            selectedTargetNoteId: reviewState.targetNoteId,
+            onTargetSelected: (noteId) {
+              ref.read(noteDraftReviewProvider.notifier).selectTargetNote(noteId);
+            },
+          ),
           const SizedBox(height: 16),
           NoteDraftReviewPanel(
             noteDraft: reviewState.noteDraft!,
-            availableNotes: availableNotes,
-            selectedTargetNoteId: reviewState.targetNoteId,
-            status: reviewState.status,
-            selectedDecision: reviewState.selectedDecision,
-            errorMessage: reviewState.errorMessage,
-            onTargetNoteSelected: (noteId) {
-              ref.read(noteDraftReviewProvider.notifier).selectTargetNote(noteId);
-            },
             onSaveAsNewNote: _saveAsNewNote,
             onAppendToExistingNote: _appendToExistingNote,
             onDiscard: _discardDraft,
@@ -375,98 +388,144 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (memoryResults.isNotEmpty) ...[
-          _buildSectionHeader('🧠 MEMORY', AppColors.pinHighlight),
-          const SizedBox(height: 12),
-          ...memoryResults.asMap().entries.map((e) {
-            final delay = e.key * 30;
-            return _AnimatedResultItem(
-              delay: delay,
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: ExcerptQuoteCard(
-                  result: e.value,
-                  onTap: () => context.push('/note/${e.value.note.id}'),
+          if (memoryResults.isNotEmpty) ...[
+            _buildSectionHeader('🧠 MEMORY', AppColors.pinHighlight),
+            const SizedBox(height: 12),
+            ...memoryResults.asMap().entries.map((e) {
+              final delay = e.key * 30;
+              return _AnimatedResultItem(
+                delay: delay,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: ExcerptQuoteCard(
+                    result: e.value,
+                    onTap: () => context.push('/note/${e.value.note.id}'),
+                  ),
                 ),
-              ),
-            );
-          }),
-          const SizedBox(height: 20),
-        ],
-        if (noteResults.isNotEmpty) ...[
-          _buildSectionHeader('YOUR NOTES', AppColors.primaryAccent),
-          const SizedBox(height: 12),
-          ...noteResults.asMap().entries.map((e) {
-            final delay = (memoryResults.length + e.key) * 30;
-            return _AnimatedResultItem(
-              delay: delay,
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: NoteCard(
-                  note: e.value,
-                  index: memoryResults.length + e.key,
+              );
+            }),
+            const SizedBox(height: 20),
+          ],
+          if (noteResults.isNotEmpty) ...[
+            _buildSectionHeader('YOUR NOTES', AppColors.primaryAccent),
+            const SizedBox(height: 12),
+            ...noteResults.asMap().entries.map((e) {
+              final delay = (memoryResults.length + e.key) * 30;
+              return _AnimatedResultItem(
+                delay: delay,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: NoteCard(
+                    note: e.value,
+                    index: memoryResults.length + e.key,
+                  ),
                 ),
+              );
+            }),
+            const SizedBox(height: 20),
+          ],
+          if (memoryResults.isNotEmpty || noteResults.isNotEmpty || isAiLoading || aiResponse != null) ...[
+            _buildSectionHeader('AI RESPONSE', AppColors.primaryAccent),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.aiResponseBackground,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.dividerBorder),
               ),
-            );
-          }),
-          const SizedBox(height: 20),
-        ],
-        if (memoryResults.isNotEmpty ||
-            noteResults.isNotEmpty ||
-            isAiLoading ||
-            aiResponse != null) ...[
-          _buildSectionHeader('AI RESPONSE', AppColors.primaryAccent),
-          const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.aiResponseBackground,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.dividerBorder),
-            ),
-            child: isAiLoading && aiResponse == null
-                ? const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      MemoryPulseIndicator(),
-                      SizedBox(width: 12),
-                      AiLoadingDots(),
-                    ],
-                  )
-                : aiResponse != null
-                    ? MarkdownBody(
-                        data: aiResponse,
-                        styleSheet: MarkdownStyleSheet(
-                          p: AppTextStyles.aiResponse,
-                          code: AppTextStyles.codeBlock,
+              child: isAiLoading && aiResponse == null
+                  ? const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        MemoryPulseIndicator(),
+                        SizedBox(width: 12),
+                        AiLoadingDots(),
+                      ],
+                    )
+                  : aiResponse != null
+                      ? MarkdownBody(
+                          data: aiResponse,
+                          styleSheet: MarkdownStyleSheet(
+                            p: AppTextStyles.aiResponse,
+                            code: AppTextStyles.codeBlock,
+                          ),
+                        )
+                      : Text(
+                          'Set your API key in Settings to enable AI responses.',
+                          style: AppTextStyles.bodyMedium,
                         ),
-                      )
-                    : Text(
-                        'Set your API key in Settings to enable AI responses.',
-                        style: AppTextStyles.bodyMedium,
-                      ),
-          ),
-        ],
-        if (memoryResults.isEmpty && noteResults.isEmpty && !isSearching) ...[
-          const SizedBox(height: 40),
-          Center(
-            child: Column(
-              children: [
-                const Icon(Icons.search_off, size: 48, color: AppColors.placeholderText),
-                const SizedBox(height: 12),
-                Text('No results found', style: AppTextStyles.titleMedium),
-                const SizedBox(height: 4),
-                Text(
-                  'Try different keywords or add more notes',
-                  style: AppTextStyles.bodyMedium,
-                  textAlign: TextAlign.center,
-                ),
-              ],
             ),
-          ),
-        ],
+          ],
+          if (memoryResults.isEmpty && noteResults.isEmpty && !isSearching) ...[
+            const SizedBox(height: 40),
+            Center(
+              child: Column(
+                children: [
+                  const Icon(Icons.search_off, size: 48, color: AppColors.placeholderText),
+                  const SizedBox(height: 12),
+                  Text('No results found', style: AppTextStyles.titleMedium),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Try different keywords or add more notes',
+                    style: AppTextStyles.bodyMedium,
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ],
       ],
+    );
+  }
+
+  Widget _buildAppendTargetSelector({
+    required List<Note> availableNotes,
+    required String? selectedTargetNoteId,
+    required ValueChanged<String?> onTargetSelected,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.aiResponseBackground,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.dividerBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Append target', style: AppTextStyles.titleMedium),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<String>(
+            key: const Key('append-target-dropdown'),
+            value: selectedTargetNoteId,
+            isExpanded: true,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            ),
+            hint: const Text('Select a target note'),
+            items: availableNotes
+                .map(
+                  (note) => DropdownMenuItem<String>(
+                    value: note.id,
+                    child: Text(note.title),
+                  ),
+                )
+                .toList(),
+            onChanged: onTargetSelected,
+          ),
+          if (selectedTargetNoteId == null || selectedTargetNoteId.isEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Select a target note before append is enabled.',
+              style: AppTextStyles.bodySmall,
+            ),
+          ],
+        ],
+      ),
     );
   }
 
