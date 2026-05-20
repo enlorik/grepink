@@ -500,7 +500,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
             key: const Key('append-target-dropdown'),
-            value: selectedTargetNoteId,
+            initialValue: selectedTargetNoteId,
             isExpanded: true,
             decoration: const InputDecoration(
               border: OutlineInputBorder(),
