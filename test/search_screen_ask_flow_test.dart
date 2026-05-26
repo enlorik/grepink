@@ -22,6 +22,18 @@ class _FakeKnowledgeIngestionService implements KnowledgeIngestionService {
   Future<NoteDraft> ingest(String question) => _onIngest(question);
 }
 
+class _PendingKnowledgeIngestionService implements KnowledgeIngestionService {
+  final Map<String, Completer<NoteDraft>> _completers =
+      <String, Completer<NoteDraft>>{};
+
+  Completer<NoteDraft> completerFor(String question) {
+    return _completers.putIfAbsent(question, () => Completer<NoteDraft>());
+  }
+
+  @override
+  Future<NoteDraft> ingest(String question) => completerFor(question).future;
+}
+
 class _FakeNoteDraftReviewRepository implements NoteDraftReviewRepository {
   final Map<String, Note> notesById = <String, Note>{};
   int insertedNotes = 0;
@@ -103,7 +115,7 @@ Note _note({
   );
 }
 
-Future<void> _pumpSearchScreen(
+Future<ProviderContainer> _pumpSearchScreen(
   WidgetTester tester, {
   required KnowledgeIngestionService ingestionService,
   required _FakeNoteDraftReviewRepository repository,
@@ -111,19 +123,22 @@ Future<void> _pumpSearchScreen(
   List<Note> recentNotes = const <Note>[],
   void Function()? onRefresh,
 }) async {
+  final container = ProviderContainer(
+    overrides: [
+      knowledgeIngestionServiceProvider.overrideWith(
+        (ref) async => ingestionService,
+      ),
+      noteDraftReviewRepositoryProvider.overrideWithValue(repository),
+      allNotesProvider.overrideWithValue(notes),
+      recentNotesProvider.overrideWithValue(recentNotes),
+      refreshNotesProvider.overrideWithValue(() async {
+        onRefresh?.call();
+      }),
+    ],
+  );
   await tester.pumpWidget(
-    ProviderScope(
-      overrides: [
-        knowledgeIngestionServiceProvider.overrideWith(
-          (ref) async => ingestionService,
-        ),
-        noteDraftReviewRepositoryProvider.overrideWithValue(repository),
-        allNotesProvider.overrideWithValue(notes),
-        recentNotesProvider.overrideWithValue(recentNotes),
-        refreshNotesProvider.overrideWithValue(() async {
-          onRefresh?.call();
-        }),
-      ],
+    UncontrolledProviderScope(
+      container: container,
       child: const MaterialApp(
         home: MediaQuery(
           data: MediaQueryData(disableAnimations: true),
@@ -133,6 +148,8 @@ Future<void> _pumpSearchScreen(
     ),
   );
   await tester.pump();
+  addTearDown(container.dispose);
+  return container;
 }
 
 Future<void> _askQuestion(WidgetTester tester, String question) async {
@@ -304,6 +321,39 @@ void main() {
       expect(repository.updatedNotes, 0);
       expect(find.text('Draft Review'), findsNothing);
       expect(find.text('Draft discarded. Nothing was saved.'), findsAtLeastNWidgets(1));
+    });
+
+    testWidgets('loading disables asking again until the current draft resolves',
+        (tester) async {
+      final repository = _FakeNoteDraftReviewRepository();
+      final service = _PendingKnowledgeIngestionService();
+
+      await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repository,
+      );
+
+      await _askQuestion(tester, 'First question');
+      final askButton = tester.widget<FilledButton>(
+        find.byKey(const Key('ask-question-button')),
+      );
+      expect(askButton.onPressed, isNull);
+      expect(find.text('Generating draft...'), findsOneWidget);
+
+      service.completerFor('First question').complete(
+            _draft(
+              question: 'First question',
+              action: NoteDraftAction.createNewNote,
+            ),
+          );
+      await tester.pumpAndSettle();
+
+      final enabledAskButton = tester.widget<FilledButton>(
+        find.byKey(const Key('ask-question-button')),
+      );
+      expect(enabledAskButton.onPressed, isNotNull);
+      expect(find.text('Draft Review'), findsOneWidget);
     });
   });
 }
