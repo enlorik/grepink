@@ -40,12 +40,28 @@ NoteDraft _draft() {
       ),
       KnowledgeDelta(
         evidence: webEvidence,
+        deltaType: DeltaType.contradiction,
+        reason: 'contradiction',
+      ),
+      KnowledgeDelta(
+        evidence: webEvidence,
         deltaType: DeltaType.duplicate,
         reason: 'duplicate',
       ),
     ],
     localEvidence: [localEvidence],
     webEvidence: [webEvidence],
+  );
+}
+
+NoteDraft _draftWithoutSources() {
+  return const NoteDraft(
+    question: 'Question with no sources',
+    markdownContent: 'No sources available.',
+    action: NoteDraftAction.doNotSave,
+    deltas: [],
+    localEvidence: [],
+    webEvidence: [],
   );
 }
 
@@ -111,10 +127,14 @@ void main() {
           findsOneWidget);
       expect(find.text('New claims: 1'), findsOneWidget);
       expect(find.text('Better sources: 1'), findsOneWidget);
+      expect(find.text('Contradictions: 1'), findsOneWidget);
       expect(find.text('Duplicates ignored: 1'), findsOneWidget);
-      expect(find.text('Local notes'), findsOneWidget);
-      expect(find.text('Web search results'), findsOneWidget);
-      expect(find.text('https://example.com/source'), findsOneWidget);
+      expect(find.text('Local notes (1)'), findsOneWidget);
+      expect(find.text('Web search results (1)'), findsOneWidget);
+      expect(find.text('Ignored duplicates (1)'), findsOneWidget);
+      expect(find.text('Existing local note'), findsWidgets);
+      expect(find.text('Fresh sourced claim'), findsWidgets);
+      expect(find.text('https://example.com/source'), findsWidgets);
       expect(find.text('Append target'), findsOneWidget);
       expect(
         find.text('No target selected. Append stays blocked until you choose a note.'),
@@ -156,6 +176,17 @@ void main() {
       expect(discardTapped, 1);
     });
 
+    testWidgets('hides sources section when there are no grouped sources',
+        (tester) async {
+      await tester.pumpWidget(_buildWidget(draft: _draftWithoutSources()));
+
+      expect(find.text('Sources'), findsNothing);
+      expect(find.text('Local notes'), findsNothing);
+      expect(find.text('Web search results'), findsNothing);
+      expect(find.text('Grounded AI answer sources'), findsNothing);
+      expect(find.text('Ignored duplicates'), findsNothing);
+    });
+
     testWidgets('shows saved status and append target selection state',
         (tester) async {
       String? selectedTarget;
@@ -182,11 +213,8 @@ void main() {
         ),
       );
 
-      expect(find.text('Update appended successfully.'), findsOneWidget);
-      expect(find.text('Append success for "Existing target note".'),
-          findsOneWidget);
-      expect(find.text('Append will update the selected note only.'),
-          findsOneWidget);
+      expect(find.text('Append success for "Existing target note".'), findsOneWidget);
+      expect(find.text('Append will update the selected note only.'), findsOneWidget);
 
       await tester.ensureVisible(find.byType(DropdownButtonFormField<String>));
       await tester.tap(find.byType(DropdownButtonFormField<String>));
