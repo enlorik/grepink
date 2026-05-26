@@ -71,15 +71,18 @@ final knowledgeIngestionServiceProvider =
 
 class KnowledgeIngestionNotifier extends StateNotifier<KnowledgeIngestionState> {
   final Ref _ref;
+  int _requestSequence = 0;
 
   KnowledgeIngestionNotifier(this._ref) : super(const KnowledgeIngestionState());
 
   Future<void> ingest(String question) async {
     final trimmedQuestion = question.trim();
     if (trimmedQuestion.isEmpty) {
-      state = const KnowledgeIngestionState();
+      reset();
       return;
     }
+
+    final requestId = ++_requestSequence;
 
     state = state.copyWith(
       status: KnowledgeIngestionStatus.loading,
@@ -91,6 +94,7 @@ class KnowledgeIngestionNotifier extends StateNotifier<KnowledgeIngestionState> 
     try {
       final service = await _ref.read(knowledgeIngestionServiceProvider.future);
       final noteDraft = await service.ingest(trimmedQuestion);
+      if (requestId != _requestSequence) return;
 
       state = state.copyWith(
         status: KnowledgeIngestionStatus.success,
@@ -99,6 +103,7 @@ class KnowledgeIngestionNotifier extends StateNotifier<KnowledgeIngestionState> 
         clearError: true,
       );
     } catch (error) {
+      if (requestId != _requestSequence) return;
       state = state.copyWith(
         status: KnowledgeIngestionStatus.error,
         question: trimmedQuestion,
@@ -109,6 +114,7 @@ class KnowledgeIngestionNotifier extends StateNotifier<KnowledgeIngestionState> 
   }
 
   void reset() {
+    _requestSequence++;
     state = const KnowledgeIngestionState();
   }
 }
