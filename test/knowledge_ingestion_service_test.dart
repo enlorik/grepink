@@ -2,9 +2,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:grepink/models/evidence_item.dart';
 import 'package:grepink/models/knowledge_delta.dart';
 import 'package:grepink/models/note_draft.dart';
+import 'package:grepink/services/brave_evidence_provider.dart';
 import 'package:grepink/services/delta_detector.dart';
 import 'package:grepink/services/knowledge_ingestion_service.dart';
 import 'package:grepink/services/summary_writer.dart';
+import 'package:http/http.dart' as http;
 import 'helpers/fake_ingestion_sources.dart';
 
 // ---------------------------------------------------------------------------
@@ -21,6 +23,13 @@ class _StubDeltaDetector implements DeltaDetector {
     List<EvidenceItem> incomingEvidence,
   ) async =>
       deltas;
+}
+
+class _ThrowingHttpClient extends http.BaseClient {
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) {
+    throw Exception('brave boom');
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -172,6 +181,24 @@ void main() {
       final draft = await svc.ingest('Already known');
 
       expect(draft.action, NoteDraftAction.doNotSave);
+    });
+
+    test('Brave provider failure still returns a safe doNotSave draft',
+        () async {
+      final svc = KnowledgeIngestionServiceImpl(
+        localRetriever: FakeLocalEvidenceRetriever(const []),
+        webProvider: BraveEvidenceProvider(
+          apiKey: 'brave-key',
+          httpClient: _ThrowingHttpClient(),
+        ),
+        deltaDetector: _StubDeltaDetector(const []),
+        summaryWriter: MockSummaryWriter(),
+      );
+
+      final draft = await svc.ingest('Brave failure test');
+
+      expect(draft.action, NoteDraftAction.doNotSave);
+      expect(draft.webEvidence, isEmpty);
     });
   });
 
