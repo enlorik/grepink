@@ -24,6 +24,10 @@ class NoteDraftReviewPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final groupedSources = _groupSources(noteDraft);
+    final duplicateEvidence = noteDraft.deltas
+        .where((delta) => delta.deltaType == DeltaType.duplicate)
+        .map((delta) => delta.evidence)
+        .toList();
 
     return Container(
       decoration: BoxDecoration(
@@ -68,16 +72,26 @@ class NoteDraftReviewPanel extends StatelessWidget {
                 selectable: true,
               ),
             ),
-            if (groupedSources.isNotEmpty) ...[
+            if (groupedSources.isNotEmpty || duplicateEvidence.isNotEmpty) ...[
               const SizedBox(height: 16),
               Text('Sources', style: AppTextStyles.titleMedium),
               const SizedBox(height: 8),
               ...groupedSources.entries.map(
                 (entry) => Padding(
                   padding: const EdgeInsets.only(bottom: 12),
-                  child: _SourceSection(title: entry.key, items: entry.value),
+                  child: _SourceSection(
+                    title: '${entry.key} (${entry.value.length})',
+                    items: entry.value,
+                  ),
                 ),
               ),
+              if (duplicateEvidence.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                _SourceSection(
+                  title: 'Ignored duplicates (${duplicateEvidence.length})',
+                  items: duplicateEvidence,
+                ),
+              ],
             ],
             const SizedBox(height: 16),
             Wrap(
@@ -219,11 +233,33 @@ class _SourceSection extends StatelessWidget {
         const SizedBox(height: 6),
         ...items.map(
           (item) => Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Text(
-              item.sourceUrl ?? item.title,
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: AppColors.deepAction,
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.aiResponseBackground,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.dividerBorder),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(item.title, style: AppTextStyles.bodyLarge),
+                  if (item.content.trim().isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(item.content, style: AppTextStyles.bodyMedium),
+                  ],
+                  const SizedBox(height: 6),
+                  Text(
+                    item.type == EvidenceType.localNote
+                        ? 'Local note'
+                        : (item.sourceUrl ?? 'Unsourced evidence'),
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: AppColors.deepAction,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

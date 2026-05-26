@@ -98,9 +98,12 @@ void main() {
       expect(find.text('Better sources: 1'), findsOneWidget);
       expect(find.text('Contradictions: 1'), findsOneWidget);
       expect(find.text('Duplicates ignored: 1'), findsOneWidget);
-      expect(find.text('Local notes'), findsOneWidget);
-      expect(find.text('Web search results'), findsOneWidget);
-      expect(find.text('https://example.com/source'), findsOneWidget);
+      expect(find.text('Local notes (1)'), findsOneWidget);
+      expect(find.text('Web search results (1)'), findsOneWidget);
+      expect(find.text('Ignored duplicates (1)'), findsOneWidget);
+      expect(find.text('Existing local note'), findsWidgets);
+      expect(find.text('Fresh sourced claim'), findsWidgets);
+      expect(find.text('https://example.com/source'), findsWidgets);
       expect(find.text('Save as new note'), findsOneWidget);
       expect(find.text('Append to existing note'), findsOneWidget);
       expect(find.text('Discard'), findsOneWidget);
@@ -141,6 +144,7 @@ void main() {
       expect(find.text('Local notes'), findsNothing);
       expect(find.text('Web search results'), findsNothing);
       expect(find.text('Grounded AI answer sources'), findsNothing);
+      expect(find.text('Ignored duplicates'), findsNothing);
     });
   });
 }
