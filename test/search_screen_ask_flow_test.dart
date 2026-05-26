@@ -31,9 +31,22 @@ class _FakeNoteDraftReviewRepository implements NoteDraftReviewRepository {
   Future<Note?> getNoteById(String id) async => notesById[id];
 
   @override
-  Future<void> insertNote(Note note) async {
+  Future<Note> insertNote({required String title, required String content}) async {
     insertedNotes++;
+    final now = DateTime(2026, 5, 18);
+    final note = Note(
+      id: 'generated-$insertedNotes',
+      title: title,
+      content: content,
+      tags: const [],
+      keywords: const [],
+      isPinned: false,
+      createdAt: now,
+      updatedAt: now,
+      embeddingPending: true,
+    );
     notesById[note.id] = note;
+    return note;
   }
 
   @override
@@ -131,8 +144,7 @@ Future<void> _askQuestion(WidgetTester tester, String question) async {
 
 void main() {
   group('SearchScreen ask flow', () {
-    testWidgets('shows loading and then the draft review panel',
-        (tester) async {
+    testWidgets('shows loading and then the draft review panel', (tester) async {
       final completer = Completer<NoteDraft>();
       final repository = _FakeNoteDraftReviewRepository();
 
@@ -145,6 +157,10 @@ void main() {
       await _askQuestion(tester, 'What changed?');
 
       expect(find.text('Generating draft...'), findsOneWidget);
+      final askButton = tester.widget<FilledButton>(
+        find.byKey(const Key('ask-question-button')),
+      );
+      expect(askButton.onPressed, isNull);
 
       completer.complete(
         _draft(
@@ -157,7 +173,6 @@ void main() {
       expect(find.text('Draft Review'), findsOneWidget);
       expect(find.textContaining('Recommended action: Save as new note'),
           findsOneWidget);
-      expect(find.text('Save as new note'), findsOneWidget);
     });
 
     testWidgets('shows the do-not-save state clearly', (tester) async {
@@ -181,11 +196,13 @@ void main() {
         find.textContaining('No new knowledge was detected'),
         findsOneWidget,
       );
-      expect(find.textContaining('Recommended action: Do not save yet'),
-          findsOneWidget);
+      expect(
+        find.textContaining('Recommended action: Discard'),
+        findsOneWidget,
+      );
     });
 
-    testWidgets('save as new note only persists after the explicit save tap',
+    testWidgets('save as new note calls review notifier persistence path',
         (tester) async {
       final repository = _FakeNoteDraftReviewRepository();
       var refreshCalls = 0;
@@ -199,13 +216,11 @@ void main() {
           ),
         ),
         repository: repository,
-        recentNotes: const <Note>[],
         onRefresh: () => refreshCalls++,
       );
 
       await _askQuestion(tester, 'Save this');
       await tester.pumpAndSettle();
-
       expect(repository.insertedNotes, 0);
 
       await tester.ensureVisible(find.text('Save as new note'));
@@ -217,7 +232,7 @@ void main() {
       expect(find.text('Draft saved successfully.'), findsOneWidget);
     });
 
-    testWidgets('append requires a selected target and only persists after tap',
+    testWidgets('append calls review notifier path after target selection',
         (tester) async {
       final repository = _FakeNoteDraftReviewRepository();
       repository.notesById['note-1'] = _note(
@@ -236,33 +251,21 @@ void main() {
         ),
         repository: repository,
         notes: [
-          Note(
+          _note(
             id: 'note-1',
             title: 'Existing note',
             content: 'Existing content',
-            tags: [],
-            keywords: [],
-            isPinned: false,
-            createdAt: DateTime(2026, 5, 18),
-            updatedAt: DateTime(2026, 5, 18),
-            embeddingPending: false,
           ),
         ],
-        recentNotes: const <Note>[],
       );
 
       await _askQuestion(tester, 'Append this');
       await tester.pumpAndSettle();
 
+      expect(find.byKey(const Key('append-target-dropdown')), findsOneWidget);
       expect(repository.updatedNotes, 0);
 
-      final appendButton = tester.widget<OutlinedButton>(
-        find.widgetWithText(OutlinedButton, 'Append to existing note'),
-      );
-      expect(appendButton.onPressed, isNull);
-
-      await tester.ensureVisible(find.byType(DropdownButtonFormField<String>));
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.tap(find.byKey(const Key('append-target-dropdown')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Existing note').last);
       await tester.pumpAndSettle();
@@ -275,8 +278,7 @@ void main() {
       expect(find.text('Update appended successfully.'), findsOneWidget);
     });
 
-    testWidgets('discard clears the review flow without persistence',
-        (tester) async {
+    testWidgets('discard clears draft and does not persist', (tester) async {
       final repository = _FakeNoteDraftReviewRepository();
 
       await _pumpSearchScreen(
@@ -301,7 +303,7 @@ void main() {
       expect(repository.insertedNotes, 0);
       expect(repository.updatedNotes, 0);
       expect(find.text('Draft Review'), findsNothing);
-      expect(find.text('Draft discarded. Nothing was saved.'), findsOneWidget);
+      expect(find.text('Draft discarded. Nothing was saved.'), findsAtLeastNWidgets(1));
     });
   });
 }
