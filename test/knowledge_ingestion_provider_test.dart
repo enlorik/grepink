@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:grepink/models/evidence_item.dart';
@@ -21,6 +23,23 @@ class _FakeKnowledgeIngestionService implements KnowledgeIngestionService {
   Future<NoteDraft> ingest(String question) async {
     if (error != null) throw error!;
     return draft!;
+  }
+}
+
+class _PendingKnowledgeIngestionService implements KnowledgeIngestionService {
+  final Map<String, Completer<NoteDraft>> _completersByQuestion =
+      <String, Completer<NoteDraft>>{};
+
+  Completer<NoteDraft> completerFor(String question) {
+    return _completersByQuestion.putIfAbsent(
+      question,
+      () => Completer<NoteDraft>(),
+    );
+  }
+
+  @override
+  Future<NoteDraft> ingest(String question) {
+    return completerFor(question).future;
   }
 }
 
@@ -161,6 +180,71 @@ void main() {
       expect(state.question, 'Fail');
       expect(state.noteDraft, isNull);
       expect(state.errorMessage, contains('boom'));
+    });
+
+    test('ignores stale older completion when a newer ingest finishes first',
+        () async {
+      final service = _PendingKnowledgeIngestionService();
+      final container = ProviderContainer(
+        overrides: [
+          knowledgeIngestionServiceProvider.overrideWith((ref) async => service),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final notifier = container.read(knowledgeIngestionProvider.notifier);
+      final firstFuture = notifier.ingest('First question');
+      final secondFuture = notifier.ingest('Second question');
+
+      service.completerFor('Second question').complete(
+            _draft(
+              question: 'Second question',
+              action: NoteDraftAction.createNewNote,
+            ),
+          );
+      await secondFuture;
+
+      service.completerFor('First question').complete(
+            _draft(
+              question: 'First question',
+              action: NoteDraftAction.doNotSave,
+            ),
+          );
+      await firstFuture;
+
+      final state = container.read(knowledgeIngestionProvider);
+      expect(state.status, KnowledgeIngestionStatus.success);
+      expect(state.question, 'Second question');
+      expect(state.noteDraft!.question, 'Second question');
+      expect(state.noteDraft!.action, NoteDraftAction.createNewNote);
+    });
+
+    test('reset invalidates a pending ingest result', () async {
+      final service = _PendingKnowledgeIngestionService();
+      final container = ProviderContainer(
+        overrides: [
+          knowledgeIngestionServiceProvider.overrideWith((ref) async => service),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final notifier = container.read(knowledgeIngestionProvider.notifier);
+      final pendingFuture = notifier.ingest('Pending question');
+
+      notifier.reset();
+      service.completerFor('Pending question').complete(
+            _draft(
+              question: 'Pending question',
+              action: NoteDraftAction.createNewNote,
+            ),
+          );
+      await pendingFuture;
+
+      final state = container.read(knowledgeIngestionProvider);
+      expect(state.status, KnowledgeIngestionStatus.idle);
+      expect(state.question, isEmpty);
+      expect(state.noteDraft, isNull);
+      expect(state.errorMessage, isNull);
     });
   });
 }

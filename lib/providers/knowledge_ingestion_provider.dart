@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/knowledge_ingestion_state.dart';
+import '../services/brave_evidence_provider.dart';
 import '../services/configured_summary_writer_factory.dart';
 import '../services/delta_detector.dart';
 import '../services/delta_detector_impl.dart';
@@ -9,6 +10,7 @@ import '../services/local_evidence_retriever.dart';
 import '../services/local_evidence_retriever_impl.dart';
 import '../services/summary_writer.dart';
 import '../services/web_evidence_provider.dart';
+import 'brave_settings_provider.dart';
 import 'llm_settings_provider.dart';
 
 final localEvidenceRetrieverProvider = Provider<LocalEvidenceRetriever>(
@@ -18,6 +20,26 @@ final localEvidenceRetrieverProvider = Provider<LocalEvidenceRetriever>(
 final knowledgeWebEvidenceProvider = Provider<WebEvidenceProvider>(
   (ref) => EmptyWebEvidenceProvider(),
 );
+
+final configuredKnowledgeWebEvidenceProvider =
+    FutureProvider<WebEvidenceProvider>((ref) async {
+  final braveSettings = await ref.watch(braveSettingsProvider.future);
+  if (!braveSettings.enabled || !braveSettings.apiKeyConfigured) {
+    return ref.watch(knowledgeWebEvidenceProvider);
+  }
+
+  final braveSettingsService = await ref.watch(braveSettingsServiceProvider.future);
+  final apiKey = await braveSettingsService.loadApiKey();
+  if (apiKey == null || apiKey.trim().isEmpty) {
+    return ref.watch(knowledgeWebEvidenceProvider);
+  }
+
+  return BraveEvidenceProvider(
+    apiKey: apiKey,
+    count: braveSettings.resultCount,
+    safeSearch: braveSettings.safeSearch,
+  );
+});
 
 final deltaDetectorProvider = Provider<DeltaDetector>(
   (ref) => DeltaDetectorImpl(),
@@ -37,9 +59,11 @@ final summaryWriterProvider = FutureProvider<SummaryWriter>((ref) async {
 final knowledgeIngestionServiceProvider =
     FutureProvider<KnowledgeIngestionService>((ref) async {
   final summaryWriter = await ref.watch(summaryWriterProvider.future);
+  final webProvider =
+      await ref.watch(configuredKnowledgeWebEvidenceProvider.future);
   return KnowledgeIngestionServiceImpl(
     localRetriever: ref.watch(localEvidenceRetrieverProvider),
-    webProvider: ref.watch(knowledgeWebEvidenceProvider),
+    webProvider: webProvider,
     deltaDetector: ref.watch(deltaDetectorProvider),
     summaryWriter: summaryWriter,
   );
@@ -47,15 +71,18 @@ final knowledgeIngestionServiceProvider =
 
 class KnowledgeIngestionNotifier extends StateNotifier<KnowledgeIngestionState> {
   final Ref _ref;
+  int _requestSequence = 0;
 
   KnowledgeIngestionNotifier(this._ref) : super(const KnowledgeIngestionState());
 
   Future<void> ingest(String question) async {
     final trimmedQuestion = question.trim();
     if (trimmedQuestion.isEmpty) {
-      state = const KnowledgeIngestionState();
+      reset();
       return;
     }
+
+    final requestId = ++_requestSequence;
 
     state = state.copyWith(
       status: KnowledgeIngestionStatus.loading,
@@ -67,6 +94,7 @@ class KnowledgeIngestionNotifier extends StateNotifier<KnowledgeIngestionState> 
     try {
       final service = await _ref.read(knowledgeIngestionServiceProvider.future);
       final noteDraft = await service.ingest(trimmedQuestion);
+      if (requestId != _requestSequence) return;
 
       state = state.copyWith(
         status: KnowledgeIngestionStatus.success,
@@ -75,6 +103,7 @@ class KnowledgeIngestionNotifier extends StateNotifier<KnowledgeIngestionState> 
         clearError: true,
       );
     } catch (error) {
+      if (requestId != _requestSequence) return;
       state = state.copyWith(
         status: KnowledgeIngestionStatus.error,
         question: trimmedQuestion,
@@ -85,6 +114,7 @@ class KnowledgeIngestionNotifier extends StateNotifier<KnowledgeIngestionState> 
   }
 
   void reset() {
+    _requestSequence++;
     state = const KnowledgeIngestionState();
   }
 }
