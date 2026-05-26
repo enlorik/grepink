@@ -104,12 +104,25 @@ final notesProvider = StateNotifierProvider<NotesNotifier, AsyncValue<List<Note>
   (ref) => NotesNotifier(ref),
 );
 
+final allNotesProvider = Provider<List<Note>>((ref) {
+  return ref.watch(notesProvider).valueOrNull ?? [];
+});
+
+final recentNotesProvider = Provider<List<Note>>((ref) {
+  return ref.watch(allNotesProvider);
+});
+
+final refreshNotesProvider = Provider<Future<void> Function()>((ref) {
+  final notifier = ref.read(notesProvider.notifier);
+  return notifier.loadNotes;
+});
+
 final pinnedNotesProvider = Provider<List<Note>>((ref) {
-  final notes = ref.watch(notesProvider).valueOrNull ?? [];
+  final notes = ref.watch(allNotesProvider);
   return notes.where((n) => n.isPinned).toList();
 });
 
 final unpinnedNotesProvider = Provider<List<Note>>((ref) {
-  final notes = ref.watch(notesProvider).valueOrNull ?? [];
+  final notes = ref.watch(allNotesProvider);
   return notes.where((n) => !n.isPinned).toList();
 });
