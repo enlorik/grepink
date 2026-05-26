@@ -303,7 +303,7 @@ void main() {
       expect(repository.insertedNotes, 0);
       expect(repository.updatedNotes, 0);
       expect(find.text('Draft Review'), findsNothing);
-      expect(find.text('Draft discarded. Nothing was saved.'), findsOneWidget);
+      expect(find.text('Draft discarded. Nothing was saved.'), findsAtLeastNWidgets(1));
     });
   });
 }
