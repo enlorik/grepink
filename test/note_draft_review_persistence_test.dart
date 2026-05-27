@@ -157,6 +157,10 @@ void main() {
       expect(createdNote, isNotNull);
       expect(repository.insertedNotes, 1);
       expect(createdNote!.title, 'What changed?');
+      expect(createdNote.content, contains('<!-- grepink-generated-note'));
+      expect(createdNote.content, contains('question: What changed?'));
+      expect(createdNote.content, contains('action: createNewNote'));
+      expect(createdNote.content, contains('source_count: 1'));
       expect(createdNote.content, contains('https://example.com/source'));
       expect(
         container.read(noteDraftReviewProvider).status,
@@ -192,12 +196,42 @@ void main() {
 
       expect(updatedNote, isNotNull);
       expect(repository.updatedNotes, 1);
-      expect(updatedNote!.content, contains('## Update from question: Append this'));
+      expect(updatedNote!.content, contains('<!-- grepink-generated-note'));
+      expect(updatedNote.content, contains('question: Append this'));
+      expect(updatedNote.content, contains('action: appendToExistingNote'));
+      expect(updatedNote.content, contains('source_count: 1'));
+      expect(updatedNote.content, contains('## Update from question: Append this'));
       expect(updatedNote.content, contains('https://example.com/source'));
       expect(
         container.read(noteDraftReviewProvider).status,
         NoteDraftReviewStatus.saved,
       );
+    });
+
+    test('generated note metadata does not include secret-like fields', () async {
+      final repository = _FakeNoteDraftReviewRepository();
+      final container = ProviderContainer(
+        overrides: [
+          noteDraftReviewRepositoryProvider.overrideWithValue(repository),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final notifier = container.read(noteDraftReviewProvider.notifier);
+      notifier.startReview(
+        _draft(
+          question: 'Keep this traceable',
+          action: NoteDraftAction.createNewNote,
+        ),
+      );
+
+      final createdNote = await notifier.saveAsNewNote();
+
+      expect(createdNote, isNotNull);
+      expect(createdNote!.content, isNot(contains('apiKey')));
+      expect(createdNote.content, isNot(contains('api_key')));
+      expect(createdNote.content, isNot(contains('prompt')));
+      expect(createdNote.content, isNot(contains('sk-')));
     });
 
     test('appendToExistingNote fails safely when no target is selected',
