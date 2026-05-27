@@ -38,9 +38,17 @@ class NoteDraftReviewPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final groupedSources = _groupSources(noteDraft);
+    final duplicateEvidence = noteDraft.deltas
+        .where((delta) => delta.deltaType == DeltaType.duplicate)
+        .map((delta) => delta.evidence)
+        .toList();
     final isSaving = status == NoteDraftReviewStatus.saving;
     final hasTarget =
         selectedTargetNoteId != null && selectedTargetNoteId!.trim().isNotEmpty;
+    final selectedTarget = availableNotes.cast<Note?>().firstWhere(
+          (note) => note?.id == selectedTargetNoteId,
+          orElse: () => null,
+        );
     final canAppend = availableNotes.isNotEmpty && hasTarget && !isSaving;
 
     return Container(
@@ -63,14 +71,6 @@ class NoteDraftReviewPanel extends StatelessWidget {
           children: [
             Text('Draft Review', style: AppTextStyles.titleLarge),
             const SizedBox(height: 12),
-            if (status != NoteDraftReviewStatus.reviewing) ...[
-              _ReviewStatusBanner(
-                status: status,
-                selectedDecision: selectedDecision,
-                errorMessage: errorMessage,
-              ),
-              const SizedBox(height: 16),
-            ],
             Text('Question', style: AppTextStyles.titleMedium),
             const SizedBox(height: 4),
             Text(noteDraft.question, style: AppTextStyles.bodyLarge),
@@ -94,17 +94,37 @@ class NoteDraftReviewPanel extends StatelessWidget {
                 selectable: true,
               ),
             ),
-            const SizedBox(height: 16),
-            Text('Sources', style: AppTextStyles.titleMedium),
-            const SizedBox(height: 8),
-            ...groupedSources.entries.map(
-              (entry) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _SourceSection(title: entry.key, items: entry.value),
+            if (groupedSources.isNotEmpty || duplicateEvidence.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Text('Sources', style: AppTextStyles.titleMedium),
+              const SizedBox(height: 8),
+              ...groupedSources.entries.map(
+                (entry) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _SourceSection(
+                    title: '${entry.key} (${entry.value.length})',
+                    items: entry.value,
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
+              if (duplicateEvidence.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                _SourceSection(
+                  title: 'Ignored duplicates (${duplicateEvidence.length})',
+                  items: duplicateEvidence,
+                ),
+              ],
+            ],
+            const SizedBox(height: 16),
             Text('Append target', style: AppTextStyles.titleMedium),
+            const SizedBox(height: 8),
+            _AppendTargetStatus(
+              hasAvailableNotes: availableNotes.isNotEmpty,
+              selectedTargetTitle: selectedTarget?.title,
+              isSaving: isSaving,
+              status: status,
+              errorMessage: errorMessage,
+            ),
             const SizedBox(height: 8),
             if (availableNotes.isEmpty)
               Text(
@@ -151,7 +171,7 @@ class NoteDraftReviewPanel extends StatelessWidget {
                 ),
               ),
             ],
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -192,6 +212,49 @@ class NoteDraftReviewPanel extends StatelessWidget {
   }
 }
 
+class _AppendTargetStatus extends StatelessWidget {
+  final bool hasAvailableNotes;
+  final String? selectedTargetTitle;
+  final bool isSaving;
+  final NoteDraftReviewStatus status;
+  final String? errorMessage;
+
+  const _AppendTargetStatus({
+    required this.hasAvailableNotes,
+    required this.selectedTargetTitle,
+    required this.isSaving,
+    required this.status,
+    required this.errorMessage,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final message =
+        switch ((hasAvailableNotes, selectedTargetTitle, isSaving, status)) {
+      (false, _, _, _) => 'No valid append targets are available.',
+      (true, null, _, _) =>
+        'No target selected. Append stays blocked until you choose a note.',
+      (true, String title, true, _) => 'Append in progress for "$title".',
+      (true, String title, _, NoteDraftReviewStatus.saved) =>
+        'Append success for "$title".',
+      (true, String _, _, NoteDraftReviewStatus.error) =>
+        errorMessage ?? 'Append error. Select a valid note and try again.',
+      (true, String title, _, _) => 'Target selected: "$title".',
+    };
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppColors.aiResponseBackground,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.dividerBorder),
+      ),
+      child: Text(message, style: AppTextStyles.bodyMedium),
+    );
+  }
+}
+
 class _RecommendationCard extends StatelessWidget {
   final NoteDraftAction action;
 
@@ -218,71 +281,7 @@ class _RecommendationCard extends StatelessWidget {
     return switch (action) {
       NoteDraftAction.createNewNote => 'Save as new note',
       NoteDraftAction.appendToExistingNote => 'Append to existing note',
-      NoteDraftAction.doNotSave => 'Do not save yet',
-    };
-  }
-}
-
-class _ReviewStatusBanner extends StatelessWidget {
-  final NoteDraftReviewStatus status;
-  final NoteDraftReviewDecision? selectedDecision;
-  final String? errorMessage;
-
-  const _ReviewStatusBanner({
-    required this.status,
-    required this.selectedDecision,
-    required this.errorMessage,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final (backgroundColor, borderColor, message) = _styleForStatus();
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: borderColor),
-      ),
-      child: Text(
-        message,
-        style: AppTextStyles.bodyMedium.copyWith(color: AppColors.deepAction),
-      ),
-    );
-  }
-
-  (Color, Color, String) _styleForStatus() {
-    return switch (status) {
-      NoteDraftReviewStatus.saving => (
-          AppColors.aiResponseBackground,
-          AppColors.dividerBorder,
-          switch (selectedDecision) {
-            NoteDraftReviewDecision.appendToExistingNote =>
-              'Appending this draft to the selected note...',
-            _ => 'Saving this draft as a note...',
-          },
-        ),
-      NoteDraftReviewStatus.saved => (
-          AppColors.tagBackground,
-          AppColors.tagBorder,
-          switch (selectedDecision) {
-            NoteDraftReviewDecision.appendToExistingNote =>
-              'Update appended successfully.',
-            _ => 'Draft saved successfully.',
-          },
-        ),
-      NoteDraftReviewStatus.error => (
-          AppColors.aiResponseBackground,
-          AppColors.pinHighlight.withValues(alpha: 0.45),
-          errorMessage ?? 'Something went wrong while saving this draft.',
-        ),
-      _ => (
-          AppColors.aiResponseBackground,
-          AppColors.dividerBorder,
-          '',
-        ),
+      NoteDraftAction.doNotSave => 'Discard',
     };
   }
 }
@@ -303,6 +302,9 @@ class _DeltaCountsRow extends StatelessWidget {
           .length,
       'Better sources': deltas
           .where((delta) => delta.deltaType == DeltaType.betterSource)
+          .length,
+      'Contradictions': deltas
+          .where((delta) => delta.deltaType == DeltaType.contradiction)
           .length,
       'Duplicates ignored': deltas
           .where((delta) => delta.deltaType == DeltaType.duplicate)
@@ -352,11 +354,33 @@ class _SourceSection extends StatelessWidget {
         const SizedBox(height: 6),
         ...items.map(
           (item) => Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Text(
-              item.sourceUrl ?? item.title,
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: AppColors.deepAction,
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.aiResponseBackground,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.dividerBorder),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(item.title, style: AppTextStyles.bodyLarge),
+                  if (item.content.trim().isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(item.content, style: AppTextStyles.bodyMedium),
+                  ],
+                  const SizedBox(height: 6),
+                  Text(
+                    item.type == EvidenceType.localNote
+                        ? 'Local note'
+                        : (item.sourceUrl ?? 'Unsourced evidence'),
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: AppColors.deepAction,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

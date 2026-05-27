@@ -2,9 +2,12 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../models/brave_settings.dart';
+import '../providers/brave_settings_provider.dart';
 import '../providers/notes_provider.dart';
 import '../providers/settings_provider.dart';
 import '../services/database_service.dart';
+import '../services/brave_evidence_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/grepink_bottom_nav.dart';
@@ -19,23 +22,28 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   late TextEditingController _apiKeyController;
+  late TextEditingController _braveApiKeyController;
   bool _apiKeyVisible = false;
+  bool _braveApiKeyVisible = false;
 
   @override
   void initState() {
     super.initState();
     _apiKeyController = TextEditingController();
+    _braveApiKeyController = TextEditingController();
   }
 
   @override
   void dispose() {
     _apiKeyController.dispose();
+    _braveApiKeyController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final settingsAsync = ref.watch(settingsProvider);
+    final braveSettingsAsync = ref.watch(braveSettingsProvider);
 
     return Scaffold(
       body: Container(
@@ -67,12 +75,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     child: CircularProgressIndicator(color: AppColors.primaryAction),
                   ),
                   error: (e, _) => Center(child: Text('Error: $e')),
-                  data: (settings) {
-                    if (_apiKeyController.text.isEmpty && settings.apiKey.isNotEmpty) {
-                      _apiKeyController.text = settings.apiKey;
-                    }
-                    return _buildContent(settings);
-                  },
+                  data: (settings) => braveSettingsAsync.when(
+                    loading: () => const Center(
+                      child: CircularProgressIndicator(color: AppColors.primaryAction),
+                    ),
+                    error: (e, _) => Center(child: Text('Error: $e')),
+                    data: (braveSettings) {
+                      if (_apiKeyController.text.isEmpty && settings.apiKey.isNotEmpty) {
+                        _apiKeyController.text = settings.apiKey;
+                      }
+                      return _buildContent(settings, braveSettings);
+                    },
+                  ),
                 ),
               ),
             ],
@@ -89,7 +103,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  Widget _buildContent(AppSettings settings) {
+  Widget _buildContent(AppSettings settings, BraveSettings braveSettings) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
       children: [
@@ -201,6 +215,151 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
         // AI PROVIDER
         const LlmProviderSettingsSection(),
+
+        const SizedBox(height: 8),
+
+        _buildSection('WEB EVIDENCE', [
+          _buildSettingRow(
+            title: 'Brave Search evidence',
+            subtitle: braveSettings.apiKeyConfigured
+                ? 'API key stored securely'
+                : 'Add a Brave Search API key to enable this later',
+            trailing: Switch(
+              value: braveSettings.enabled,
+              onChanged: (value) {
+                ref.read(braveSettingsProvider.notifier).setEnabled(value);
+              },
+              activeThumbColor: AppColors.primaryAction,
+            ),
+          ),
+          _buildSettingRow(
+            title: 'Brave API Key',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: _braveApiKeyController,
+                  obscureText: !_braveApiKeyVisible,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.bodyText,
+                    fontFamily: 'monospace',
+                  ),
+                  decoration: InputDecoration(
+                    hintText: braveSettings.apiKeyConfigured
+                        ? 'Enter a new key to replace the saved one'
+                        : 'brave-key...',
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    isDense: true,
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _braveApiKeyVisible
+                            ? Icons.visibility_off
+                            : Icons.visibility,
+                        size: 18,
+                        color: AppColors.secondaryText,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _braveApiKeyVisible = !_braveApiKeyVisible;
+                        });
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    FilledButton(
+                      onPressed: () async {
+                        final apiKey = _braveApiKeyController.text.trim();
+                        if (apiKey.isEmpty) return;
+
+                        await ref
+                            .read(braveSettingsProvider.notifier)
+                            .saveApiKey(apiKey);
+                        if (!mounted) return;
+
+                        _braveApiKeyController.clear();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Brave API key saved securely.'),
+                          ),
+                        );
+                      },
+                      child: const Text('Save key'),
+                    ),
+                    OutlinedButton(
+                      onPressed: braveSettings.apiKeyConfigured
+                          ? () async {
+                              await ref
+                                  .read(braveSettingsProvider.notifier)
+                                  .clearApiKey();
+                              if (!mounted) return;
+
+                              _braveApiKeyController.clear();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Brave API key cleared.'),
+                                ),
+                              );
+                            }
+                          : null,
+                      child: const Text('Clear key'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          _buildSettingRow(
+            title: 'Result count',
+            subtitle: '${braveSettings.resultCount} results',
+            child: Slider(
+              value: braveSettings.resultCount.toDouble(),
+              min: 1,
+              max: 20,
+              divisions: 19,
+              activeColor: AppColors.primaryAction,
+              inactiveColor: AppColors.dividerBorder,
+              label: braveSettings.resultCount.toString(),
+              onChanged: (value) {
+                ref
+                    .read(braveSettingsProvider.notifier)
+                    .setResultCount(value.round());
+              },
+            ),
+          ),
+          _buildSettingRow(
+            title: 'Safe Search',
+            child: DropdownButtonFormField<BraveSafeSearch>(
+              initialValue: braveSettings.safeSearch,
+              decoration: const InputDecoration(
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+              ),
+              items: BraveSafeSearch.values
+                  .map(
+                    (option) => DropdownMenuItem<BraveSafeSearch>(
+                      value: option,
+                      child: Text(option.name),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                if (value == null) return;
+                ref.read(braveSettingsProvider.notifier).setSafeSearch(value);
+              },
+            ),
+          ),
+        ]),
 
         const SizedBox(height: 8),
 

@@ -1,46 +1,47 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:uuid/uuid.dart';
 
 import '../models/note_draft.dart';
 import '../models/note_draft_review_state.dart';
 import '../models/note.dart';
 import '../services/database_service.dart';
+import 'notes_provider.dart';
 
 abstract class NoteDraftReviewRepository {
-  Future<void> insertNote(Note note);
+  Future<Note> insertNote({required String title, required String content});
   Future<void> updateNote(Note note);
   Future<Note?> getNoteById(String id);
 }
 
-class DatabaseNoteDraftReviewRepository implements NoteDraftReviewRepository {
-  final DatabaseService _databaseService;
+class NotesNotifierNoteDraftReviewRepository
+    implements NoteDraftReviewRepository {
+  final NotesNotifier _notesNotifier;
 
-  DatabaseNoteDraftReviewRepository({DatabaseService? databaseService})
-      : _databaseService = databaseService ?? DatabaseService.instance;
-
-  @override
-  Future<Note?> getNoteById(String id) => _databaseService.getNoteById(id);
+  NotesNotifierNoteDraftReviewRepository(this._notesNotifier);
 
   @override
-  Future<void> insertNote(Note note) => _databaseService.insertNote(note);
+  Future<Note> insertNote({required String title, required String content}) =>
+      _notesNotifier.addNote(title: title, content: content);
 
   @override
-  Future<void> updateNote(Note note) => _databaseService.updateNote(note);
+  Future<void> updateNote(Note note) => _notesNotifier.updateNote(note);
+
+  @override
+  Future<Note?> getNoteById(String id) =>
+      DatabaseService.instance.getNoteById(id);
 }
 
 final noteDraftReviewRepositoryProvider = Provider<NoteDraftReviewRepository>(
-  (ref) => DatabaseNoteDraftReviewRepository(),
+  (ref) => NotesNotifierNoteDraftReviewRepository(
+    ref.read(notesProvider.notifier),
+  ),
 );
 
 class NoteDraftReviewNotifier extends StateNotifier<NoteDraftReviewState> {
   final NoteDraftReviewRepository _repository;
-  final Uuid _uuid;
 
   NoteDraftReviewNotifier({
     required NoteDraftReviewRepository repository,
-    Uuid? uuid,
   })  : _repository = repository,
-        _uuid = uuid ?? const Uuid(),
         super(const NoteDraftReviewState());
 
   void startReview(NoteDraft noteDraft) {
@@ -101,25 +102,15 @@ class NoteDraftReviewNotifier extends StateNotifier<NoteDraftReviewState> {
       clearError: true,
     );
 
-    final now = DateTime.now();
-    final note = Note(
-      id: _uuid.v4(),
-      title: _titleFor(draft),
-      content: _buildGeneratedNoteMarkdown(
-        draft,
-        action: NoteDraftAction.createNewNote,
-        generatedAt: now,
-      ),
-      tags: const [],
-      keywords: const [],
-      isPinned: false,
-      createdAt: now,
-      updatedAt: now,
-      embeddingPending: true,
-    );
-
     try {
-      await _repository.insertNote(note);
+      final note = await _repository.insertNote(
+        title: _titleFor(draft),
+        content: _buildGeneratedNoteMarkdown(
+          draft,
+          action: NoteDraftAction.createNewNote,
+          generatedAt: DateTime.now(),
+        ),
+      );
       state = state.copyWith(status: NoteDraftReviewStatus.saved);
       return note;
     } catch (error) {

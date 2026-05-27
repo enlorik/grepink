@@ -6,6 +6,7 @@ import 'package:grepink/models/note.dart';
 import 'package:grepink/models/note_draft.dart';
 import 'package:grepink/models/note_draft_review_state.dart';
 import 'package:grepink/providers/note_draft_review_provider.dart';
+import 'package:grepink/providers/notes_provider.dart';
 
 class _FakeNoteDraftReviewRepository implements NoteDraftReviewRepository {
   final Map<String, Note> notesById = <String, Note>{};
@@ -16,15 +17,69 @@ class _FakeNoteDraftReviewRepository implements NoteDraftReviewRepository {
   Future<Note?> getNoteById(String id) async => notesById[id];
 
   @override
-  Future<void> insertNote(Note note) async {
+  Future<Note> insertNote({required String title, required String content}) async {
     insertedNotes++;
+    final now = DateTime(2026, 5, 18);
+    final note = Note(
+      id: 'fake-$insertedNotes',
+      title: title,
+      content: content,
+      tags: const [],
+      keywords: const [],
+      isPinned: false,
+      createdAt: now,
+      updatedAt: now,
+      embeddingPending: true,
+    );
     notesById[note.id] = note;
+    return note;
   }
 
   @override
   Future<void> updateNote(Note note) async {
     updatedNotes++;
     notesById[note.id] = note;
+  }
+}
+
+/// Fake NotesNotifier that records addNote/updateNote calls without hitting a
+/// real database.
+class _FakeNotesNotifier extends NotesNotifier {
+  int addNoteCallCount = 0;
+  int updateNoteCallCount = 0;
+
+  _FakeNotesNotifier(super.ref);
+
+  @override
+  Future<void> loadNotes() async {
+    state = const AsyncValue.data([]);
+  }
+
+  @override
+  Future<Note> addNote({
+    required String title,
+    required String content,
+    List<String> tags = const [],
+    List<String> keywords = const [],
+  }) async {
+    addNoteCallCount++;
+    final now = DateTime.now();
+    return Note(
+      id: 'notifier-added-$addNoteCallCount',
+      title: title,
+      content: content,
+      tags: tags,
+      keywords: keywords,
+      isPinned: false,
+      createdAt: now,
+      updatedAt: now,
+      embeddingPending: true,
+    );
+  }
+
+  @override
+  Future<void> updateNote(Note note) async {
+    updateNoteCallCount++;
   }
 }
 
@@ -265,6 +320,58 @@ void main() {
       expect(state.noteDraft, isNull);
       expect(repository.insertedNotes, 0);
       expect(repository.updatedNotes, 0);
+    });
+  });
+
+  group('NotesNotifierNoteDraftReviewRepository delegation', () {
+    test('insertNote delegates to NotesNotifier.addNote', () async {
+      final container = ProviderContainer(
+        overrides: [
+          notesProvider.overrideWith((ref) => _FakeNotesNotifier(ref)),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final fakeNotifier =
+          container.read(notesProvider.notifier) as _FakeNotesNotifier;
+      final repo = NotesNotifierNoteDraftReviewRepository(fakeNotifier);
+
+      final note = await repo.insertNote(title: 'Test', content: 'Content');
+
+      expect(fakeNotifier.addNoteCallCount, 1);
+      expect(note.title, 'Test');
+      expect(note.content, 'Content');
+      expect(note.embeddingPending, isTrue);
+    });
+
+    test('updateNote delegates to NotesNotifier.updateNote', () async {
+      final container = ProviderContainer(
+        overrides: [
+          notesProvider.overrideWith((ref) => _FakeNotesNotifier(ref)),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final fakeNotifier =
+          container.read(notesProvider.notifier) as _FakeNotesNotifier;
+      final repo = NotesNotifierNoteDraftReviewRepository(fakeNotifier);
+
+      final now = DateTime(2026, 5, 18);
+      final existingNote = Note(
+        id: 'n1',
+        title: 'Old',
+        content: 'Old content',
+        tags: const [],
+        keywords: const [],
+        isPinned: false,
+        createdAt: now,
+        updatedAt: now,
+        embeddingPending: false,
+      );
+
+      await repo.updateNote(existingNote);
+
+      expect(fakeNotifier.updateNoteCallCount, 1);
     });
   });
 }
