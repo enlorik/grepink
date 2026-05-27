@@ -305,6 +305,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             onSaveAsNewNote: _saveAsNewNote,
             onAppendToExistingNote: _appendToExistingNote,
             onDiscard: _discardDraft,
+            availableNotes: availableNotes,
+            selectedTargetNoteId: reviewState.targetNoteId,
+            onTargetNoteSelected: (noteId) {
+              ref.read(noteDraftReviewProvider.notifier).selectTargetNote(noteId);
+            },
+            status: reviewState.status,
+            selectedDecision: reviewState.selectedDecision,
+            errorMessage: reviewState.errorMessage,
           ),
         ],
       ],
