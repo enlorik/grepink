@@ -254,5 +254,79 @@ void main() {
       expect(enabledAppendButton.onPressed, isNotNull);
       expect(find.text('Target selected: "Existing target note".'), findsOneWidget);
     });
+
+    testWidgets('web sources with URL appear before unsourced web items',
+        (tester) async {
+      const sourced = EvidenceItem(
+        id: 'web-sourced',
+        type: EvidenceType.webSearch,
+        title: 'Sourced web result',
+        content: 'Has a source URL',
+        sourceUrl: 'https://example.com/sourced',
+      );
+      const unsourced = EvidenceItem(
+        id: 'web-unsourced',
+        type: EvidenceType.webSearch,
+        title: 'Unsourced web result',
+        content: 'No URL attached',
+      );
+
+      const draft = NoteDraft(
+        question: 'Sort order test',
+        markdownContent: '# Test',
+        action: NoteDraftAction.doNotSave,
+        deltas: [],
+        localEvidence: [],
+        webEvidence: [unsourced, sourced],
+      );
+
+      await tester.pumpWidget(_buildWidget(draft: draft));
+      await tester.pump();
+
+      final sourcedCardOffset =
+          tester.getTopLeft(find.text('Sourced web result').first);
+      final unsourcedCardOffset =
+          tester.getTopLeft(find.text('Unsourced web result').first);
+
+      expect(sourcedCardOffset.dy, lessThan(unsourcedCardOffset.dy),
+          reason: 'sourced item should appear above unsourced item');
+    });
+
+    testWidgets('local notes with sourceNoteId appear before those without',
+        (tester) async {
+      const withId = EvidenceItem(
+        id: 'local-with-id',
+        type: EvidenceType.localNote,
+        title: 'Note with source ID',
+        content: 'Has source note id',
+        sourceNoteId: 'note-ref-1',
+      );
+      const withoutId = EvidenceItem(
+        id: 'local-no-id',
+        type: EvidenceType.localNote,
+        title: 'Note without source ID',
+        content: 'No source note id',
+      );
+
+      const draft = NoteDraft(
+        question: 'Local sort test',
+        markdownContent: '# Local',
+        action: NoteDraftAction.doNotSave,
+        deltas: [],
+        localEvidence: [withoutId, withId],
+        webEvidence: [],
+      );
+
+      await tester.pumpWidget(_buildWidget(draft: draft));
+      await tester.pump();
+
+      final withIdOffset =
+          tester.getTopLeft(find.text('Note with source ID').first);
+      final withoutIdOffset =
+          tester.getTopLeft(find.text('Note without source ID').first);
+
+      expect(withIdOffset.dy, lessThan(withoutIdOffset.dy),
+          reason: 'local note with sourceNoteId should appear above one without');
+    });
   });
 }
