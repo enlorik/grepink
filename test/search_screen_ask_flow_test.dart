@@ -356,4 +356,150 @@ void main() {
       expect(find.text('Draft Review'), findsOneWidget);
     });
   });
+
+  group('SearchScreen layout smoke tests', () {
+    Future<void> setSurface(WidgetTester tester, Size size) async {
+      await tester.binding.setSurfaceSize(size);
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+    }
+
+    Future<void> pumpWithDraft(
+      WidgetTester tester, {
+      required NoteDraftAction action,
+      List<Note> notes = const [],
+    }) async {
+      await _pumpSearchScreen(
+        tester,
+        ingestionService: _FakeKnowledgeIngestionService(
+          (_) async => _draft(question: 'Layout test', action: action),
+        ),
+        repository: _FakeNoteDraftReviewRepository(),
+        notes: notes,
+      );
+      await _askQuestion(tester, 'Layout test');
+      await tester.pumpAndSettle();
+    }
+
+    // ── phone ──────────────────────────────────────────────────────────────
+
+    testWidgets('phone – ask form fields are accessible', (tester) async {
+      await setSurface(tester, const Size(360, 640));
+      await _pumpSearchScreen(
+        tester,
+        ingestionService: _FakeKnowledgeIngestionService((_) async => _draft(
+              question: 'x',
+              action: NoteDraftAction.createNewNote,
+            )),
+        repository: _FakeNoteDraftReviewRepository(),
+      );
+
+      expect(find.byKey(const Key('ask-question-field')), findsOneWidget);
+      expect(find.byKey(const Key('ask-question-button')), findsOneWidget);
+    });
+
+    testWidgets('phone – loading indicator is accessible', (tester) async {
+      await setSurface(tester, const Size(360, 640));
+      final completer = Completer<NoteDraft>();
+      await _pumpSearchScreen(
+        tester,
+        ingestionService:
+            _FakeKnowledgeIngestionService((_) => completer.future),
+        repository: _FakeNoteDraftReviewRepository(),
+      );
+
+      await _askQuestion(tester, 'Loading test');
+
+      expect(find.text('Generating draft...'), findsOneWidget);
+      final askBtn =
+          tester.widget<FilledButton>(find.byKey(const Key('ask-question-button')));
+      expect(askBtn.onPressed, isNull);
+    });
+
+    testWidgets('phone – save and discard buttons are reachable after ask',
+        (tester) async {
+      await setSurface(tester, const Size(360, 640));
+      await pumpWithDraft(tester, action: NoteDraftAction.createNewNote);
+
+      expect(find.text('Draft Review'), findsOneWidget);
+      await tester.ensureVisible(find.text('Save as new note'));
+      expect(find.text('Save as new note'), findsOneWidget);
+      await tester.ensureVisible(find.text('Discard'));
+      expect(find.text('Discard'), findsOneWidget);
+    });
+
+    testWidgets('phone – append target dropdown is accessible and does not overflow',
+        (tester) async {
+      await setSurface(tester, const Size(360, 640));
+      final note = _note(id: 'n1', title: 'Target', content: 'c');
+      await pumpWithDraft(
+        tester,
+        action: NoteDraftAction.appendToExistingNote,
+        notes: [note],
+      );
+
+      expect(find.byKey(const Key('append-target-dropdown')), findsOneWidget);
+
+      // Verify the dropdown fits within the 360px screen width (no overflow)
+      final dropdownRect = tester.getRect(
+        find.byKey(const Key('append-target-dropdown')),
+      );
+      expect(dropdownRect.right, lessThanOrEqualTo(360.0),
+          reason: 'Dropdown must not exceed screen width on a narrow phone');
+    });
+
+    testWidgets('phone – append and save buttons reachable after ask (createNewNote)',
+        (tester) async {
+      await setSurface(tester, const Size(360, 640));
+      await pumpWithDraft(tester, action: NoteDraftAction.createNewNote);
+
+      await tester.ensureVisible(find.text('Append to existing note'));
+      expect(find.text('Append to existing note'), findsOneWidget);
+    });
+
+    // ── tablet ─────────────────────────────────────────────────────────────
+
+    testWidgets('tablet – ask form and review panel are accessible', (tester) async {
+      await setSurface(tester, const Size(768, 1024));
+      await pumpWithDraft(tester, action: NoteDraftAction.createNewNote);
+
+      expect(find.byKey(const Key('ask-question-field')), findsOneWidget);
+      expect(find.text('Draft Review'), findsOneWidget);
+      await tester.ensureVisible(find.text('Save as new note'));
+      expect(find.text('Save as new note'), findsOneWidget);
+      await tester.ensureVisible(find.text('Discard'));
+      expect(find.text('Discard'), findsOneWidget);
+    });
+
+    testWidgets('tablet – append target dropdown is accessible', (tester) async {
+      await setSurface(tester, const Size(768, 1024));
+      final note = _note(id: 'n1', title: 'Target', content: 'c');
+      await pumpWithDraft(
+        tester,
+        action: NoteDraftAction.appendToExistingNote,
+        notes: [note],
+      );
+
+      expect(find.byKey(const Key('append-target-dropdown')), findsOneWidget);
+    });
+
+    // ── desktop ────────────────────────────────────────────────────────────
+
+    testWidgets('desktop – ask form and review panel are accessible', (tester) async {
+      await setSurface(tester, const Size(1280, 800));
+      await pumpWithDraft(tester, action: NoteDraftAction.createNewNote);
+
+      expect(find.byKey(const Key('ask-question-field')), findsOneWidget);
+      expect(find.text('Draft Review'), findsOneWidget);
+      await tester.ensureVisible(find.text('Save as new note'));
+      expect(find.text('Save as new note'), findsOneWidget);
+    });
+
+    testWidgets('desktop – discard button is reachable', (tester) async {
+      await setSurface(tester, const Size(1280, 800));
+      await pumpWithDraft(tester, action: NoteDraftAction.createNewNote);
+
+      await tester.ensureVisible(find.text('Discard'));
+      expect(find.text('Discard'), findsOneWidget);
+    });
+  });
 }
