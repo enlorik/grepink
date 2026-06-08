@@ -233,7 +233,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              Row(
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   FilledButton.icon(
                     key: const Key('ask-question-button'),
@@ -252,12 +253,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     ),
                   ),
                   if (knowledgeState.isLoading) ...[
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Building a note draft from your existing knowledge.',
-                        style: AppTextStyles.bodySmall,
-                      ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Building a note draft from your existing knowledge.',
+                      style: AppTextStyles.bodySmall,
                     ),
                   ],
                 ],

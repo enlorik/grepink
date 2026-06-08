@@ -135,6 +135,7 @@ class NoteDraftReviewPanel extends StatelessWidget {
             else ...[
               DropdownButtonFormField<String>(
                 key: ValueKey<String>('append-target-${selectedTargetNoteId ?? 'none'}'),
+                isExpanded: true,
                 initialValue: availableNotes.any((note) => note.id == selectedTargetNoteId)
                     ? selectedTargetNoteId
                     : null,

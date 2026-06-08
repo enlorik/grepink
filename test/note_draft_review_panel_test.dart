@@ -328,5 +328,59 @@ void main() {
       expect(withIdOffset.dy, lessThan(withoutIdOffset.dy),
           reason: 'local note with sourceNoteId should appear above one without');
     });
+
+    testWidgets('append target dropdown fits within a 360px phone screen width',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(360, 640));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        _buildWidget(
+          draft: _draft(),
+          availableNotes: [targetNote],
+        ),
+      );
+
+      // Key is 'append-target-none' when no note is pre-selected
+      expect(
+        find.byKey(const ValueKey<String>('append-target-none')),
+        findsOneWidget,
+      );
+      final dropdownRect = tester.getRect(
+        find.byKey(const ValueKey<String>('append-target-none')),
+      );
+      expect(
+        dropdownRect.right,
+        lessThanOrEqualTo(360.0),
+        reason: 'Dropdown must not overflow the 360px phone screen width',
+      );
+    });
+
+    testWidgets('append target dropdown with a selected note fits within 360px',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(360, 640));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        _buildWidget(
+          draft: _draft(),
+          availableNotes: [targetNote],
+          selectedTargetNoteId: targetNote.id,
+        ),
+      );
+
+      expect(
+        find.byKey(ValueKey<String>('append-target-${targetNote.id}')),
+        findsOneWidget,
+      );
+      final dropdownRect = tester.getRect(
+        find.byKey(ValueKey<String>('append-target-${targetNote.id}')),
+      );
+      expect(
+        dropdownRect.right,
+        lessThanOrEqualTo(360.0),
+        reason: 'Dropdown must not overflow when a note is selected on a narrow screen',
+      );
+    });
   });
 }
