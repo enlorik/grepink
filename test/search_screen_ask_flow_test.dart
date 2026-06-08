@@ -427,7 +427,7 @@ void main() {
       expect(find.text('Discard'), findsOneWidget);
     });
 
-    testWidgets('phone – append target dropdown is accessible and does not overflow',
+    testWidgets('phone – SearchScreen append target dropdown fits on narrow screen',
         (tester) async {
       await setSurface(tester, const Size(360, 640));
       final note = _note(id: 'n1', title: 'Target', content: 'c');
@@ -437,14 +437,21 @@ void main() {
         notes: [note],
       );
 
+      // This is the SearchScreen's own append-target selector above the panel
       expect(find.byKey(const Key('append-target-dropdown')), findsOneWidget);
-
-      // Verify the dropdown fits within the 360px screen width (no overflow)
-      final dropdownRect = tester.getRect(
+      final outerDropdownRect = tester.getRect(
         find.byKey(const Key('append-target-dropdown')),
       );
-      expect(dropdownRect.right, lessThanOrEqualTo(360.0),
-          reason: 'Dropdown must not exceed screen width on a narrow phone');
+      expect(outerDropdownRect.right, lessThanOrEqualTo(360.0),
+          reason: 'SearchScreen dropdown must not exceed screen width on a narrow phone');
+
+      // This is the NoteDraftReviewPanel's own dropdown (key is dynamic based on selection)
+      expect(find.byKey(const ValueKey<String>('append-target-none')), findsOneWidget);
+      final panelDropdownRect = tester.getRect(
+        find.byKey(const ValueKey<String>('append-target-none')),
+      );
+      expect(panelDropdownRect.right, lessThanOrEqualTo(360.0),
+          reason: 'Panel dropdown must not exceed screen width on a narrow phone');
     });
 
     testWidgets('phone – append and save buttons reachable after ask (createNewNote)',
