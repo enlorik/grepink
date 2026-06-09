@@ -44,13 +44,16 @@ class NoteDraftReviewPanel extends StatelessWidget {
         .map((delta) => delta.evidence)
         .toList();
     final isSaving = status == NoteDraftReviewStatus.saving;
+    final isActionBlocked = status == NoteDraftReviewStatus.saving ||
+        status == NoteDraftReviewStatus.saved ||
+        status == NoteDraftReviewStatus.discarded;
     final hasTarget =
         selectedTargetNoteId != null && selectedTargetNoteId!.trim().isNotEmpty;
     final selectedTarget = availableNotes.cast<Note?>().firstWhere(
           (note) => note?.id == selectedTargetNoteId,
           orElse: () => null,
         );
-    final canAppend = availableNotes.isNotEmpty && hasTarget && !isSaving;
+    final canAppend = !isActionBlocked && availableNotes.isNotEmpty && hasTarget;
 
     return Container(
       decoration: BoxDecoration(
@@ -139,7 +142,7 @@ class NoteDraftReviewPanel extends StatelessWidget {
                 initialValue: availableNotes.any((note) => note.id == selectedTargetNoteId)
                     ? selectedTargetNoteId
                     : null,
-                onChanged: isSaving ? null : onTargetNoteSelected,
+                onChanged: isActionBlocked ? null : onTargetNoteSelected,
                 items: availableNotes
                     .map(
                       (note) => DropdownMenuItem<String>(
@@ -179,7 +182,7 @@ class NoteDraftReviewPanel extends StatelessWidget {
               runSpacing: 8,
               children: [
                 FilledButton(
-                  onPressed: isSaving ? null : onSaveAsNewNote,
+                  onPressed: isActionBlocked ? null : onSaveAsNewNote,
                   child: const Text('Save as new note'),
                 ),
                 OutlinedButton(
@@ -187,7 +190,7 @@ class NoteDraftReviewPanel extends StatelessWidget {
                   child: const Text('Append to existing note'),
                 ),
                 TextButton(
-                  onPressed: isSaving ? null : onDiscard,
+                  onPressed: isActionBlocked ? null : onDiscard,
                   child: const Text('Discard'),
                 ),
               ],
