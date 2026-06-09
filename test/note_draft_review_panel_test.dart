@@ -187,8 +187,22 @@ void main() {
       expect(find.text('Ignored duplicates'), findsNothing);
     });
 
-    testWidgets('shows saved status and append target selection state',
-        (tester) async {
+    testWidgets('shows success message in saved state', (tester) async {
+      await tester.pumpWidget(
+        _buildWidget(
+          draft: _draft(),
+          availableNotes: [targetNote],
+          selectedTargetNoteId: targetNote.id,
+          status: NoteDraftReviewStatus.saved,
+          selectedDecision: NoteDraftReviewDecision.appendToExistingNote,
+        ),
+      );
+
+      expect(find.text('Append success for "Existing target note".'), findsOneWidget);
+      expect(find.text('Append will update the selected note only.'), findsOneWidget);
+    });
+
+    testWidgets('dropdown fires callback when in reviewing state', (tester) async {
       String? selectedTarget;
       final alternateNote = Note(
         id: 'note-2',
@@ -207,22 +221,18 @@ void main() {
           draft: _draft(),
           availableNotes: [targetNote, alternateNote],
           selectedTargetNoteId: targetNote.id,
-          status: NoteDraftReviewStatus.saved,
-          selectedDecision: NoteDraftReviewDecision.appendToExistingNote,
+          status: NoteDraftReviewStatus.reviewing,
           onTargetNoteSelected: (value) => selectedTarget = value,
         ),
       );
 
-      expect(find.text('Append success for "Existing target note".'), findsOneWidget);
-      expect(find.text('Append will update the selected note only.'), findsOneWidget);
-
       await tester.ensureVisible(find.byType(DropdownButtonFormField<String>));
       await tester.tap(find.byType(DropdownButtonFormField<String>));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Existing target note').last);
+      await tester.tap(find.text('Another note').last);
       await tester.pumpAndSettle();
 
-      expect(selectedTarget, targetNote.id);
+      expect(selectedTarget, alternateNote.id);
     });
 
     testWidgets('append button stays disabled until a target note is selected',
@@ -381,6 +391,123 @@ void main() {
         lessThanOrEqualTo(360.0),
         reason: 'Dropdown must not overflow when a note is selected on a narrow screen',
       );
+    });
+
+    testWidgets('saved state disables save and append action buttons',
+        (tester) async {
+      await tester.pumpWidget(
+        _buildWidget(
+          draft: _draft(),
+          availableNotes: [targetNote],
+          selectedTargetNoteId: targetNote.id,
+          status: NoteDraftReviewStatus.saved,
+          onSaveAsNewNote: () {},
+          onAppendToExistingNote: () {},
+          onDiscard: () {},
+        ),
+      );
+
+      final saveButton = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, 'Save as new note'),
+      );
+      final appendButton = tester.widget<OutlinedButton>(
+        find.widgetWithText(OutlinedButton, 'Append to existing note'),
+      );
+      final discardButton = tester.widget<TextButton>(
+        find.widgetWithText(TextButton, 'Discard'),
+      );
+      expect(saveButton.onPressed, isNull,
+          reason: 'Save must be disabled after the note is saved');
+      expect(appendButton.onPressed, isNull,
+          reason: 'Append must be disabled after the note is saved');
+      expect(discardButton.onPressed, isNull,
+          reason: 'Discard must be disabled after the note is saved');
+    });
+
+    testWidgets('discarded state disables save and append action buttons',
+        (tester) async {
+      await tester.pumpWidget(
+        _buildWidget(
+          draft: _draft(),
+          availableNotes: [targetNote],
+          selectedTargetNoteId: targetNote.id,
+          status: NoteDraftReviewStatus.discarded,
+          onSaveAsNewNote: () {},
+          onAppendToExistingNote: () {},
+          onDiscard: () {},
+        ),
+      );
+
+      final saveButton = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, 'Save as new note'),
+      );
+      final appendButton = tester.widget<OutlinedButton>(
+        find.widgetWithText(OutlinedButton, 'Append to existing note'),
+      );
+      expect(saveButton.onPressed, isNull,
+          reason: 'Save must be disabled after discard');
+      expect(appendButton.onPressed, isNull,
+          reason: 'Append must be disabled after discard');
+    });
+
+    testWidgets('error state shows error message in append target status',
+        (tester) async {
+      await tester.pumpWidget(
+        _buildWidget(
+          draft: _draft(),
+          availableNotes: [targetNote],
+          selectedTargetNoteId: targetNote.id,
+          status: NoteDraftReviewStatus.error,
+          errorMessage: 'Selected target note no longer exists.',
+        ),
+      );
+
+      expect(
+        find.text('Selected target note no longer exists.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('error state without errorMessage shows fallback text',
+        (tester) async {
+      await tester.pumpWidget(
+        _buildWidget(
+          draft: _draft(),
+          availableNotes: [targetNote],
+          selectedTargetNoteId: targetNote.id,
+          status: NoteDraftReviewStatus.error,
+        ),
+      );
+
+      expect(
+        find.text('Append error. Select a valid note and try again.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('long error message wraps without overflow on 360px screen',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(360, 700));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      const longError =
+          'Something went wrong saving this draft to the database — '
+          'the storage layer reported an unexpected failure. '
+          'Please try again or contact support if the issue persists.';
+
+      await tester.pumpWidget(
+        _buildWidget(
+          draft: _draft(),
+          availableNotes: [targetNote],
+          selectedTargetNoteId: targetNote.id,
+          status: NoteDraftReviewStatus.error,
+          errorMessage: longError,
+        ),
+      );
+
+      expect(tester.takeException(), isNull,
+          reason: 'Long error message must not cause a RenderFlex overflow');
+      expect(find.textContaining('Something went wrong'), findsOneWidget);
     });
   });
 }
