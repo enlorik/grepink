@@ -62,6 +62,24 @@ class _FailingRepository implements NoteDraftReviewRepository {
       throw Exception('database unavailable');
 }
 
+/// Finds the target note successfully but throws when updateNote is called.
+class _FailingUpdateRepository implements NoteDraftReviewRepository {
+  final Note noteToReturn;
+
+  _FailingUpdateRepository(this.noteToReturn);
+
+  @override
+  Future<Note?> getNoteById(String id) async => noteToReturn;
+
+  @override
+  Future<Note> insertNote({required String title, required String content}) =>
+      throw Exception('not expected');
+
+  @override
+  Future<void> updateNote(Note note) =>
+      throw Exception('update database unavailable');
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -291,18 +309,24 @@ void main() {
         );
       });
 
-      test('repository failure on update surfaces error state', () async {
-        final container = _container(_FailingRepository());
+      test('repository failure on updateNote surfaces error state', () async {
+        final existingNote = _existingNote();
+        final container = _container(_FailingUpdateRepository(existingNote));
         final notifier = container.read(noteDraftReviewProvider.notifier);
 
         notifier.startReview(_draft(action: NoteDraftAction.appendToExistingNote));
-        notifier.selectTargetNote('note-1');
+        notifier.selectTargetNote(existingNote.id);
         final result = await notifier.appendToExistingNote();
 
-        expect(result, isNull);
+        expect(result, isNull,
+            reason: 'updateNote threw so no updated note should be returned');
         expect(
           container.read(noteDraftReviewProvider).status,
           NoteDraftReviewStatus.error,
+        );
+        expect(
+          container.read(noteDraftReviewProvider).errorMessage,
+          isNotEmpty,
         );
       });
     });
