@@ -4,7 +4,6 @@ import 'package:grepink/models/evidence_item.dart';
 import 'package:grepink/models/knowledge_delta.dart';
 import 'package:grepink/models/note.dart';
 import 'package:grepink/models/note_draft.dart';
-import 'package:grepink/models/note_draft_review_state.dart';
 import 'package:grepink/providers/note_draft_review_provider.dart';
 
 // ---------------------------------------------------------------------------
