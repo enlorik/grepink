@@ -146,7 +146,7 @@ void main() {
 
   group('BraveSettingsNotifier — key safety', () {
     test('clearing API key updates apiKeyConfigured to false', () async {
-      final (container, _, __, ___) = await _makeContainer();
+      final (container, _, _, _) = await _makeContainer();
       addTearDown(container.dispose);
 
       await container.read(braveSettingsProvider.future);
@@ -165,7 +165,7 @@ void main() {
     });
 
     test('empty API key is treated as no key — provider reads unconfigured', () async {
-      final (container, _, secure, __) = await _makeContainer();
+      final (container, _, secure, _) = await _makeContainer();
       addTearDown(container.dispose);
 
       await container.read(braveSettingsProvider.future);
@@ -179,7 +179,7 @@ void main() {
     });
 
     test('persisted settings JSON never includes API key value', () async {
-      final (container, _, __, prefs) = await _makeContainer();
+      final (container, _, _, prefs) = await _makeContainer();
       addTearDown(container.dispose);
 
       await container.read(braveSettingsProvider.future);
