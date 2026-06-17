@@ -185,6 +185,30 @@ void main() {
       expect(a, isNot(equals(b)));
     });
 
+    test('not equal when generatedAt differs', () {
+      final a = GroundedAnswer(
+        question: 'q',
+        answerText: 'text',
+        citations: const [],
+        providerName: 'p',
+        generatedAt: DateTime.utc(2026, 6, 17, 10),
+      );
+      final b = GroundedAnswer(
+        question: 'q',
+        answerText: 'text',
+        citations: const [],
+        providerName: 'p',
+        generatedAt: DateTime.utc(2026, 6, 17, 11),
+      );
+      expect(a, isNot(equals(b)));
+    });
+
+    test('not equal when rawSourceLabel differs', () {
+      final a = _answer(rawSourceLabel: 'label_a');
+      final b = _answer(rawSourceLabel: 'label_b');
+      expect(a, isNot(equals(b)));
+    });
+
     test('hashCode is consistent with equality', () {
       final a = _answer();
       final b = _answer();
