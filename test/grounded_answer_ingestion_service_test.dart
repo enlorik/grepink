@@ -34,6 +34,32 @@ class _FakeLocalEvidence implements LocalEvidenceRetriever {
   Future<List<EvidenceItem>> retrieve(String question) async => _items;
 }
 
+class _CallOrder {
+  final events = <String>[];
+}
+
+class _OrderTrackingProvider implements GroundedAnswerProvider {
+  final _CallOrder _order;
+  _OrderTrackingProvider(this._order);
+
+  @override
+  Future<GroundedAnswer?> fetchGroundedAnswer(String question) async {
+    _order.events.add('provider');
+    return _answer();
+  }
+}
+
+class _OrderTrackingLocalEvidence implements LocalEvidenceRetriever {
+  final _CallOrder _order;
+  _OrderTrackingLocalEvidence(this._order);
+
+  @override
+  Future<List<EvidenceItem>> retrieve(String question) async {
+    _order.events.add('local');
+    return const [];
+  }
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 GroundedAnswer _answer({
@@ -218,6 +244,23 @@ void main() {
       final result = await svc.ingest('What is gravity?');
 
       expect(result.hasNewKnowledge, isFalse);
+    });
+
+    test('local evidence is retrieved before the external provider is called',
+        () async {
+      final order = _CallOrder();
+      final svc = GroundedAnswerIngestionService(
+        provider: _OrderTrackingProvider(order),
+        extractor: const RuleBasedClaimExtractionService(),
+        deduplicator: TextSimilarityClaimDeduplicationService(
+            FakeTextSimilarityProvider(0.1)),
+        localEvidence: _OrderTrackingLocalEvidence(order),
+      );
+
+      await svc.ingest('What is gravity?');
+
+      expect(order.events, containsAllInOrder(['local', 'provider']));
+      expect(order.events.first, 'local');
     });
   });
 }

@@ -32,12 +32,11 @@ class GroundedAnswerIngestionService {
     }
 
     try {
+      final localEvidence = await _localEvidence.retrieve(question);
       final answer = await _provider.fetchGroundedAnswer(question);
       if (answer == null || answer.isEmpty) {
         return GroundedClaimIngestionResult.empty(question);
       }
-
-      final localEvidence = await _localEvidence.retrieve(question);
       final claims = _extractor.extract(answer);
 
       if (claims.isEmpty) {
