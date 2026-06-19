@@ -43,9 +43,11 @@ class RuleBasedClaimExtractionService implements ClaimExtractionService {
       if (seen.contains(trimmed)) continue;
       seen.add(trimmed);
 
-      // ID is a deterministic content-based key derived from provider, question,
-      // claim text, and insertion order. Avoids VM-restart-unstable hashCode.
-      final id = _claimId(answer.providerName, answer.question, trimmed, claims.length);
+      // ID is deterministic: same GroundedAnswer + same claim text + same
+      // position always yields the same ID, but distinct answer instances
+      // (different generatedAt) never collide even for identical question/text.
+      final id = _claimId(
+          answer.providerName, answer.question, trimmed, claims.length, answer.generatedAt);
 
       claims.add(ExtractedClaim(
         id: id,
@@ -61,17 +63,17 @@ class RuleBasedClaimExtractionService implements ClaimExtractionService {
     return List.unmodifiable(claims);
   }
 
-  /// Builds a deterministic ID from stable string content.
+  /// Builds a deterministic, instance-scoped ID.
   ///
-  /// Uses a simple concatenation key rather than Dart's VM-unstable hashCode,
-  /// so IDs remain consistent across app restarts if the same claim is re-extracted.
+  /// [generatedAt] scopes the ID to the specific answer instance so that two
+  /// answers to the same question at different times never share claim IDs,
+  /// even when provider/question/text are identical.
   static String _claimId(
-      String provider, String question, String claimText, int index) {
-    // Take the first 40 chars of each component to keep IDs human-readable
-    // without unbounded length. Index disambiguates duplicates within a run.
+      String provider, String question, String claimText, int index, DateTime generatedAt) {
     final qKey = question.length > 40 ? question.substring(0, 40) : question;
     final tKey = claimText.length > 40 ? claimText.substring(0, 40) : claimText;
-    return '${provider}_q:${qKey}_i:${index}_t:$tKey'
+    final tsKey = generatedAt.millisecondsSinceEpoch.toRadixString(36);
+    return '${provider}_ts:${tsKey}_q:${qKey}_i:${index}_t:$tKey'
         .replaceAll(RegExp(r'\s+'), '_');
   }
 }

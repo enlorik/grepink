@@ -168,6 +168,47 @@ void main() {
           equals(second.map((c) => c.id).toList()));
     });
 
+    test('same question and text but different generatedAt produces different IDs', () {
+      final t1 = DateTime(2024, 1, 1, 10, 0, 0);
+      final t2 = DateTime(2024, 1, 1, 10, 0, 1);
+      final answer1 = _answer(
+        question: 'What is gravity?',
+        answerText: 'Gravity pulls objects.',
+      );
+      // Manually build second answer with different timestamp via copyWith-style
+      final answer2 = GroundedAnswer(
+        question: answer1.question,
+        answerText: answer1.answerText,
+        citations: [],
+        providerName: answer1.providerName,
+        generatedAt: t2,
+      );
+      final a1 = GroundedAnswer(
+        question: answer1.question,
+        answerText: answer1.answerText,
+        citations: [],
+        providerName: answer1.providerName,
+        generatedAt: t1,
+      );
+
+      final ids1 = service.extract(a1).map((c) => c.id).toList();
+      final ids2 = service.extract(answer2).map((c) => c.id).toList();
+
+      expect(ids1, isNotEmpty);
+      expect(ids1, isNot(equals(ids2)));
+    });
+
+    test('all IDs within one extracted answer are unique', () {
+      final answer = _answer(
+        answerText: 'First claim. Second claim. Third claim.',
+      );
+
+      final claims = service.extract(answer);
+      final ids = claims.map((c) => c.id).toSet();
+
+      expect(ids.length, equals(claims.length));
+    });
+
     test('citation lists on claims are unmodifiable', () {
       final answer = _answer(
         answerText: 'A claim.',
