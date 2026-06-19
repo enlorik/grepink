@@ -87,19 +87,19 @@ class TextSimilarityClaimDeduplicationService
       final localHasUrl =
           bestMatch.sourceUrl != null && bestMatch.sourceUrl!.isNotEmpty;
       final claimHasUrl = claim.citationUrls.isNotEmpty;
-      // Treat a claim URL that already appears in the matched note's text as
-      // "already sourced" — don't flag it as a better source just because the
-      // EvidenceItem.sourceUrl field is null.
-      final claimUrlAlreadyInNote =
-          claim.citationUrls.any((url) => bestMatch!.content.contains(url));
+      // Suppress betterSource only when EVERY claim URL is already present in
+      // the matched note's text. If even one URL is missing the note is missing
+      // a source, so betterSource still fires.
+      final allClaimUrlsInNote =
+          claim.citationUrls.every((url) => bestMatch!.content.contains(url));
 
-      if (claimHasUrl && !localHasUrl && !claimUrlAlreadyInNote) {
+      if (claimHasUrl && !localHasUrl && !allClaimUrlsInNote) {
         return ClaimDeduplicationResult(
           claim: claim,
           classification: ClaimNoveltyClassification.betterSource,
           matchedLocalEvidence: [bestMatch],
           reason:
-              'Similar content found locally but the external claim provides a citation URL the local note lacks.',
+              'Similar content found locally but the external claim has citation URLs not present in the local note.',
           similarityScore: bestScore,
           citationUrls: List.unmodifiable(claim.citationUrls),
         );

@@ -266,5 +266,60 @@ void main() {
 
       expect(results.first.classification, ClaimNoveltyClassification.newClaim);
     });
+
+    test('claim with two URLs, both in note content → alreadyKnown', () async {
+      final service =
+          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+
+      const urlA = 'https://example.com/a';
+      const urlB = 'https://example.com/b';
+      final results = await service.classify(
+        [_claim(citationUrls: [urlA, urlB])],
+        [_evidence(content: 'The sky is blue. See $urlA and $urlB for more.')],
+      );
+
+      expect(results.first.classification, ClaimNoveltyClassification.alreadyKnown);
+    });
+
+    test('claim with two URLs, only one in note content → betterSource', () async {
+      // any() suppression would wrongly mark this alreadyKnown because urlA is
+      // present. every() is required: urlB is missing, so betterSource fires.
+      final service =
+          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+
+      const urlA = 'https://example.com/a';
+      const urlB = 'https://example.com/b';
+      final results = await service.classify(
+        [_claim(citationUrls: [urlA, urlB])],
+        [_evidence(content: 'The sky is blue. See $urlA for more.')],
+      );
+
+      expect(results.first.classification, ClaimNoveltyClassification.betterSource);
+    });
+
+    test('claim with one URL present in note content → alreadyKnown', () async {
+      final service =
+          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+
+      const url = 'https://example.com/source';
+      final results = await service.classify(
+        [_claim(citationUrls: [url])],
+        [_evidence(content: 'The sky is blue. See $url for more.')],
+      );
+
+      expect(results.first.classification, ClaimNoveltyClassification.alreadyKnown);
+    });
+
+    test('claim with one URL absent from note content → betterSource', () async {
+      final service =
+          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+
+      final results = await service.classify(
+        [_claim(citationUrls: ['https://example.com/source'])],
+        [_evidence(content: 'The sky is blue.')],
+      );
+
+      expect(results.first.classification, ClaimNoveltyClassification.betterSource);
+    });
   });
 }
