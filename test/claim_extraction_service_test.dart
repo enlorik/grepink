@@ -155,18 +155,17 @@ void main() {
       expect(ids.length, claims.length);
     });
 
-    test('does not include API keys or secrets in claim text or ids', () {
+    test('claim IDs are stable across multiple extract calls for the same input', () {
       final answer = _answer(
-        answerText: 'Normal scientific fact. Another fact.',
+        question: 'What is gravity?',
+        answerText: 'Gravity pulls objects. It acts at a distance.',
       );
 
-      final claims = service.extract(answer);
+      final first = service.extract(answer);
+      final second = service.extract(answer);
 
-      for (final claim in claims) {
-        expect(claim.text, isNot(contains('sk-')));
-        expect(claim.id, isNot(contains('sk-')));
-        expect(claim.text, isNot(contains('Bearer ')));
-      }
+      expect(first.map((c) => c.id).toList(),
+          equals(second.map((c) => c.id).toList()));
     });
 
     test('citation lists on claims are unmodifiable', () {

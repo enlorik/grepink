@@ -15,6 +15,10 @@ abstract class ClaimExtractionService {
 /// understand citations yet. Citation URLs from the parent answer are attached
 /// to every extracted claim conservatively until per-sentence attribution is
 /// available.
+///
+/// Known limitation: the sentence splitter will incorrectly fragment
+/// abbreviations like "Dr.", "U.S.", "e.g." that contain internal periods
+/// followed by whitespace. This is a known trade-off of a rule-based approach.
 class RuleBasedClaimExtractionService implements ClaimExtractionService {
   const RuleBasedClaimExtractionService();
 
@@ -39,8 +43,12 @@ class RuleBasedClaimExtractionService implements ClaimExtractionService {
       if (seen.contains(trimmed)) continue;
       seen.add(trimmed);
 
+      // ID is a deterministic content-based key derived from provider, question,
+      // claim text, and insertion order. Avoids VM-restart-unstable hashCode.
+      final id = _claimId(answer.providerName, answer.question, trimmed, claims.length);
+
       claims.add(ExtractedClaim(
-        id: '${answer.providerName}_${answer.question.hashCode}_${claims.length}',
+        id: id,
         text: trimmed,
         citationUrls: List.unmodifiable(citationUrls),
         citationTitles: List.unmodifiable(citationTitles),
@@ -51,5 +59,19 @@ class RuleBasedClaimExtractionService implements ClaimExtractionService {
     }
 
     return List.unmodifiable(claims);
+  }
+
+  /// Builds a deterministic ID from stable string content.
+  ///
+  /// Uses a simple concatenation key rather than Dart's VM-unstable hashCode,
+  /// so IDs remain consistent across app restarts if the same claim is re-extracted.
+  static String _claimId(
+      String provider, String question, String claimText, int index) {
+    // Take the first 40 chars of each component to keep IDs human-readable
+    // without unbounded length. Index disambiguates duplicates within a run.
+    final qKey = question.length > 40 ? question.substring(0, 40) : question;
+    final tKey = claimText.length > 40 ? claimText.substring(0, 40) : claimText;
+    return '${provider}_q:${qKey}_i:${index}_t:$tKey'
+        .replaceAll(RegExp(r'\s+'), '_');
   }
 }
