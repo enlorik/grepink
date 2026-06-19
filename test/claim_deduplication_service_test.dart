@@ -321,5 +321,59 @@ void main() {
 
       expect(results.first.classification, ClaimNoveltyClassification.betterSource);
     });
+
+    test('identical positive claim and note → alreadyKnown, not contradiction', () async {
+      final service =
+          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+
+      final results = await service.classify(
+        [_claim(text: 'The sky is blue.')],
+        [_evidence(content: 'The sky is blue.')],
+      );
+
+      expect(results.first.classification, ClaimNoveltyClassification.alreadyKnown);
+    });
+
+    test('negated claim vs positive note → contradiction, not alreadyKnown', () async {
+      // High token overlap (4/5 Jaccard) but opposite polarity — must not be
+      // silently collapsed into alreadyKnown.
+      final service =
+          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+
+      final results = await service.classify(
+        [_claim(text: 'The sky is not blue.')],
+        [_evidence(content: 'The sky is blue.')],
+      );
+
+      expect(results.first.classification, ClaimNoveltyClassification.contradiction);
+    });
+
+    test('positive claim vs negated note → contradiction, not alreadyKnown', () async {
+      final service =
+          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+
+      final results = await service.classify(
+        [_claim(text: 'The sky is blue.')],
+        [_evidence(content: 'The sky is not blue.')],
+      );
+
+      expect(results.first.classification, ClaimNoveltyClassification.contradiction);
+    });
+
+    test('unrelated negated note with low similarity → newClaim, not contradiction',
+        () async {
+      // Threshold gate must prevent negation logic from running on low-scoring
+      // matches — a negative sentence about a completely different topic should
+      // never become contradiction just because it contains "not".
+      final service =
+          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.1));
+
+      final results = await service.classify(
+        [_claim(text: 'The sky is blue.')],
+        [_evidence(content: 'Bananas are not vegetables.')],
+      );
+
+      expect(results.first.classification, ClaimNoveltyClassification.newClaim);
+    });
   });
 }

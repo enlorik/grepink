@@ -17,6 +17,17 @@ abstract class ClaimDeduplicationService {
 /// Threshold above which a claim is considered to match local evidence.
 const _highSimilarityThreshold = 0.65;
 
+/// Returns true if [text] contains a common English negation marker.
+///
+/// Intentionally conservative — only matches the clearest negation words so
+/// that normal sentences are never wrongly flagged. Does not attempt full NLI.
+bool _hasNegation(String text) {
+  return RegExp(
+    r"\b(not|no|never|cannot|n't)\b",
+    caseSensitive: false,
+  ).hasMatch(text);
+}
+
 /// Splits note content into comparable chunks for claim similarity scoring.
 ///
 /// Splits on sentence-ending punctuation AND on newlines so that Markdown
@@ -72,6 +83,7 @@ class TextSimilarityClaimDeduplicationService
 
     double bestScore = 0.0;
     EvidenceItem? bestMatch;
+    String bestChunk = '';
 
     for (final evidence in localEvidence) {
       for (final chunk in _chunks(evidence.content)) {
@@ -79,11 +91,29 @@ class TextSimilarityClaimDeduplicationService
         if (score > bestScore) {
           bestScore = score;
           bestMatch = evidence;
+          bestChunk = chunk;
         }
       }
     }
 
     if (bestScore >= _highSimilarityThreshold && bestMatch != null) {
+      // Conservative negation check: compare polarity of the claim against the
+      // specific chunk that scored highest (not the full note, which may contain
+      // unrelated negations). If one has a negation marker and the other does
+      // not, the texts likely assert opposite things — flag as contradiction
+      // rather than silently collapsing them into alreadyKnown.
+      if (_hasNegation(claim.text) != _hasNegation(bestChunk)) {
+        return ClaimDeduplicationResult(
+          claim: claim,
+          classification: ClaimNoveltyClassification.contradiction,
+          matchedLocalEvidence: [bestMatch],
+          reason:
+              'High token overlap but opposite polarity — possible negation conflict.',
+          similarityScore: bestScore,
+          citationUrls: List.unmodifiable(claim.citationUrls),
+        );
+      }
+
       final localHasUrl =
           bestMatch.sourceUrl != null && bestMatch.sourceUrl!.isNotEmpty;
       final claimHasUrl = claim.citationUrls.isNotEmpty;
