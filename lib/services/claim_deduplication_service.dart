@@ -17,6 +17,21 @@ abstract class ClaimDeduplicationService {
 /// Threshold above which a claim is considered to match local evidence.
 const _highSimilarityThreshold = 0.65;
 
+/// Splits note content into sentence-level chunks for fine-grained comparison.
+///
+/// Comparing a short claim against the full note body dilutes the similarity
+/// score — a 10-word claim buried in a 500-word note will score very low even
+/// if it appears verbatim. Chunking on sentence boundaries lets us take the
+/// max score across chunks instead.
+List<String> _chunks(String content) {
+  final parts = content
+      .split(RegExp(r'(?<=[.!?])\s+'))
+      .map((s) => s.trim())
+      .where((s) => s.isNotEmpty)
+      .toList();
+  return parts.isEmpty ? [content] : parts;
+}
+
 class TextSimilarityClaimDeduplicationService
     implements ClaimDeduplicationService {
   final TextSimilarityProvider _similarity;
@@ -58,22 +73,26 @@ class TextSimilarityClaimDeduplicationService
     EvidenceItem? bestMatch;
 
     for (final evidence in localEvidence) {
-      final score = await _similarity.similarity(claim.text, evidence.content);
-      if (score > bestScore) {
-        bestScore = score;
-        bestMatch = evidence;
+      for (final chunk in _chunks(evidence.content)) {
+        final score = await _similarity.similarity(claim.text, chunk);
+        if (score > bestScore) {
+          bestScore = score;
+          bestMatch = evidence;
+        }
       }
     }
 
     if (bestScore >= _highSimilarityThreshold && bestMatch != null) {
-      // Claim content is already known. Check if the external claim has a
-      // citation URL while the local match does not — that would make it a
-      // better source.
       final localHasUrl =
           bestMatch.sourceUrl != null && bestMatch.sourceUrl!.isNotEmpty;
       final claimHasUrl = claim.citationUrls.isNotEmpty;
+      // Treat a claim URL that already appears in the matched note's text as
+      // "already sourced" — don't flag it as a better source just because the
+      // EvidenceItem.sourceUrl field is null.
+      final claimUrlAlreadyInNote =
+          claim.citationUrls.any((url) => bestMatch!.content.contains(url));
 
-      if (claimHasUrl && !localHasUrl) {
+      if (claimHasUrl && !localHasUrl && !claimUrlAlreadyInNote) {
         return ClaimDeduplicationResult(
           claim: claim,
           classification: ClaimNoveltyClassification.betterSource,

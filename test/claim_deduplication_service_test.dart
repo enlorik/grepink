@@ -178,5 +178,59 @@ void main() {
         expect(result.reason, isNot(contains('api_key')));
       }
     });
+
+    test('short claim found verbatim inside a long note classifies as alreadyKnown',
+        () async {
+      // Without chunking, comparing "The sky is blue." against the full
+      // multi-sentence note body would return 0.0 from the exact-match fake
+      // (the strings differ). With chunking, one chunk matches exactly → 1.0.
+      final service = TextSimilarityClaimDeduplicationService(
+          const ExactMatchFakeTextSimilarityProvider());
+
+      const longNote =
+          'The ocean is vast. The sky is blue. Clouds form from water vapor.';
+
+      final results = await service.classify(
+        [_claim(text: 'The sky is blue.')],
+        [_evidence(content: longNote)],
+      );
+
+      expect(results.first.classification, ClaimNoveltyClassification.alreadyKnown);
+    });
+
+    test('claim not present in any chunk of a long note classifies as newClaim',
+        () async {
+      final service = TextSimilarityClaimDeduplicationService(
+          const ExactMatchFakeTextSimilarityProvider());
+
+      const longNote =
+          'The ocean is vast. The sky is blue. Clouds form from water vapor.';
+
+      final results = await service.classify(
+        [_claim(text: 'Gravity pulls objects downward.')],
+        [_evidence(content: longNote)],
+      );
+
+      expect(results.first.classification, ClaimNoveltyClassification.newClaim);
+    });
+
+    test(
+        'claim URL already present in note content is not classified as betterSource',
+        () async {
+      // The EvidenceItem.sourceUrl field is null, so a naive check would say
+      // "local has no URL — betterSource!" But the citation URL appears in the
+      // note body text, meaning the user already has that source. Should be
+      // alreadyKnown, not betterSource.
+      final service =
+          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+
+      const citationUrl = 'https://example.com/source';
+      final results = await service.classify(
+        [_claim(citationUrls: [citationUrl])],
+        [_evidence(content: 'The sky is blue. See $citationUrl for details.')],
+      );
+
+      expect(results.first.classification, ClaimNoveltyClassification.alreadyKnown);
+    });
   });
 }
