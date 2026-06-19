@@ -232,5 +232,39 @@ void main() {
 
       expect(results.first.classification, ClaimNoveltyClassification.alreadyKnown);
     });
+
+    test('claim found in Markdown bullet list classifies as alreadyKnown', () async {
+      // Lines in a bullet list do not end with sentence-ending punctuation, so
+      // the sentence-boundary splitter alone leaves the whole list as one chunk.
+      // The newline splitter handles this: each bullet becomes its own chunk and
+      // the list marker is stripped before comparison.
+      final service = TextSimilarityClaimDeduplicationService(
+          const ExactMatchFakeTextSimilarityProvider());
+
+      const bulletNote =
+          '- The sky is blue\n- Clouds form from water vapor\n- The ocean is vast';
+
+      final results = await service.classify(
+        [_claim(text: 'The sky is blue')],
+        [_evidence(content: bulletNote)],
+      );
+
+      expect(results.first.classification, ClaimNoveltyClassification.alreadyKnown);
+    });
+
+    test('claim absent from Markdown bullet list classifies as newClaim', () async {
+      final service = TextSimilarityClaimDeduplicationService(
+          const ExactMatchFakeTextSimilarityProvider());
+
+      const bulletNote =
+          '- The sky is blue\n- Clouds form from water vapor\n- The ocean is vast';
+
+      final results = await service.classify(
+        [_claim(text: 'Gravity pulls objects downward')],
+        [_evidence(content: bulletNote)],
+      );
+
+      expect(results.first.classification, ClaimNoveltyClassification.newClaim);
+    });
   });
 }

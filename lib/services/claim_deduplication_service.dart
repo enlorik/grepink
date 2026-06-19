@@ -17,16 +17,17 @@ abstract class ClaimDeduplicationService {
 /// Threshold above which a claim is considered to match local evidence.
 const _highSimilarityThreshold = 0.65;
 
-/// Splits note content into sentence-level chunks for fine-grained comparison.
+/// Splits note content into comparable chunks for claim similarity scoring.
 ///
-/// Comparing a short claim against the full note body dilutes the similarity
-/// score — a 10-word claim buried in a 500-word note will score very low even
-/// if it appears verbatim. Chunking on sentence boundaries lets us take the
-/// max score across chunks instead.
+/// Splits on sentence-ending punctuation AND on newlines so that Markdown
+/// bullet lists (whose lines rarely end with `.!?`) are also broken apart.
+/// Strips leading Markdown list markers (`- `, `* `, `1. `, etc.) so that
+/// bare claim text can match bullet content without the formatting noise.
 List<String> _chunks(String content) {
   final parts = content
-      .split(RegExp(r'(?<=[.!?])\s+'))
+      .split(RegExp(r'(?<=[.!?])\s+|\n+'))
       .map((s) => s.trim())
+      .map((s) => s.replaceFirst(RegExp(r'^[-*•+]\s+|^\d+\.\s+'), '').trim())
       .where((s) => s.isNotEmpty)
       .toList();
   return parts.isEmpty ? [content] : parts;
