@@ -375,5 +375,94 @@ void main() {
 
       expect(results.first.classification, ClaimNoveltyClassification.newClaim);
     });
+
+    test("contracted negation isn't vs positive note → contradiction", () async {
+      // \b before n't breaks on contractions because the apostrophe is a
+      // non-word char — \bn't\b never matches "isn't". The fix drops the
+      // leading \b so n't matches inside any contraction.
+      final service =
+          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+
+      final results = await service.classify(
+        [_claim(text: "The sky isn't blue.")],
+        [_evidence(content: 'The sky is blue.')],
+      );
+
+      expect(results.first.classification, ClaimNoveltyClassification.contradiction);
+    });
+
+    test("contracted negation doesn't vs positive note → contradiction", () async {
+      final service =
+          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+
+      final results = await service.classify(
+        [_claim(text: "The sky doesn't look blue.")],
+        [_evidence(content: 'The sky looks blue.')],
+      );
+
+      expect(results.first.classification, ClaimNoveltyClassification.contradiction);
+    });
+
+    test('non-negated identical claim still classifies as alreadyKnown', () async {
+      final service =
+          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+
+      final results = await service.classify(
+        [_claim(text: 'The sky is blue.')],
+        [_evidence(content: 'The sky is blue.')],
+      );
+
+      expect(results.first.classification, ClaimNoveltyClassification.alreadyKnown);
+    });
+
+    test('differing numeric values → contradiction, not alreadyKnown', () async {
+      // "$10 million" vs "$12 million" — high Jaccard overlap because most tokens
+      // match, but the key fact differs. Must not be collapsed into alreadyKnown.
+      final service =
+          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+
+      final results = await service.classify(
+        [_claim(text: 'Revenue was \$10 million in 2024.')],
+        [_evidence(content: 'Revenue was \$12 million in 2024.')],
+      );
+
+      expect(results.first.classification, ClaimNoveltyClassification.contradiction);
+    });
+
+    test('identical numeric values → alreadyKnown, not contradiction', () async {
+      final service =
+          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+
+      final results = await service.classify(
+        [_claim(text: 'Revenue was \$10 million in 2024.')],
+        [_evidence(content: 'Revenue was \$10 million in 2024.')],
+      );
+
+      expect(results.first.classification, ClaimNoveltyClassification.alreadyKnown);
+    });
+
+    test('differing population numbers → contradiction', () async {
+      final service =
+          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+
+      final results = await service.classify(
+        [_claim(text: 'Population was 5 million.')],
+        [_evidence(content: 'Population was 6 million.')],
+      );
+
+      expect(results.first.classification, ClaimNoveltyClassification.contradiction);
+    });
+
+    test('numeric claim with low similarity → newClaim, not contradiction', () async {
+      final service =
+          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.1));
+
+      final results = await service.classify(
+        [_claim(text: 'Revenue was \$10 million.')],
+        [_evidence(content: 'Population was 6 million.')],
+      );
+
+      expect(results.first.classification, ClaimNoveltyClassification.newClaim);
+    });
   });
 }

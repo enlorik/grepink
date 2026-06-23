@@ -19,13 +19,27 @@ const _highSimilarityThreshold = 0.65;
 
 /// Returns true if [text] contains a common English negation marker.
 ///
-/// Intentionally conservative — only matches the clearest negation words so
-/// that normal sentences are never wrongly flagged. Does not attempt full NLI.
+/// Covers full-word negations (not, no, never, cannot) with word boundaries
+/// and contracted negations (isn't, doesn't, can't, won't, etc.) via `n't`
+/// without a leading \b — apostrophe breaks the word boundary so \bn't\b
+/// never matches contractions.
+/// Intentionally conservative — does not attempt full NLI.
 bool _hasNegation(String text) {
   return RegExp(
-    r"\b(not|no|never|cannot|n't)\b",
+    r"\b(not|no|never|cannot)\b|n't",
     caseSensitive: false,
   ).hasMatch(text);
+}
+
+/// Extracts numeric and date-like tokens from [text] as a set of strings.
+///
+/// Matches integers, decimals, currency amounts, percentages, and 4-digit
+/// years. Returns an empty set when no numeric tokens are found.
+Set<String> _numericTokens(String text) {
+  return RegExp(r'[\$£€]?\d[\d,\.]*%?')
+      .allMatches(text)
+      .map((m) => m.group(0)!)
+      .toSet();
 }
 
 /// Splits note content into comparable chunks for claim similarity scoring.
@@ -109,6 +123,23 @@ class TextSimilarityClaimDeduplicationService
           matchedLocalEvidence: [bestMatch],
           reason:
               'High token overlap but opposite polarity — possible negation conflict.',
+          similarityScore: bestScore,
+          citationUrls: List.unmodifiable(claim.citationUrls),
+        );
+      }
+
+      // Numeric conflict check: if both texts contain numeric/date tokens and
+      // their token sets differ, the claims describe different quantities —
+      // flag as contradiction rather than alreadyKnown.
+      final claimNums = _numericTokens(claim.text);
+      final chunkNums = _numericTokens(bestChunk);
+      if (claimNums.isNotEmpty && chunkNums.isNotEmpty && claimNums != chunkNums) {
+        return ClaimDeduplicationResult(
+          claim: claim,
+          classification: ClaimNoveltyClassification.contradiction,
+          matchedLocalEvidence: [bestMatch],
+          reason:
+              'High token overlap but differing numeric values — possible factual conflict.',
           similarityScore: bestScore,
           citationUrls: List.unmodifiable(claim.citationUrls),
         );
