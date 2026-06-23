@@ -133,7 +133,10 @@ class TextSimilarityClaimDeduplicationService
       // flag as contradiction rather than alreadyKnown.
       final claimNums = _numericTokens(claim.text);
       final chunkNums = _numericTokens(bestChunk);
-      if (claimNums.isNotEmpty && chunkNums.isNotEmpty && claimNums != chunkNums) {
+      if (claimNums.isNotEmpty &&
+          chunkNums.isNotEmpty &&
+          (claimNums.length != chunkNums.length ||
+              !claimNums.containsAll(chunkNums))) {
         return ClaimDeduplicationResult(
           claim: claim,
           classification: ClaimNoveltyClassification.contradiction,
