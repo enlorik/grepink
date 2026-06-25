@@ -520,5 +520,37 @@ void main() {
 
       expect(results.first.classification, ClaimNoveltyClassification.alreadyKnown);
     });
+
+    test('claim with extra numeric context vs local note → uncertain, not contradiction',
+        () async {
+      // Claim adds a year ("in 2024") that the local note lacks. The numeric
+      // token sets are {$10, 2024} vs {$10} — one is a strict superset of the
+      // other. This is additional context, not a conflicting value, so the
+      // result must be uncertain (not contradiction, not alreadyKnown).
+      final service =
+          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+
+      final results = await service.classify(
+        [_claim(text: 'Revenue was \$10 million in 2024.')],
+        [_evidence(content: 'Revenue was \$10 million.')],
+      );
+
+      expect(results.first.classification, ClaimNoveltyClassification.uncertain);
+    });
+
+    test('local note with extra numeric context vs claim → uncertain, not contradiction',
+        () async {
+      // Symmetric case: local note has the year, claim does not. Still a strict
+      // superset relationship — must be uncertain, not contradiction.
+      final service =
+          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+
+      final results = await service.classify(
+        [_claim(text: 'Revenue was \$10 million.')],
+        [_evidence(content: 'Revenue was \$10 million in 2024.')],
+      );
+
+      expect(results.first.classification, ClaimNoveltyClassification.uncertain);
+    });
   });
 }

@@ -132,24 +132,41 @@ class TextSimilarityClaimDeduplicationService
         );
       }
 
-      // Numeric conflict check: if both texts contain numeric/date tokens and
-      // their token sets differ, the claims describe different quantities —
-      // flag as contradiction rather than alreadyKnown.
+      // Numeric conflict check: only flag as contradiction when both sides have
+      // numeric tokens and neither set is a subset of the other — meaning each
+      // side has at least one number the other lacks (a true value conflict).
+      // When one side is a strict superset (extra context like an added year),
+      // return uncertain rather than wrongly calling it a contradiction.
       final claimNums = _numericTokens(claim.text);
       final chunkNums = _numericTokens(bestChunk);
-      if (claimNums.isNotEmpty &&
-          chunkNums.isNotEmpty &&
-          (claimNums.length != chunkNums.length ||
-              !claimNums.containsAll(chunkNums))) {
-        return ClaimDeduplicationResult(
-          claim: claim,
-          classification: ClaimNoveltyClassification.contradiction,
-          matchedLocalEvidence: [bestMatch],
-          reason:
-              'High token overlap but differing numeric values — possible factual conflict.',
-          similarityScore: bestScore,
-          citationUrls: List.unmodifiable(claim.citationUrls),
-        );
+      if (claimNums.isNotEmpty && chunkNums.isNotEmpty) {
+        final claimContainsChunk = claimNums.containsAll(chunkNums);
+        final chunkContainsClaim = chunkNums.containsAll(claimNums);
+        if (!claimContainsChunk || !chunkContainsClaim) {
+          if (claimContainsChunk || chunkContainsClaim) {
+            // One side is a strict superset — additional numeric context, not
+            // a conflicting value.
+            return ClaimDeduplicationResult(
+              claim: claim,
+              classification: ClaimNoveltyClassification.uncertain,
+              matchedLocalEvidence: [bestMatch],
+              reason:
+                  'High token overlap but one side contains additional numeric context — possibly more specific.',
+              similarityScore: bestScore,
+              citationUrls: List.unmodifiable(claim.citationUrls),
+            );
+          }
+          // Neither contains the other — conflicting comparable numeric values.
+          return ClaimDeduplicationResult(
+            claim: claim,
+            classification: ClaimNoveltyClassification.contradiction,
+            matchedLocalEvidence: [bestMatch],
+            reason:
+                'High token overlap but differing numeric values — possible factual conflict.',
+            similarityScore: bestScore,
+            citationUrls: List.unmodifiable(claim.citationUrls),
+          );
+        }
       }
 
       final localHasUrl =
