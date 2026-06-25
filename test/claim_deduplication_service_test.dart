@@ -464,5 +464,61 @@ void main() {
 
       expect(results.first.classification, ClaimNoveltyClassification.newClaim);
     });
+
+    test('numeric claim ending in period vs same without period → alreadyKnown',
+        () async {
+      // "2024." and "2024" must normalise to the same token so sentence-final
+      // punctuation does not falsely trigger a numeric conflict.
+      final service =
+          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+
+      final results = await service.classify(
+        [_claim(text: 'Revenue was \$10 million in 2024.')],
+        [_evidence(content: 'Revenue was \$10 million in 2024')],
+      );
+
+      expect(results.first.classification, ClaimNoveltyClassification.alreadyKnown);
+    });
+
+    test('decimal percentage preserved across period-terminated and plain forms → alreadyKnown',
+        () async {
+      // "10.5%" must remain "10.5%" after normalisation — the dot is part of the
+      // number, not sentence-ending punctuation.
+      final service =
+          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+
+      final results = await service.classify(
+        [_claim(text: 'Growth rate was 10.5%.')],
+        [_evidence(content: 'Growth rate was 10.5%.')],
+      );
+
+      expect(results.first.classification, ClaimNoveltyClassification.alreadyKnown);
+    });
+
+    test('differing dollar amounts with trailing periods → contradiction', () async {
+      // Even after stripping trailing punctuation the amounts differ (\$10 vs
+      // \$12), so this must still fire as contradiction.
+      final service =
+          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+
+      final results = await service.classify(
+        [_claim(text: 'Revenue was \$10 million.')],
+        [_evidence(content: 'Revenue was \$12 million.')],
+      );
+
+      expect(results.first.classification, ClaimNoveltyClassification.contradiction);
+    });
+
+    test('year with trailing period normalises correctly → alreadyKnown', () async {
+      final service =
+          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+
+      final results = await service.classify(
+        [_claim(text: 'The policy was adopted in 2019.')],
+        [_evidence(content: 'The policy was adopted in 2019')],
+      );
+
+      expect(results.first.classification, ClaimNoveltyClassification.alreadyKnown);
+    });
   });
 }

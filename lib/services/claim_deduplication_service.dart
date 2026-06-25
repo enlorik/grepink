@@ -34,11 +34,15 @@ bool _hasNegation(String text) {
 /// Extracts numeric and date-like tokens from [text] as a set of strings.
 ///
 /// Matches integers, decimals, currency amounts, percentages, and 4-digit
-/// years. Returns an empty set when no numeric tokens are found.
+/// years. Trailing `.` or `,` are stripped after extraction so that a
+/// sentence-final number like "2024." normalises to "2024" and does not
+/// falsely conflict with "2024" from a clause that lacks closing punctuation.
+/// Meaningful decimals ("10.5") and percentages ("12%") are preserved because
+/// they never end with a bare `.` or `,`.
 Set<String> _numericTokens(String text) {
   return RegExp(r'[\$£€]?\d[\d,\.]*%?')
       .allMatches(text)
-      .map((m) => m.group(0)!)
+      .map((m) => m.group(0)!.replaceFirst(RegExp(r'[.,]+$'), ''))
       .toSet();
 }
 
