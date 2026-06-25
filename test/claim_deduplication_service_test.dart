@@ -552,5 +552,80 @@ void main() {
 
       expect(results.first.classification, ClaimNoveltyClassification.uncertain);
     });
+
+    test('signed negative value vs positive value → contradiction, not alreadyKnown',
+        () async {
+      // Without sign capture, "-5%" and "5%" both produce token "5%".
+      // With the fix the tokens are "-5%" vs "5%" — a genuine conflict.
+      final service =
+          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+
+      final results = await service.classify(
+        [_claim(text: 'Operating margin was -5%.')],
+        [_evidence(content: 'Operating margin was 5%.')],
+      );
+
+      expect(
+        results.first.classification,
+        anyOf(
+          ClaimNoveltyClassification.contradiction,
+          ClaimNoveltyClassification.uncertain,
+        ),
+      );
+      expect(
+        results.first.classification,
+        isNot(ClaimNoveltyClassification.alreadyKnown),
+      );
+    });
+
+    test('explicit positive sign normalised away → alreadyKnown', () async {
+      // "+5%" and "5%" are equivalent; the leading + is stripped during
+      // normalisation so the token sets are equal and the claim is alreadyKnown.
+      final service =
+          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+
+      final results = await service.classify(
+        [_claim(text: 'Growth was +5%.')],
+        [_evidence(content: 'Growth was 5%.')],
+      );
+
+      expect(results.first.classification, ClaimNoveltyClassification.alreadyKnown);
+    });
+
+    test('identical negative decimal percentages → alreadyKnown', () async {
+      final service =
+          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+
+      final results = await service.classify(
+        [_claim(text: 'Operating margin was -10.5%.')],
+        [_evidence(content: 'Operating margin was -10.5%.')],
+      );
+
+      expect(results.first.classification, ClaimNoveltyClassification.alreadyKnown);
+    });
+
+    test('negative currency value vs positive currency value → contradiction or uncertain',
+        () async {
+      // "-\$10" captures the sign, "$10" does not; different tokens → conflict.
+      final service =
+          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+
+      final results = await service.classify(
+        [_claim(text: 'Cash flow was -\$10 million.')],
+        [_evidence(content: 'Cash flow was \$10 million.')],
+      );
+
+      expect(
+        results.first.classification,
+        anyOf(
+          ClaimNoveltyClassification.contradiction,
+          ClaimNoveltyClassification.uncertain,
+        ),
+      );
+      expect(
+        results.first.classification,
+        isNot(ClaimNoveltyClassification.alreadyKnown),
+      );
+    });
   });
 }
