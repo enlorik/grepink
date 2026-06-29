@@ -34,6 +34,12 @@ class _FakeLocalEvidence implements LocalEvidenceRetriever {
   Future<List<EvidenceItem>> retrieve(String question) async => _items;
 }
 
+class _ThrowingLocalEvidence implements LocalEvidenceRetriever {
+  @override
+  Future<List<EvidenceItem>> retrieve(String question) async =>
+      throw Exception('local evidence retrieval failed');
+}
+
 class _CallOrder {
   final events = <String>[];
 }
@@ -244,6 +250,23 @@ void main() {
       final result = await svc.ingest('What is gravity?');
 
       expect(result.hasNewKnowledge, isFalse);
+    });
+
+    test('local evidence retriever exception returns safe empty result', () async {
+      // The outer try/catch in ingest() covers the local retrieval call, so a
+      // failing retriever must not crash the service or surface an exception.
+      final svc = GroundedAnswerIngestionService(
+        provider: _FakeProvider(_answer()),
+        extractor: const RuleBasedClaimExtractionService(),
+        deduplicator: TextSimilarityClaimDeduplicationService(
+            FakeTextSimilarityProvider(0.1)),
+        localEvidence: _ThrowingLocalEvidence(),
+      );
+
+      final result = await svc.ingest('What is gravity?');
+
+      expect(result.isEmpty, isTrue);
+      expect(result.newClaims, isEmpty);
     });
 
     test('local evidence is retrieved before the external provider is called',
