@@ -627,5 +627,48 @@ void main() {
         isNot(ClaimNoveltyClassification.alreadyKnown),
       );
     });
+
+    test('thousands-comma vs no-comma same value → alreadyKnown, not contradiction',
+        () async {
+      // "$1,200" and "$1200" represent the same amount; thousands-separator
+      // commas must be stripped before comparing so formatting differences do
+      // not produce a false numeric conflict.
+      final service =
+          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+
+      final results = await service.classify(
+        [_claim(text: 'Revenue was \$1,200 last quarter.')],
+        [_evidence(content: 'Revenue was \$1200 last quarter.')],
+      );
+
+      expect(results.first.classification, ClaimNoveltyClassification.alreadyKnown);
+    });
+
+    test('thousands-comma values that genuinely differ → contradiction', () async {
+      // After normalisation $1,200 → $1200 and $1,300 → $1300; different values
+      // must still fire as contradiction.
+      final service =
+          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+
+      final results = await service.classify(
+        [_claim(text: 'Revenue was \$1,200 last quarter.')],
+        [_evidence(content: 'Revenue was \$1,300 last quarter.')],
+      );
+
+      expect(results.first.classification, ClaimNoveltyClassification.contradiction);
+    });
+
+    test('large number with grouping commas normalises correctly → alreadyKnown',
+        () async {
+      final service =
+          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+
+      final results = await service.classify(
+        [_claim(text: 'The population reached 1,000,000.')],
+        [_evidence(content: 'The population reached 1000000.')],
+      );
+
+      expect(results.first.classification, ClaimNoveltyClassification.alreadyKnown);
+    });
   });
 }

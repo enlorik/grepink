@@ -39,7 +39,10 @@ bool _hasNegation(String text) {
 /// Normalisation applied to each raw match:
 /// 1. Trailing `.` or `,` are stripped ("2024." → "2024", "$10." → "$10")
 ///    so sentence-final punctuation does not produce false conflicts.
-/// 2. A leading `+` is stripped ("+5%" → "5%") because an explicit plus
+/// 2. Thousands-separator commas are removed ("1,000" → "1000",
+///    "$1,200" → "$1200") so formatting differences do not produce false
+///    conflicts between equivalent values.
+/// 3. A leading `+` is stripped ("+5%" → "5%") because an explicit plus
 ///    sign is equivalent to no sign; negative signs are preserved because
 ///    a negative value is materially different from a positive one.
 Set<String> _numericTokens(String text) {
@@ -47,6 +50,7 @@ Set<String> _numericTokens(String text) {
       .allMatches(text)
       .map((m) => m.group(0)!)
       .map((t) => t.replaceFirst(RegExp(r'[.,]+$'), ''))
+      .map((t) => t.replaceAll(',', ''))
       .map((t) => t.replaceFirst(RegExp(r'^\+'), ''))
       .toSet();
 }
