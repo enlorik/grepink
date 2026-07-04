@@ -36,6 +36,11 @@ bool _hasNegation(String text) {
 /// Matches integers, decimals, currency amounts, percentages, and 4-digit
 /// years, including optionally signed values (e.g. -5%, -$10).
 ///
+/// The leading `[-+]` is only captured when NOT immediately preceded by a
+/// digit (`(?<!\d)`). This prevents hyphens in date strings like `2024-05-01`
+/// from being treated as negative signs — the month and day components are
+/// extracted as unsigned tokens (`05`, `01`) instead of `-05`, `-01`.
+///
 /// Normalisation applied to each raw match:
 /// 1. Trailing `.` or `,` are stripped ("2024." → "2024", "$10." → "$10")
 ///    so sentence-final punctuation does not produce false conflicts.
@@ -46,7 +51,7 @@ bool _hasNegation(String text) {
 ///    sign is equivalent to no sign; negative signs are preserved because
 ///    a negative value is materially different from a positive one.
 Set<String> _numericTokens(String text) {
-  return RegExp(r'[-+]?[\$£€]?\d[\d,\.]*%?')
+  return RegExp(r'(?<!\d)[-+]?[\$£€]?\d[\d,\.]*%?')
       .allMatches(text)
       .map((m) => m.group(0)!)
       .map((t) => t.replaceFirst(RegExp(r'[.,]+$'), ''))

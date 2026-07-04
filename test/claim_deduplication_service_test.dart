@@ -670,5 +670,57 @@ void main() {
 
       expect(results.first.classification, ClaimNoveltyClassification.alreadyKnown);
     });
+
+    test('hyphenated date vs slash date same value → alreadyKnown, not contradiction',
+        () async {
+      // "2024-05-01" with the old regex produced {2024, -05, -01} while
+      // "2024/05/01" produced {2024, 05, 01} — a false contradiction.
+      // The lookbehind (?<!\d) prevents hyphens between digit groups from
+      // being captured as negative signs.
+      final service =
+          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+
+      final results = await service.classify(
+        [_claim(text: 'The event occurred on 2024-05-01.')],
+        [_evidence(content: 'The event occurred on 2024/05/01.')],
+      );
+
+      expect(results.first.classification, ClaimNoveltyClassification.alreadyKnown);
+    });
+
+    test('hyphenated dates with different months → not alreadyKnown', () async {
+      // After normalisation {2024, 05, 01} vs {2024, 06, 01} — month differs,
+      // neither set contains the other → contradiction or uncertain.
+      final service =
+          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+
+      final results = await service.classify(
+        [_claim(text: 'The event occurred on 2024-05-01.')],
+        [_evidence(content: 'The event occurred on 2024-06-01.')],
+      );
+
+      expect(
+        results.first.classification,
+        isNot(ClaimNoveltyClassification.alreadyKnown),
+      );
+    });
+
+    test('genuine negative value still distinguished from positive after date fix',
+        () async {
+      // The lookbehind must not suppress negatives that are actual signed values
+      // (preceded by a space, not a digit). -5% vs 5% must remain a conflict.
+      final service =
+          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+
+      final results = await service.classify(
+        [_claim(text: 'The margin was -5%.')],
+        [_evidence(content: 'The margin was 5%.')],
+      );
+
+      expect(
+        results.first.classification,
+        isNot(ClaimNoveltyClassification.alreadyKnown),
+      );
+    });
   });
 }
