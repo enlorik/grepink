@@ -259,7 +259,7 @@ void main() {
         provider: _FakeProvider(_answer()),
         extractor: const RuleBasedClaimExtractionService(),
         deduplicator: TextSimilarityClaimDeduplicationService(
-            FakeTextSimilarityProvider(0.1)),
+            const FakeTextSimilarityProvider(0.1)),
         localEvidence: _ThrowingLocalEvidence(),
       );
 
@@ -276,7 +276,7 @@ void main() {
         provider: _OrderTrackingProvider(order),
         extractor: const RuleBasedClaimExtractionService(),
         deduplicator: TextSimilarityClaimDeduplicationService(
-            FakeTextSimilarityProvider(0.1)),
+            const FakeTextSimilarityProvider(0.1)),
         localEvidence: _OrderTrackingLocalEvidence(order),
       );
 
