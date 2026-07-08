@@ -100,6 +100,27 @@ class _ClaimReviewItemTile extends StatelessWidget {
     required this.onToggle,
   });
 
+  Widget? _buildSubtitle() {
+    final lines = <Widget>[];
+    if (item.reason.trim().isNotEmpty) {
+      lines.add(Text(item.reason, style: AppTextStyles.bodySmall));
+    }
+    for (var i = 0; i < item.citationUrls.length; i++) {
+      final url = item.citationUrls[i];
+      final title = i < item.citationTitles.length ? item.citationTitles[i] : '';
+      lines.add(
+        Text(
+          key: Key('claim-review-source-${item.id}-$i'),
+          title.trim().isEmpty ? url : title,
+          style: AppTextStyles.bodySmall,
+          overflow: TextOverflow.ellipsis,
+        ),
+      );
+    }
+    if (lines.isEmpty) return null;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: lines);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -115,9 +136,7 @@ class _ClaimReviewItemTile extends StatelessWidget {
         onChanged: (_) => onToggle(),
         controlAffinity: ListTileControlAffinity.leading,
         title: Text(item.text, style: AppTextStyles.bodyMedium),
-        subtitle: item.reason.trim().isEmpty
-            ? null
-            : Text(item.reason, style: AppTextStyles.bodySmall),
+        subtitle: _buildSubtitle(),
       ),
     );
   }
