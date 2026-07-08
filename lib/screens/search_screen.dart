@@ -70,6 +70,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     }
 
     final askId = ++_askSequence;
+    ref.read(claimReviewProvider.notifier).reset();
 
     await ref.read(knowledgeIngestionProvider.notifier).ingest(question);
     if (!mounted || askId != _askSequence) return;
