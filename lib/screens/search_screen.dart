@@ -34,6 +34,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   final FocusNode _focusNode = FocusNode();
   final TextEditingController _askController = TextEditingController();
   final FocusNode _askFocusNode = FocusNode();
+  int _askSequence = 0;
 
   @override
   void initState() {
@@ -68,7 +69,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       return;
     }
 
+    final askId = ++_askSequence;
+
     await ref.read(knowledgeIngestionProvider.notifier).ingest(question);
+    if (!mounted || askId != _askSequence) return;
 
     final knowledgeState = ref.read(knowledgeIngestionProvider);
     if (knowledgeState.isSuccess && knowledgeState.noteDraft != null) {
