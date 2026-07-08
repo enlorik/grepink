@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:go_router/go_router.dart';
+import '../models/claim_review_session_state.dart';
 import '../models/knowledge_ingestion_state.dart';
 import '../models/note.dart';
 import '../models/note_draft_review_state.dart';
 import '../models/search_state.dart';
+import '../providers/claim_review_provider.dart';
 import '../providers/knowledge_ingestion_provider.dart';
 import '../providers/note_draft_review_provider.dart';
 import '../providers/notes_provider.dart';
@@ -18,6 +20,7 @@ import '../widgets/note_card.dart';
 import '../widgets/memory_pulse_indicator.dart';
 import '../widgets/grepink_bottom_nav.dart';
 import '../widgets/note_draft_review_panel.dart';
+import '../widgets/claim_review_groups_panel.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
@@ -61,6 +64,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
     if (question.isEmpty) {
       ref.read(knowledgeIngestionProvider.notifier).reset();
+      ref.read(claimReviewProvider.notifier).reset();
       return;
     }
 
@@ -72,6 +76,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             knowledgeState.noteDraft!,
           );
     }
+
+    await ref.read(claimReviewProvider.notifier).runReview(question);
+  }
+
+  void _toggleClaim(String claimId) {
+    ref.read(claimReviewProvider.notifier).toggle(claimId);
   }
 
   Future<void> _saveAsNewNote() async {
@@ -120,6 +130,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final recentNotes = ref.watch(recentNotesProvider);
     final knowledgeState = ref.watch(knowledgeIngestionProvider);
     final reviewState = ref.watch(noteDraftReviewProvider);
+    final claimReviewState = ref.watch(claimReviewProvider);
 
     return Scaffold(
       body: Container(
@@ -144,6 +155,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                         knowledgeState: knowledgeState,
                         reviewState: reviewState,
                         availableNotes: allNotes,
+                        claimReviewState: claimReviewState,
                       ),
                       const SizedBox(height: 24),
                       if (searchState.isEmpty)
@@ -174,6 +186,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     required KnowledgeIngestionState knowledgeState,
     required NoteDraftReviewState reviewState,
     required List<Note> availableNotes,
+    required ClaimReviewSessionState claimReviewState,
   }) {
     final askDisabled = knowledgeState.isLoading;
 
@@ -312,6 +325,21 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             status: reviewState.status,
             selectedDecision: reviewState.selectedDecision,
             errorMessage: reviewState.errorMessage,
+          ),
+        ],
+        if (claimReviewState.isError && claimReviewState.errorMessage != null) ...[
+          const SizedBox(height: 12),
+          _buildStatusCard(
+            message: 'Could not review claims for this question.',
+            borderColor: AppColors.pinHighlight.withValues(alpha: 0.45),
+          ),
+        ],
+        if (claimReviewState.hasReviewItems && claimReviewState.selection != null) ...[
+          const SizedBox(height: 16),
+          ClaimReviewGroupsPanel(
+            groups: claimReviewState.groups,
+            selectedIds: claimReviewState.selection!.selectedIds,
+            onToggle: _toggleClaim,
           ),
         ],
       ],
