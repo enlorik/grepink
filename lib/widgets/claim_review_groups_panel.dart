@@ -133,7 +133,7 @@ class _ClaimReviewItemTile extends StatelessWidget {
       ),
       child: CheckboxListTile(
         value: selected,
-        onChanged: (_) => onToggle(),
+        onChanged: item.canBeSaved ? (_) => onToggle() : null,
         controlAffinity: ListTileControlAffinity.leading,
         title: Text(item.text, style: AppTextStyles.bodyMedium),
         subtitle: _buildSubtitle(),
