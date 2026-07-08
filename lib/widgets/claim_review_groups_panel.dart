@@ -111,7 +111,7 @@ class _ClaimReviewItemTile extends StatelessWidget {
       lines.add(
         Text(
           key: Key('claim-review-source-${item.id}-$i'),
-          title.trim().isEmpty ? url : title,
+          title.trim().isEmpty ? url : '$title ($url)',
           style: AppTextStyles.bodySmall,
           overflow: TextOverflow.ellipsis,
         ),

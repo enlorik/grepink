@@ -372,7 +372,7 @@ void main() {
       await _pumpSearchScreen(tester, ingestionService: service);
       await _askQuestion(tester, 'question');
 
-      expect(find.text('Example A'), findsOneWidget);
+      expect(find.text('Example A (https://example.com/a)'), findsOneWidget);
       expect(find.text('https://example.com/b'), findsOneWidget);
     });
   });
