@@ -95,6 +95,19 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     ref.read(claimReviewProvider.notifier).generateDraft();
   }
 
+  Future<void> _saveClaimDraftAsNewNote() async {
+    await ref.read(claimReviewProvider.notifier).saveAsNewNote();
+    if (ref.read(claimReviewProvider).saveStatus != ClaimDraftSaveStatus.saved) {
+      return;
+    }
+
+    await ref.read(refreshNotesProvider)();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Claim draft saved as a new note.')),
+    );
+  }
+
   Future<void> _saveAsNewNote() async {
     final note = await ref.read(noteDraftReviewProvider.notifier).saveAsNewNote();
     if (note == null) return;
@@ -362,7 +375,16 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         ],
         if (claimReviewState.draft != null) ...[
           const SizedBox(height: 16),
-          ClaimDraftPreviewPanel(draft: claimReviewState.draft!),
+          ClaimDraftPreviewPanel(
+            draft: claimReviewState.draft!,
+            saveStatus: claimReviewState.saveStatus,
+            saveErrorMessage: claimReviewState.saveErrorMessage,
+            onSaveAsNewNote: claimReviewState.draft!.shouldSave &&
+                    claimReviewState.saveStatus != ClaimDraftSaveStatus.saving &&
+                    !claimReviewState.isDraftAlreadySaved
+                ? _saveClaimDraftAsNewNote
+                : null,
+          ),
         ],
       ],
     );

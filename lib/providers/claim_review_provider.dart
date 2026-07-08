@@ -9,6 +9,7 @@ import '../services/grounded_answer_provider.dart';
 import '../services/selected_claims_draft_builder.dart';
 import '../services/text_similarity_provider.dart';
 import 'knowledge_ingestion_provider.dart';
+import 'note_draft_review_provider.dart';
 
 /// No real grounded-answer provider is wired up yet. Using the null
 /// implementation keeps this pipeline inert (no network calls, no fake
@@ -85,6 +86,8 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
         citations: ingestion.citations,
         clearError: true,
         clearDraft: true,
+        saveStatus: ClaimDraftSaveStatus.idle,
+        clearSaveError: true,
       );
     } catch (error) {
       if (requestId != _requestSequence) return;
@@ -95,6 +98,8 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
         clearSelection: true,
         errorMessage: error.toString(),
         clearDraft: true,
+        saveStatus: ClaimDraftSaveStatus.idle,
+        clearSaveError: true,
       );
     }
   }
@@ -102,7 +107,12 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
   void toggle(String claimId) {
     final selection = state.selection;
     if (selection == null) return;
-    state = state.copyWith(selection: selection.toggle(claimId), clearDraft: true);
+    state = state.copyWith(
+      selection: selection.toggle(claimId),
+      clearDraft: true,
+      saveStatus: ClaimDraftSaveStatus.idle,
+      clearSaveError: true,
+    );
   }
 
   /// Builds a markdown draft from the currently selected saveable claims.
@@ -121,7 +131,52 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
       providerName: state.providerName,
       citations: state.citations,
     );
-    state = state.copyWith(draft: result);
+    state = state.copyWith(
+      draft: result,
+      saveStatus: ClaimDraftSaveStatus.idle,
+      clearSaveError: true,
+    );
+  }
+
+  /// Saves [ClaimReviewSessionState.draft] as a new note using the same
+  /// persistence path as the existing note-draft review flow.
+  ///
+  /// Does nothing if there is no draft, the draft is not saveable
+  /// ([ClaimDraftResult.shouldSave] is false), or the exact same draft
+  /// content was already saved successfully.
+  Future<void> saveAsNewNote() async {
+    final draft = state.draft;
+    if (draft == null || !draft.shouldSave) return;
+    if (state.isDraftAlreadySaved) return;
+
+    state = state.copyWith(
+      saveStatus: ClaimDraftSaveStatus.saving,
+      clearSaveError: true,
+    );
+
+    try {
+      final repository = _ref.read(noteDraftReviewRepositoryProvider);
+      await repository.insertNote(
+        title: _titleFor(state.question),
+        content: draft.markdownContent,
+      );
+      state = state.copyWith(
+        saveStatus: ClaimDraftSaveStatus.saved,
+        savedDraftContent: draft.markdownContent,
+      );
+    } catch (error) {
+      state = state.copyWith(
+        saveStatus: ClaimDraftSaveStatus.error,
+        saveErrorMessage: error.toString(),
+      );
+    }
+  }
+
+  String _titleFor(String question) {
+    final compact = question.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (compact.isEmpty) return 'Generated note';
+    if (compact.length <= 80) return compact;
+    return '${compact.substring(0, 77)}...';
   }
 
   void reset() {

@@ -4,6 +4,8 @@ import '../services/selected_claims_draft_builder.dart';
 
 enum ClaimReviewSessionStatus { idle, loading, success, error }
 
+enum ClaimDraftSaveStatus { idle, saving, saved, error }
+
 class ClaimReviewSessionState {
   final ClaimReviewSessionStatus status;
   final String question;
@@ -13,6 +15,9 @@ class ClaimReviewSessionState {
   final String providerName;
   final List<GroundedAnswerCitation> citations;
   final ClaimDraftResult? draft;
+  final ClaimDraftSaveStatus saveStatus;
+  final String? saveErrorMessage;
+  final String? savedDraftContent;
 
   const ClaimReviewSessionState({
     this.status = ClaimReviewSessionStatus.idle,
@@ -23,6 +28,9 @@ class ClaimReviewSessionState {
     this.providerName = '',
     this.citations = const [],
     this.draft,
+    this.saveStatus = ClaimDraftSaveStatus.idle,
+    this.saveErrorMessage,
+    this.savedDraftContent,
   });
 
   bool get isLoading => status == ClaimReviewSessionStatus.loading;
@@ -31,6 +39,13 @@ class ClaimReviewSessionState {
 
   bool get hasReviewItems =>
       groups.any((group) => group.items.isNotEmpty);
+
+  /// True when the current [draft] has already been saved and hasn't
+  /// changed since, so a repeat save would create a duplicate note.
+  bool get isDraftAlreadySaved =>
+      saveStatus == ClaimDraftSaveStatus.saved &&
+      draft != null &&
+      savedDraftContent == draft!.markdownContent;
 
   ClaimReviewSessionState copyWith({
     ClaimReviewSessionStatus? status,
@@ -41,9 +56,13 @@ class ClaimReviewSessionState {
     String? providerName,
     List<GroundedAnswerCitation>? citations,
     ClaimDraftResult? draft,
+    ClaimDraftSaveStatus? saveStatus,
+    String? saveErrorMessage,
+    String? savedDraftContent,
     bool clearSelection = false,
     bool clearError = false,
     bool clearDraft = false,
+    bool clearSaveError = false,
   }) {
     return ClaimReviewSessionState(
       status: status ?? this.status,
@@ -54,6 +73,10 @@ class ClaimReviewSessionState {
       providerName: providerName ?? this.providerName,
       citations: citations ?? this.citations,
       draft: clearDraft ? null : (draft ?? this.draft),
+      saveStatus: saveStatus ?? this.saveStatus,
+      saveErrorMessage:
+          clearSaveError ? null : (saveErrorMessage ?? this.saveErrorMessage),
+      savedDraftContent: savedDraftContent ?? this.savedDraftContent,
     );
   }
 }
