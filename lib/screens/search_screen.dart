@@ -21,6 +21,7 @@ import '../widgets/memory_pulse_indicator.dart';
 import '../widgets/grepink_bottom_nav.dart';
 import '../widgets/note_draft_review_panel.dart';
 import '../widgets/claim_review_groups_panel.dart';
+import '../widgets/claim_draft_preview_panel.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
@@ -88,6 +89,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   void _toggleClaim(String claimId) {
     ref.read(claimReviewProvider.notifier).toggle(claimId);
+  }
+
+  void _generateClaimDraft() {
+    ref.read(claimReviewProvider.notifier).generateDraft();
   }
 
   Future<void> _saveAsNewNote() async {
@@ -348,6 +353,17 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             selectedIds: claimReviewState.selection!.selectedIds,
             onToggle: _toggleClaim,
           ),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            key: const Key('generate-claim-draft-button'),
+            onPressed: _generateClaimDraft,
+            icon: const Icon(Icons.description_outlined),
+            label: const Text('Generate draft'),
+          ),
+        ],
+        if (claimReviewState.draft != null) ...[
+          const SizedBox(height: 16),
+          ClaimDraftPreviewPanel(draft: claimReviewState.draft!),
         ],
       ],
     );
