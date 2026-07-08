@@ -64,6 +64,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     ref.read(noteDraftReviewProvider.notifier).clear();
 
     if (question.isEmpty) {
+      ++_askSequence;
       ref.read(knowledgeIngestionProvider.notifier).reset();
       ref.read(claimReviewProvider.notifier).reset();
       return;
