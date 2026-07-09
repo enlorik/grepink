@@ -175,15 +175,29 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
         (state.appendedTargetsByContent[result.markdownContent]
                 ?.contains(state.targetNoteId) ??
             false);
+    // A save/append for this exact content may still be in flight (not yet
+    // recorded above). Regenerating the same selection must not drop the
+    // status back to idle in that case, otherwise the Save/Append buttons
+    // re-enable before the pending write resolves and a second tap starts a
+    // duplicate write.
+    final sameContentIsSaving = state.saveStatus == ClaimDraftSaveStatus.saving &&
+        state.draft?.markdownContent == result.markdownContent;
+    final sameContentIsAppending =
+        state.appendStatus == ClaimDraftAppendStatus.appending &&
+            state.draft?.markdownContent == result.markdownContent;
     state = state.copyWith(
       draft: result,
       saveStatus: matchesSavedDraft
           ? ClaimDraftSaveStatus.saved
-          : ClaimDraftSaveStatus.idle,
+          : (sameContentIsSaving
+              ? ClaimDraftSaveStatus.saving
+              : ClaimDraftSaveStatus.idle),
       clearSaveError: true,
       appendStatus: matchesAppendedDraft
           ? ClaimDraftAppendStatus.appended
-          : ClaimDraftAppendStatus.idle,
+          : (sameContentIsAppending
+              ? ClaimDraftAppendStatus.appending
+              : ClaimDraftAppendStatus.idle),
       clearAppendError: true,
     );
   }

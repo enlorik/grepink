@@ -526,15 +526,21 @@ void main() {
 
       // Regenerate with the exact same selection while the save is still
       // in flight. This produces a new (but content-identical) draft
-      // instance and resets saveStatus to idle in the meantime.
+      // instance; saveStatus must stay "saving" so the Save button remains
+      // disabled and a second tap can't start a duplicate insert before the
+      // first one resolves.
       notifier.generateDraft();
       expect(
         container.read(claimReviewProvider).saveStatus,
-        ClaimDraftSaveStatus.idle,
+        ClaimDraftSaveStatus.saving,
       );
+
+      // A tap during this window must be a no-op, not a second insert.
+      final secondTapWhileSaving = notifier.saveAsNewNote();
 
       gate.complete();
       await saving;
+      await secondTapWhileSaving;
 
       // The content that was actually inserted matches the regenerated
       // draft, so it must end up recorded as saved, not left looking

@@ -728,6 +728,68 @@ void main() {
     });
 
     testWidgets(
+        'regenerating the same draft while appending keeps it marked appending',
+        (tester) async {
+      final existing = _existingNote(content: 'Note A content.');
+      final gate = Completer<void>();
+      final repo = _AppendableNoteDraftReviewRepository()
+        ..existingNote = existing
+        ..updateGate = gate;
+      final provider = _FixedGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      final service = _buildIngestionService(
+        provider: provider,
+        claims: [_claim('n1', 'A brand new claim.')],
+        results: [
+          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+        ],
+      );
+
+      final container = await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repo,
+        availableNotes: [existing],
+      );
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+      final notifier = container.read(claimReviewProvider.notifier);
+      notifier.selectTargetNote(existing.id);
+
+      final appending = notifier.appendToExistingNote();
+      await tester.pump();
+      expect(
+        container.read(claimReviewProvider).appendStatus,
+        ClaimDraftAppendStatus.appending,
+      );
+
+      // Regenerating the exact same selection while the append is still in
+      // flight must not drop appendStatus back to idle, otherwise the
+      // Append button re-enables and a second tap starts a duplicate write
+      // before the first updateNote resolves.
+      notifier.generateDraft();
+      expect(
+        container.read(claimReviewProvider).appendStatus,
+        ClaimDraftAppendStatus.appending,
+      );
+
+      final secondTapWhileAppending = notifier.appendToExistingNote();
+
+      gate.complete();
+      await appending;
+      await secondTapWhileAppending;
+
+      expect(repo.updatedNotes, hasLength(1));
+    });
+
+    testWidgets(
         'returning to a draft content appended earlier is still recognized after appending a different draft',
         (tester) async {
       final existing = _existingNote(content: 'Old content here.');
