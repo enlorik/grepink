@@ -1135,7 +1135,7 @@ void main() {
       expect(container.read(claimReviewProvider).isAppendInFlight, isTrue);
 
       final dropdownFinder = find.byKey(
-        ValueKey<String>('claim-draft-append-target-${existingA.id}'),
+        ValueKey<String>('claim-draft-append-target-${existingA.id}-valid'),
       );
       final dropdown =
           tester.widget<DropdownButtonFormField<String>>(dropdownFinder);

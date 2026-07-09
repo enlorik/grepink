@@ -39,6 +39,9 @@ class ClaimDraftPreviewPanel extends StatelessWidget {
     this.isAppendInFlight = false,
   });
 
+  bool get _targetNoteIsValid =>
+      availableNotes.any((note) => note.id == selectedTargetNoteId);
+
   @override
   Widget build(BuildContext context) {
     if (!draft.shouldSave) {
@@ -129,17 +132,20 @@ class ClaimDraftPreviewPanel extends StatelessWidget {
           Text('Append target', style: AppTextStyles.titleMedium),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
-            key: ValueKey<String>(
-              'claim-draft-append-target-${selectedTargetNoteId ?? 'none'}',
-            ),
             // A previously selected target can vanish from availableNotes
             // (e.g. the note was deleted, or the list was refreshed) while
             // still being referenced by selectedTargetNoteId. Passing a
             // value DropdownButtonFormField doesn't have a matching item
             // for throws, so fall back to no selection instead of crashing.
-            initialValue: availableNotes.any((note) => note.id == selectedTargetNoteId)
-                ? selectedTargetNoteId
-                : null,
+            // The validity flag is baked into the key so the FormField is
+            // recreated (and initialValue re-applied) the moment the
+            // selected note drops out of availableNotes, instead of
+            // silently keeping the stale value from before.
+            key: ValueKey<String>(
+              'claim-draft-append-target-${selectedTargetNoteId ?? 'none'}-'
+              '${_targetNoteIsValid ? 'valid' : 'invalid'}',
+            ),
+            initialValue: _targetNoteIsValid ? selectedTargetNoteId : null,
             isExpanded: true,
             decoration: const InputDecoration(
               border: OutlineInputBorder(),
