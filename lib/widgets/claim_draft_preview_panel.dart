@@ -58,7 +58,7 @@ class ClaimDraftPreviewPanel extends StatelessWidget {
           border: Border.all(color: AppColors.dividerBorder),
         ),
         child: Text(
-          'Select at least one new claim or better source to generate a draft.',
+          'Select at least one saveable claim (new, better source, or a reviewed contradiction) to generate a draft.',
           style: AppTextStyles.bodyMedium,
         ),
       );

@@ -341,7 +341,14 @@ void main() {
       container.read(claimReviewProvider.notifier).toggle('n1');
       await tester.pumpAndSettle();
 
-      await _generateDraft(tester);
+      // With nothing left selected, the button is disabled -- generate
+      // through the notifier directly to reach the empty-draft state.
+      final button = tester.widget<FilledButton>(
+        find.byKey(const Key('generate-claim-draft-button')),
+      );
+      expect(button.onPressed, isNull);
+      container.read(claimReviewProvider.notifier).generateDraft();
+      await tester.pumpAndSettle();
 
       final draft = container.read(claimReviewProvider).draft;
       expect(draft!.shouldSave, isFalse);

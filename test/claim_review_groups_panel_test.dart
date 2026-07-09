@@ -160,6 +160,49 @@ void main() {
     });
   });
 
+  group('ClaimReviewGroupsPanel new-claim helper text', () {
+    testWidgets('explains that new claims are selected by default', (tester) async {
+      await _pumpPanel(tester, groups: [
+        ClaimReviewGroup(
+          label: 'New claims',
+          classification: ClaimNoveltyClassification.newClaim,
+          items: [_item('n1', classification: ClaimNoveltyClassification.newClaim)],
+        ),
+      ]);
+
+      expect(find.byKey(const Key('new-claim-helper-text')), findsOneWidget);
+    });
+  });
+
+  group('ClaimReviewGroupsPanel contradiction helper text', () {
+    testWidgets('appears when a contradiction group exists', (tester) async {
+      await _pumpPanel(tester, groups: [
+        ClaimReviewGroup(
+          label: 'Possible contradictions to review',
+          classification: ClaimNoveltyClassification.contradiction,
+          items: [
+            _item('c1', classification: ClaimNoveltyClassification.contradiction),
+          ],
+        ),
+      ]);
+
+      expect(find.byKey(const Key('contradiction-helper-text')), findsOneWidget);
+    });
+
+    testWidgets('does not appear when there is no contradiction group',
+        (tester) async {
+      await _pumpPanel(tester, groups: [
+        ClaimReviewGroup(
+          label: 'New claims',
+          classification: ClaimNoveltyClassification.newClaim,
+          items: [_item('n1', classification: ClaimNoveltyClassification.newClaim)],
+        ),
+      ]);
+
+      expect(find.byKey(const Key('contradiction-helper-text')), findsNothing);
+    });
+  });
+
   group('ClaimReviewGroupsPanel better-source helper text', () {
     testWidgets('explains that a better source can improve an existing note',
         (tester) async {

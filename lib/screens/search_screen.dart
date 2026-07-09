@@ -476,10 +476,20 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           const SizedBox(height: 12),
           FilledButton.icon(
             key: const Key('generate-claim-draft-button'),
-            onPressed: _generateClaimDraft,
+            onPressed: claimReviewState.selection!.selectedSaveableItems.isEmpty
+                ? null
+                : _generateClaimDraft,
             icon: const Icon(Icons.description_outlined),
             label: const Text('Generate draft'),
           ),
+          if (claimReviewState.selection!.selectedSaveableItems.isEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              key: const Key('generate-draft-disabled-helper'),
+              'Select at least one saveable claim (new, better source, or a reviewed contradiction) to generate a draft.',
+              style: AppTextStyles.bodySmall,
+            ),
+          ],
         ],
         if (claimReviewState.draftGenerationErrorMessage != null) ...[
           const SizedBox(height: 12),

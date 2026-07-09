@@ -1312,7 +1312,15 @@ void main() {
       // Deselect the only default-selected claim so the draft is empty.
       container.read(claimReviewProvider.notifier).toggle('n1');
       await tester.pumpAndSettle();
-      await _generateDraft(tester);
+
+      // With nothing left selected, Generate draft is disabled -- generate
+      // through the notifier directly to reach the empty-draft state.
+      final generateButton = tester.widget<FilledButton>(
+        find.byKey(const Key('generate-claim-draft-button')),
+      );
+      expect(generateButton.onPressed, isNull);
+      container.read(claimReviewProvider.notifier).generateDraft();
+      await tester.pumpAndSettle();
 
       expect(container.read(claimReviewProvider).draft!.shouldSave, isFalse);
 
