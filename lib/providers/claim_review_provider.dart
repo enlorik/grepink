@@ -124,12 +124,17 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
   }
 
   void selectTargetNote(String? noteId) {
+    // Re-selecting the same note (e.g. the dropdown firing onChanged again
+    // for an unchanged value) must not undo the appended/duplicate guard.
+    // Only actually switching to a different note is a legitimate reason
+    // to allow a fresh append.
+    final isDifferentTarget = noteId != state.targetNoteId;
     state = state.copyWith(
       targetNoteId: noteId,
       clearTargetNoteId: noteId == null,
-      // Appending to a different note is a legitimate new action even if
-      // the current draft was already appended elsewhere.
-      appendStatus: ClaimDraftAppendStatus.idle,
+      appendStatus: isDifferentTarget
+          ? ClaimDraftAppendStatus.idle
+          : state.appendStatus,
       clearAppendError: true,
     );
   }

@@ -406,6 +406,58 @@ void main() {
       expect(repo.updatedNotes.last.content, contains('Note B content.'));
     });
 
+    testWidgets(
+        're-selecting the same target note after appending does not re-enable append',
+        (tester) async {
+      final existing = _existingNote(content: 'Old content here.');
+      final repo = _AppendableNoteDraftReviewRepository()
+        ..existingNote = existing;
+      final provider = _FixedGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      final service = _buildIngestionService(
+        provider: provider,
+        claims: [_claim('n1', 'A brand new claim.')],
+        results: [
+          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+        ],
+      );
+
+      final container = await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repo,
+        availableNotes: [existing],
+      );
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+      final notifier = container.read(claimReviewProvider.notifier);
+      notifier.selectTargetNote(existing.id);
+      await _tapAppend(tester);
+
+      expect(repo.updatedNotes, hasLength(1));
+
+      // Re-picking the exact same note from the dropdown (which can fire
+      // onChanged even for an unchanged value) must not undo the
+      // already-appended guard.
+      notifier.selectTargetNote(existing.id);
+      await tester.pump();
+      expect(
+        container.read(claimReviewProvider).appendStatus,
+        ClaimDraftAppendStatus.appended,
+      );
+
+      await notifier.appendToExistingNote();
+
+      expect(repo.updatedNotes, hasLength(1));
+    });
+
     testWidgets('no-save draft does not modify a note', (tester) async {
       final existing = _existingNote();
       final repo = _AppendableNoteDraftReviewRepository()
