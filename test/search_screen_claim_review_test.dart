@@ -154,9 +154,11 @@ Future<ProviderContainer> _pumpSearchScreen(
     UncontrolledProviderScope(
       container: container,
       child: const MaterialApp(
-        home: MediaQuery(
-          data: MediaQueryData(disableAnimations: true),
-          child: SearchScreen(),
+        home: Scaffold(
+          body: MediaQuery(
+            data: MediaQueryData(disableAnimations: true),
+            child: SearchScreen(),
+          ),
         ),
       ),
     ),
