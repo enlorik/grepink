@@ -374,6 +374,64 @@ void main() {
     });
 
     testWidgets(
+        'a second save tapped after toggling away and back mid-save does not insert a duplicate',
+        (tester) async {
+      final gate = Completer<void>();
+      final repo = _RecordingNoteDraftReviewRepository()..insertGate = gate;
+      final provider = _FixedGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      final service = _buildIngestionService(
+        provider: provider,
+        claims: [_claim('n1', 'A brand new claim.')],
+        results: [
+          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+        ],
+      );
+
+      final container = await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repo,
+      );
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+
+      final notifier = container.read(claimReviewProvider.notifier);
+      final firstSave = notifier.saveAsNewNote();
+      await tester.pump();
+
+      // Toggling away and back to the same selection while the insert is
+      // still in flight resets the displayed saveStatus to idle (this is
+      // existing, intentional behavior -- see the "returning to a selection
+      // saved while a prior draft was in flight" test above).
+      notifier.toggle('n1');
+      notifier.toggle('n1');
+      notifier.generateDraft();
+      expect(
+        container.read(claimReviewProvider).saveStatus,
+        ClaimDraftSaveStatus.idle,
+      );
+
+      // A tap on Save in this window reads as idle, not saving, but the
+      // original insertNote call is still awaiting the same gate. This must
+      // not be allowed to start a second, overlapping insert.
+      final secondSave = notifier.saveAsNewNote();
+
+      gate.complete();
+      await firstSave;
+      await secondSave;
+
+      expect(repo.insertedNotes, hasLength(1));
+    });
+
+    testWidgets(
         'returning to a draft saved earlier is still recognized as saved after saving a different draft',
         (tester) async {
       final repo = _RecordingNoteDraftReviewRepository();

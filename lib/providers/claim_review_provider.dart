@@ -50,6 +50,16 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
   final Ref _ref;
   int _requestSequence = 0;
 
+  // Real concurrency locks, separate from the user-facing saveStatus/
+  // appendStatus displayed in state. Toggling a claim or regenerating the
+  // draft can legitimately reset the displayed status back to idle while an
+  // older insertNote/updateNote call is still awaiting, so saveAsNewNote and
+  // appendToExistingNote must not rely on the displayed status alone to
+  // reject an overlapping call -- otherwise a second tap in that window
+  // would start a duplicate write.
+  bool _saveInFlight = false;
+  bool _appendInFlight = false;
+
   ClaimReviewNotifier(this._ref) : super(const ClaimReviewSessionState());
 
   Future<void> runReview(String question) async {
@@ -212,7 +222,8 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
     final draft = state.draft;
     if (draft == null || !draft.shouldSave) return;
     if (state.isDraftAlreadySaved) return;
-    if (state.saveStatus == ClaimDraftSaveStatus.saving) return;
+    if (_saveInFlight) return;
+    _saveInFlight = true;
 
     state = state.copyWith(
       saveStatus: ClaimDraftSaveStatus.saving,
@@ -248,6 +259,8 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
           saveErrorMessage: error.toString(),
         );
       }
+    } finally {
+      _saveInFlight = false;
     }
   }
 
@@ -262,7 +275,7 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
   Future<void> appendToExistingNote() async {
     final draft = state.draft;
     if (draft == null || !draft.shouldSave) return;
-    if (state.appendStatus == ClaimDraftAppendStatus.appending) return;
+    if (_appendInFlight) return;
     if (state.isDraftAlreadyAppended) return;
 
     final targetNoteId = state.targetNoteId;
@@ -274,6 +287,7 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
       return;
     }
 
+    _appendInFlight = true;
     state = state.copyWith(
       appendStatus: ClaimDraftAppendStatus.appending,
       clearAppendError: true,
@@ -329,6 +343,8 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
         appendStatus: ClaimDraftAppendStatus.error,
         appendErrorMessage: error.toString(),
       );
+    } finally {
+      _appendInFlight = false;
     }
   }
 

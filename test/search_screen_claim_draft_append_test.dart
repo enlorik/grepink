@@ -873,6 +873,67 @@ void main() {
     });
 
     testWidgets(
+        'a second append tapped after toggling away and back mid-append does not duplicate the write',
+        (tester) async {
+      final existing = _existingNote(content: 'Note A content.');
+      final gate = Completer<void>();
+      final repo = _AppendableNoteDraftReviewRepository()
+        ..existingNote = existing
+        ..updateGate = gate;
+      final provider = _FixedGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      final service = _buildIngestionService(
+        provider: provider,
+        claims: [_claim('n1', 'A brand new claim.')],
+        results: [
+          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+        ],
+      );
+
+      final container = await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repo,
+        availableNotes: [existing],
+      );
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+      final notifier = container.read(claimReviewProvider.notifier);
+      notifier.selectTargetNote(existing.id);
+
+      final firstAppend = notifier.appendToExistingNote();
+      await tester.pump();
+
+      // Toggling away and back to the same selection while updateNote is
+      // still in flight resets the displayed appendStatus to idle.
+      notifier.toggle('n1');
+      notifier.toggle('n1');
+      notifier.generateDraft();
+      expect(
+        container.read(claimReviewProvider).appendStatus,
+        ClaimDraftAppendStatus.idle,
+      );
+
+      // A tap on Append in this window reads as idle, but the original
+      // updateNote call is still awaiting the same gate. This must not be
+      // allowed to start a second, overlapping update.
+      final secondAppend = notifier.appendToExistingNote();
+
+      gate.complete();
+      await firstAppend;
+      await secondAppend;
+
+      expect(repo.updatedNotes, hasLength(1));
+    });
+
+    testWidgets(
         'target note disappearing from the list does not crash the dropdown',
         (tester) async {
       final existingA = _existingNote(content: 'Note A content.');
