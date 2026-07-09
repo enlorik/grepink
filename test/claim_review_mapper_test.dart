@@ -31,10 +31,10 @@ ClaimDeduplicationResult _result({
       citationUrls: citationUrls,
     );
 
-EvidenceItem _evidence(String id) => EvidenceItem(
+EvidenceItem _evidence(String id, {String title = 'Note'}) => EvidenceItem(
       id: id,
       type: EvidenceType.localNote,
-      title: 'Note',
+      title: title,
       content: 'content',
     );
 
@@ -155,6 +155,25 @@ void main() {
           .items
           .first;
       expect(item.matchedLocalEvidenceIds, contains('local-ev-1'));
+    });
+
+    test('matched local evidence titles are preserved in review items', () {
+      final ev = _evidence('local-ev-1', title: 'My existing note');
+      final groups = mapper.toGroups(_ingestion(
+        knownClaims: [
+          _result(
+            id: 'k1',
+            classification: ClaimNoveltyClassification.alreadyKnown,
+            matchedLocal: [ev],
+          ),
+        ],
+      ));
+
+      final item = groups
+          .firstWhere((g) => g.classification == ClaimNoveltyClassification.alreadyKnown)
+          .items
+          .first;
+      expect(item.matchedLocalEvidenceTitles, contains('My existing note'));
     });
 
     test('no source URLs are dropped from review items', () {

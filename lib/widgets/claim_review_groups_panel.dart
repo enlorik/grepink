@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
 
+import '../models/claim_deduplication_result.dart';
 import '../models/claim_review_item.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
+
+/// Above this many items, the "Already in your notes" section starts
+/// collapsed so a long list of known claims doesn't push the useful
+/// (new/better-source) groups below the fold.
+const int _alreadyKnownCollapseThreshold = 3;
 
 /// Displays grouped claim review results and lets the user toggle which
 /// claims are selected. This panel never saves or persists anything itself —
@@ -68,13 +74,27 @@ class _ClaimReviewGroupSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final headerText = '${group.label} (${group.items.length})';
+
+    // Already-known claims aren't saveable and are usually the least
+    // actionable group, so they get a compact, collapsible treatment
+    // instead of always taking up full space like the other groups.
+    if (group.classification == ClaimNoveltyClassification.alreadyKnown) {
+      return _AlreadyKnownGroupSection(group: group, headerText: headerText);
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          '${group.label} (${group.items.length})',
-          style: AppTextStyles.titleMedium,
-        ),
+        Text(headerText, style: AppTextStyles.titleMedium),
+        if (group.classification == ClaimNoveltyClassification.betterSource) ...[
+          const SizedBox(height: 4),
+          Text(
+            key: const Key('better-source-helper-text'),
+            'Already in your notes, but this source may improve the existing claim.',
+            style: AppTextStyles.bodySmall,
+          ),
+        ],
         const SizedBox(height: 8),
         for (final item in group.items)
           _ClaimReviewItemTile(
@@ -84,6 +104,47 @@ class _ClaimReviewGroupSection extends StatelessWidget {
             onToggle: () => onToggle(item.id),
           ),
       ],
+    );
+  }
+}
+
+/// Compact, collapsible rendering for the "Already in notes" group. Starts
+/// collapsed once there are enough items that showing them all would push
+/// the actionable groups below the fold; the user can still expand it.
+class _AlreadyKnownGroupSection extends StatelessWidget {
+  final ClaimReviewGroup group;
+  final String headerText;
+
+  const _AlreadyKnownGroupSection({
+    required this.group,
+    required this.headerText,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final collapsedByDefault = group.items.length > _alreadyKnownCollapseThreshold;
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        key: const Key('already-known-section'),
+        initiallyExpanded: !collapsedByDefault,
+        tilePadding: EdgeInsets.zero,
+        childrenPadding: EdgeInsets.zero,
+        title: Text(headerText, style: AppTextStyles.titleMedium),
+        subtitle: Text(
+          'Not saved -- shown so you know Grepink already has this.',
+          style: AppTextStyles.bodySmall,
+        ),
+        children: [
+          for (final item in group.items)
+            _ClaimReviewItemTile(
+              key: Key('claim-review-item-${item.id}'),
+              item: item,
+              selected: false,
+              onToggle: () {},
+            ),
+        ],
+      ),
     );
   }
 }
@@ -112,6 +173,25 @@ class _ClaimReviewItemTile extends StatelessWidget {
         Text(
           key: Key('claim-review-source-${item.id}-$i'),
           title.trim().isEmpty ? url : '$title ($url)',
+          style: AppTextStyles.bodySmall,
+          overflow: TextOverflow.ellipsis,
+        ),
+      );
+    }
+    if (item.matchedLocalEvidenceIds.isNotEmpty) {
+      final matches = <String>[];
+      for (var i = 0; i < item.matchedLocalEvidenceIds.length; i++) {
+        final title = i < item.matchedLocalEvidenceTitles.length
+            ? item.matchedLocalEvidenceTitles[i]
+            : '';
+        matches.add(
+          title.trim().isEmpty ? item.matchedLocalEvidenceIds[i] : title,
+        );
+      }
+      lines.add(
+        Text(
+          key: Key('claim-review-matched-evidence-${item.id}'),
+          'Matches your notes: ${matches.join(', ')}',
           style: AppTextStyles.bodySmall,
           overflow: TextOverflow.ellipsis,
         ),
