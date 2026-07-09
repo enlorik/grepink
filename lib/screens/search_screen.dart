@@ -157,6 +157,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     );
   }
 
+  void _discardClaimReview() {
+    ref.read(claimReviewProvider.notifier).reset();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Review discarded. Nothing was saved.')),
+    );
+  }
+
   void _discardDraft() {
     ref.read(noteDraftReviewProvider.notifier).discard();
     ref.read(knowledgeIngestionProvider.notifier).reset();
@@ -413,6 +420,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     !claimReviewState.isDraftAlreadyAppended
                 ? _appendClaimDraftToExistingNote
                 : null,
+          ),
+        ],
+        if (claimReviewState.hasReviewItems || claimReviewState.draft != null) ...[
+          const SizedBox(height: 12),
+          TextButton(
+            key: const Key('discard-claim-review-button'),
+            onPressed: _discardClaimReview,
+            child: const Text('Discard'),
           ),
         ],
       ],
