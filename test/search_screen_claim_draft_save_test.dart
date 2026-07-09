@@ -325,6 +325,54 @@ void main() {
       expect(repo.insertedNotes, hasLength(1));
     });
 
+    testWidgets(
+        'regenerating an unchanged draft after saving keeps it marked saved',
+        (tester) async {
+      final repo = _RecordingNoteDraftReviewRepository();
+      final provider = _FixedGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      final service = _buildIngestionService(
+        provider: provider,
+        claims: [_claim('n1', 'A brand new claim.')],
+        results: [
+          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+        ],
+      );
+
+      final container = await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repo,
+      );
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+      await _tapSave(tester);
+
+      expect(repo.insertedNotes, hasLength(1));
+
+      // Tap "Generate draft" again with the same selection. The regenerated
+      // markdown is identical to what was just saved, so it must stay
+      // reported as saved rather than re-enabling the save button.
+      await _generateDraft(tester);
+
+      expect(
+        container.read(claimReviewProvider).saveStatus,
+        ClaimDraftSaveStatus.saved,
+      );
+      expect(container.read(claimReviewProvider).isDraftAlreadySaved, isTrue);
+
+      await container.read(claimReviewProvider.notifier).saveAsNewNote();
+
+      expect(repo.insertedNotes, hasLength(1));
+    });
+
     testWidgets('overlapping save calls before the first completes only save once',
         (tester) async {
       final gate = Completer<void>();

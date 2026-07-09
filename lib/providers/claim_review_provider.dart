@@ -134,9 +134,16 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
       providerName: state.providerName,
       citations: state.citations,
     );
+    // Regenerating an unchanged selection produces markdown identical to
+    // what was already saved. Keep it marked as saved instead of resetting
+    // to idle, otherwise the Save button re-enables and a repeat tap would
+    // insert a duplicate note with the same content.
+    final matchesSavedDraft = state.savedDraftContent == result.markdownContent;
     state = state.copyWith(
       draft: result,
-      saveStatus: ClaimDraftSaveStatus.idle,
+      saveStatus: matchesSavedDraft
+          ? ClaimDraftSaveStatus.saved
+          : ClaimDraftSaveStatus.idle,
       clearSaveError: true,
     );
   }
