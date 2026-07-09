@@ -53,7 +53,15 @@ class NoteDraftReviewPanel extends StatelessWidget {
           (note) => note?.id == selectedTargetNoteId,
           orElse: () => null,
         );
-    final canAppend = !isActionBlocked && availableNotes.isNotEmpty && hasTarget;
+    // The claim-review draft panel can also append to an existing note.
+    // Both write the same note's content field, so the parent nulls out
+    // onAppendToExistingNote while that other append is in flight -- fold
+    // that into canAppend rather than trusting isActionBlocked alone, since
+    // isActionBlocked only reflects this flow's own status.
+    final canAppend = !isActionBlocked &&
+        availableNotes.isNotEmpty &&
+        hasTarget &&
+        onAppendToExistingNote != null;
 
     return Container(
       decoration: BoxDecoration(

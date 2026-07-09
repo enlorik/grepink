@@ -187,6 +187,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     );
   }
 
+  bool _isNoteDraftAppendInFlight(NoteDraftReviewState reviewState) =>
+      reviewState.status == NoteDraftReviewStatus.saving &&
+      reviewState.selectedDecision == NoteDraftReviewDecision.appendToExistingNote;
+
   @override
   Widget build(BuildContext context) {
     final searchState = ref.watch(searchProvider);
@@ -382,7 +386,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           NoteDraftReviewPanel(
             noteDraft: reviewState.noteDraft!,
             onSaveAsNewNote: _saveAsNewNote,
-            onAppendToExistingNote: _appendToExistingNote,
+            // Both this flow and the claim-review draft panel can append to
+            // an existing note's content. Null this out while a claim
+            // append is writing so the two can't race and drop each
+            // other's update.
+            onAppendToExistingNote:
+                claimReviewState.isAppendInFlight ? null : _appendToExistingNote,
             onDiscard: _discardDraft,
             availableNotes: availableNotes,
             selectedTargetNoteId: reviewState.targetNoteId,
@@ -497,9 +506,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             isAppendInFlight: claimReviewState.isAppendInFlight,
             appendStatus: claimReviewState.appendStatus,
             appendErrorMessage: claimReviewState.appendErrorMessage,
+            // Same reasoning in reverse: don't let this panel start an
+            // append while the note-draft flow's own append is writing to
+            // (possibly) the same note.
             onAppendToExistingNote: claimReviewState.draft!.shouldSave &&
                     !claimReviewState.isAppendInFlight &&
-                    !claimReviewState.isDraftAlreadyAppended
+                    !claimReviewState.isDraftAlreadyAppended &&
+                    !_isNoteDraftAppendInFlight(reviewState)
                 ? _appendClaimDraftToExistingNote
                 : null,
           ),
