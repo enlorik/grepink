@@ -1069,6 +1069,84 @@ void main() {
     });
 
     testWidgets(
+        'append target dropdown widget stays disabled after a toggle resets the displayed append status',
+        (tester) async {
+      final existingA = _existingNote(content: 'Note A content.');
+      final existingB = Note(
+        id: 'existing-note-b',
+        title: 'Existing note B',
+        content: 'Note B content.',
+        tags: const [],
+        keywords: const [],
+        isPinned: false,
+        createdAt: DateTime(2026, 1, 1),
+        updatedAt: DateTime(2026, 1, 1),
+        embeddingPending: false,
+      );
+      final gate = Completer<void>();
+      final repo = _AppendableNoteDraftReviewRepository()
+        ..existingNote = existingA
+        ..updateGate = gate;
+      final provider = _FixedGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      final service = _buildIngestionService(
+        provider: provider,
+        claims: [_claim('n1', 'A brand new claim.')],
+        results: [
+          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+        ],
+      );
+
+      final container = await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repo,
+        availableNotes: [existingA, existingB],
+      );
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+      final notifier = container.read(claimReviewProvider.notifier);
+      notifier.selectTargetNote(existingA.id);
+      await tester.pump();
+
+      final appending = notifier.appendToExistingNote();
+      await tester.pump();
+
+      // Toggling away and back to the same selection while updateNote is
+      // still in flight resets the displayed appendStatus to idle and
+      // regenerates the draft, so the panel (and its dropdown) stays
+      // rendered while the real write is still in flight.
+      notifier.toggle('n1');
+      notifier.toggle('n1');
+      notifier.generateDraft();
+      await tester.pump();
+
+      expect(
+        container.read(claimReviewProvider).appendStatus,
+        ClaimDraftAppendStatus.idle,
+      );
+      expect(container.read(claimReviewProvider).isAppendInFlight, isTrue);
+
+      final dropdownFinder = find.byKey(
+        ValueKey<String>('claim-draft-append-target-${existingA.id}'),
+      );
+      final dropdown =
+          tester.widget<DropdownButtonFormField<String>>(dropdownFinder);
+      expect(dropdown.onChanged, isNull);
+
+      gate.complete();
+      await appending;
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets(
         'target note disappearing from the list does not crash the dropdown',
         (tester) async {
       final existingA = _existingNote(content: 'Note A content.');

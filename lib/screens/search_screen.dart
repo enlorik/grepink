@@ -482,6 +482,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             availableNotes: availableNotes,
             selectedTargetNoteId: claimReviewState.targetNoteId,
             onTargetNoteSelected: _selectClaimDraftTargetNote,
+            isAppendInFlight: claimReviewState.isAppendInFlight,
             appendStatus: claimReviewState.appendStatus,
             appendErrorMessage: claimReviewState.appendErrorMessage,
             onAppendToExistingNote: claimReviewState.draft!.shouldSave &&

@@ -22,6 +22,7 @@ class ClaimDraftPreviewPanel extends StatelessWidget {
   final ClaimDraftAppendStatus appendStatus;
   final String? appendErrorMessage;
   final VoidCallback? onAppendToExistingNote;
+  final bool isAppendInFlight;
 
   const ClaimDraftPreviewPanel({
     super.key,
@@ -35,6 +36,7 @@ class ClaimDraftPreviewPanel extends StatelessWidget {
     this.appendStatus = ClaimDraftAppendStatus.idle,
     this.appendErrorMessage,
     this.onAppendToExistingNote,
+    this.isAppendInFlight = false,
   });
 
   @override
@@ -153,11 +155,12 @@ class ClaimDraftPreviewPanel extends StatelessWidget {
                 )
                 .toList(),
             // Changing the target mid-append could race with the in-flight
-            // update, so lock the dropdown for the same duration the
-            // append button itself is disabled.
-            onChanged: appendStatus == ClaimDraftAppendStatus.appending
-                ? null
-                : onTargetNoteSelected,
+            // update. Gate on the real isAppendInFlight lock rather than the
+            // displayed appendStatus -- toggling a claim or regenerating the
+            // draft can reset appendStatus to idle while a previous append is
+            // still writing, and the dropdown must stay locked through that
+            // window too.
+            onChanged: isAppendInFlight ? null : onTargetNoteSelected,
           ),
           const SizedBox(height: 12),
           FilledButton(
