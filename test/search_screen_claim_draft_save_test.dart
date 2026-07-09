@@ -527,6 +527,68 @@ void main() {
       );
     });
 
+    testWidgets(
+        'returning to a selection saved while a prior draft was in flight is recognized as already saved',
+        (tester) async {
+      final gate = Completer<void>();
+      final repo = _RecordingNoteDraftReviewRepository()..insertGate = gate;
+      final provider = _FixedGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      final service = _buildIngestionService(
+        provider: provider,
+        claims: [_claim('n1', 'A brand new claim.')],
+        results: [
+          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+        ],
+      );
+
+      final container = await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repo,
+      );
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+
+      final notifier = container.read(claimReviewProvider.notifier);
+      final saving = notifier.saveAsNewNote();
+
+      // Toggle away from the selection being saved while the insert is
+      // still in flight, then toggle back to the exact same selection
+      // before the insert resolves.
+      notifier.toggle('n1');
+      notifier.toggle('n1');
+      notifier.generateDraft();
+      expect(
+        container.read(claimReviewProvider).saveStatus,
+        ClaimDraftSaveStatus.idle,
+      );
+
+      gate.complete();
+      await saving;
+
+      // The in-flight save's content matches the regenerated draft the user
+      // returned to, so it should be recognized as already saved rather
+      // than allowing a duplicate insert.
+      expect(repo.insertedNotes, hasLength(1));
+      expect(
+        container.read(claimReviewProvider).saveStatus,
+        ClaimDraftSaveStatus.saved,
+      );
+      expect(container.read(claimReviewProvider).isDraftAlreadySaved, isTrue);
+
+      await notifier.saveAsNewNote();
+
+      expect(repo.insertedNotes, hasLength(1));
+    });
+
     testWidgets('save failure is shown and does not mark the draft saved',
         (tester) async {
       final repo = _RecordingNoteDraftReviewRepository()..shouldFail = true;
