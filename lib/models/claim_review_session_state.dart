@@ -19,7 +19,7 @@ class ClaimReviewSessionState {
   final ClaimDraftResult? draft;
   final ClaimDraftSaveStatus saveStatus;
   final String? saveErrorMessage;
-  final String? savedDraftContent;
+  final Set<String> savedDraftContents;
   final String? targetNoteId;
   final ClaimDraftAppendStatus appendStatus;
   final String? appendErrorMessage;
@@ -36,7 +36,7 @@ class ClaimReviewSessionState {
     this.draft,
     this.saveStatus = ClaimDraftSaveStatus.idle,
     this.saveErrorMessage,
-    this.savedDraftContent,
+    this.savedDraftContents = const {},
     this.targetNoteId,
     this.appendStatus = ClaimDraftAppendStatus.idle,
     this.appendErrorMessage,
@@ -51,11 +51,14 @@ class ClaimReviewSessionState {
       groups.any((group) => group.items.isNotEmpty);
 
   /// True when the current [draft] has already been saved and hasn't
-  /// changed since, so a repeat save would create a duplicate note.
+  /// changed since, so a repeat save would create a duplicate note. Tracks
+  /// every distinct draft content that has been saved (not just the most
+  /// recent one), so saving draft A, then draft B, then returning to A is
+  /// still recognized as already-saved instead of allowing a duplicate.
   bool get isDraftAlreadySaved =>
       saveStatus == ClaimDraftSaveStatus.saved &&
       draft != null &&
-      savedDraftContent == draft!.markdownContent;
+      savedDraftContents.contains(draft!.markdownContent);
 
   /// True when the current [draft] has already been appended to the
   /// currently selected target note and neither has changed since, so a
@@ -81,7 +84,7 @@ class ClaimReviewSessionState {
     ClaimDraftResult? draft,
     ClaimDraftSaveStatus? saveStatus,
     String? saveErrorMessage,
-    String? savedDraftContent,
+    Set<String>? savedDraftContents,
     String? targetNoteId,
     ClaimDraftAppendStatus? appendStatus,
     String? appendErrorMessage,
@@ -105,7 +108,7 @@ class ClaimReviewSessionState {
       saveStatus: saveStatus ?? this.saveStatus,
       saveErrorMessage:
           clearSaveError ? null : (saveErrorMessage ?? this.saveErrorMessage),
-      savedDraftContent: savedDraftContent ?? this.savedDraftContent,
+      savedDraftContents: savedDraftContents ?? this.savedDraftContents,
       targetNoteId:
           clearTargetNoteId ? null : (targetNoteId ?? this.targetNoteId),
       appendStatus: appendStatus ?? this.appendStatus,

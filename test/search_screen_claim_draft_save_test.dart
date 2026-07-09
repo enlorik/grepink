@@ -373,6 +373,85 @@ void main() {
       expect(repo.insertedNotes, hasLength(1));
     });
 
+    testWidgets(
+        'returning to a draft saved earlier is still recognized as saved after saving a different draft',
+        (tester) async {
+      final repo = _RecordingNoteDraftReviewRepository();
+      final provider = _FixedGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      final service = _buildIngestionService(
+        provider: provider,
+        claims: [
+          _claim('n1', 'A brand new claim.'),
+          _claim('n2', 'Another brand new claim.'),
+        ],
+        results: [
+          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+          _result(
+            'n2',
+            'Another brand new claim.',
+            ClaimNoveltyClassification.newClaim,
+          ),
+        ],
+      );
+
+      final container = await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repo,
+      );
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+      final notifier = container.read(claimReviewProvider.notifier);
+      final draftA = container.read(claimReviewProvider).draft!.markdownContent;
+      await _tapSave(tester);
+
+      expect(repo.insertedNotes, hasLength(1));
+
+      // Deselect one claim to produce a genuinely different draft (B), and
+      // save that too.
+      notifier.toggle('n2');
+      await tester.pumpAndSettle();
+      await _generateDraft(tester);
+      final draftB = container.read(claimReviewProvider).draft!.markdownContent;
+      expect(draftB, isNot(equals(draftA)));
+      expect(
+        container.read(claimReviewProvider).saveStatus,
+        ClaimDraftSaveStatus.idle,
+      );
+      await _tapSave(tester);
+
+      expect(repo.insertedNotes, hasLength(2));
+
+      // Reselect the claim to regenerate the original draft A. Even though
+      // B was the most recently saved content, A must still be recognized
+      // as already saved instead of allowing a duplicate.
+      notifier.toggle('n2');
+      await tester.pumpAndSettle();
+      await _generateDraft(tester);
+
+      expect(
+        container.read(claimReviewProvider).draft!.markdownContent,
+        draftA,
+      );
+      expect(
+        container.read(claimReviewProvider).saveStatus,
+        ClaimDraftSaveStatus.saved,
+      );
+      expect(container.read(claimReviewProvider).isDraftAlreadySaved, isTrue);
+
+      await notifier.saveAsNewNote();
+
+      expect(repo.insertedNotes, hasLength(2));
+    });
+
     testWidgets('overlapping save calls before the first completes only save once',
         (tester) async {
       final gate = Completer<void>();

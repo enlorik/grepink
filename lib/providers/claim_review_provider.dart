@@ -169,7 +169,8 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
     // what was already saved/appended. Keep those statuses instead of
     // resetting to idle, otherwise the Save/Append buttons re-enable and a
     // repeat tap would persist a duplicate with the same content.
-    final matchesSavedDraft = state.savedDraftContent == result.markdownContent;
+    final matchesSavedDraft =
+        state.savedDraftContents.contains(result.markdownContent);
     final matchesAppendedDraft = state.targetNoteId != null &&
         (state.appendedTargetsByContent[result.markdownContent]
                 ?.contains(state.targetNoteId) ??
@@ -211,18 +212,20 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
         content: draft.markdownContent,
       );
       // The current draft may have been replaced (toggled, regenerated, or
-      // the session reset) while insertNote was in flight. savedDraftContent
-      // always records the markdown that was actually persisted, so that if
-      // the user later returns to that same selection it is still
-      // recognized as already saved instead of being inserted again. Only
-      // flip saveStatus to saved when the current draft is the one that was
-      // just persisted, so an unrelated in-progress draft isn't mislabeled.
+      // the session reset) while insertNote was in flight. savedDraftContents
+      // always records the markdown that was actually persisted (keyed by
+      // content, not just the most recent one), so that if the user later
+      // returns to that same selection -- even after saving a different
+      // draft in between -- it is still recognized as already saved instead
+      // of being inserted again. Only flip saveStatus to saved when the
+      // current draft is the one that was just persisted, so an unrelated
+      // in-progress draft isn't mislabeled.
       final matchesCurrentDraft =
           state.draft?.markdownContent == draft.markdownContent;
       state = state.copyWith(
         saveStatus:
             matchesCurrentDraft ? ClaimDraftSaveStatus.saved : state.saveStatus,
-        savedDraftContent: draft.markdownContent,
+        savedDraftContents: {...state.savedDraftContents, draft.markdownContent},
       );
     } catch (error) {
       if (state.draft?.markdownContent == draft.markdownContent) {
