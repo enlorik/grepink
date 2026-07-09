@@ -585,6 +585,70 @@ void main() {
       expect(repo.updatedNotes, hasLength(1));
     });
 
+    testWidgets(
+        'target note disappearing from the list does not crash the dropdown',
+        (tester) async {
+      final existingA = _existingNote(content: 'Note A content.');
+      final existingB = Note(
+        id: 'existing-note-b',
+        title: 'Existing note B',
+        content: 'Note B content.',
+        tags: const [],
+        keywords: const [],
+        isPinned: false,
+        createdAt: DateTime(2026, 1, 1),
+        updatedAt: DateTime(2026, 1, 1),
+        embeddingPending: false,
+      );
+      final repo = _AppendableNoteDraftReviewRepository()
+        ..existingNote = existingA;
+      final provider = _FixedGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      final service = _buildIngestionService(
+        provider: provider,
+        claims: [_claim('n1', 'A brand new claim.')],
+        results: [
+          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+        ],
+      );
+
+      final container = await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repo,
+        availableNotes: [existingA, existingB],
+      );
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+      container.read(claimReviewProvider.notifier).selectTargetNote(existingA.id);
+      await tester.pump();
+
+      // Note A (the selected target) disappears from the available list
+      // (e.g. deleted elsewhere) while note B remains, so the dropdown's
+      // items are non-empty but no longer include the stale selected value.
+      // Rebuilding it must fall back to no selection instead of throwing.
+      container.updateOverrides([
+        knowledgeIngestionServiceProvider.overrideWith(
+          (ref) async => _FakeKnowledgeIngestionService(),
+        ),
+        noteDraftReviewRepositoryProvider.overrideWithValue(repo),
+        groundedAnswerIngestionServiceProvider.overrideWithValue(service),
+        allNotesProvider.overrideWithValue([existingB]),
+        recentNotesProvider.overrideWithValue(const <Note>[]),
+        refreshNotesProvider.overrideWithValue(() async {}),
+      ]);
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('no-save draft does not modify a note', (tester) async {
       final existing = _existingNote();
       final repo = _AppendableNoteDraftReviewRepository()

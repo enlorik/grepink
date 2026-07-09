@@ -121,8 +121,17 @@ class ClaimDraftPreviewPanel extends StatelessWidget {
           Text('Append target', style: AppTextStyles.titleMedium),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
-            key: const Key('claim-draft-append-target-dropdown'),
-            initialValue: selectedTargetNoteId,
+            key: ValueKey<String>(
+              'claim-draft-append-target-${selectedTargetNoteId ?? 'none'}',
+            ),
+            // A previously selected target can vanish from availableNotes
+            // (e.g. the note was deleted, or the list was refreshed) while
+            // still being referenced by selectedTargetNoteId. Passing a
+            // value DropdownButtonFormField doesn't have a matching item
+            // for throws, so fall back to no selection instead of crashing.
+            initialValue: availableNotes.any((note) => note.id == selectedTargetNoteId)
+                ? selectedTargetNoteId
+                : null,
             isExpanded: true,
             decoration: const InputDecoration(
               border: OutlineInputBorder(),
