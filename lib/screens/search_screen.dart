@@ -418,7 +418,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             key: const Key('claim-review-provider-not-configured-state'),
             message:
                 'Claim review needs a grounded answer provider set up first. '
-                'Configure one in Settings to see review results for your questions.',
+                'This feature is not available yet in this build.',
           ),
         ],
         if (claimReviewState.isError && claimReviewState.errorMessage != null) ...[
