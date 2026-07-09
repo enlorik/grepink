@@ -413,6 +413,66 @@ void main() {
     });
 
     testWidgets(
+        'regenerating the same selection while saving still records the save on completion',
+        (tester) async {
+      final gate = Completer<void>();
+      final repo = _RecordingNoteDraftReviewRepository()..insertGate = gate;
+      final provider = _FixedGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      final service = _buildIngestionService(
+        provider: provider,
+        claims: [_claim('n1', 'A brand new claim.')],
+        results: [
+          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+        ],
+      );
+
+      final container = await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repo,
+      );
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+
+      final notifier = container.read(claimReviewProvider.notifier);
+      final saving = notifier.saveAsNewNote();
+
+      // Regenerate with the exact same selection while the save is still
+      // in flight. This produces a new (but content-identical) draft
+      // instance and resets saveStatus to idle in the meantime.
+      notifier.generateDraft();
+      expect(
+        container.read(claimReviewProvider).saveStatus,
+        ClaimDraftSaveStatus.idle,
+      );
+
+      gate.complete();
+      await saving;
+
+      // The content that was actually inserted matches the regenerated
+      // draft, so it must end up recorded as saved, not left looking
+      // unsaved (which would let a repeat tap insert a duplicate note).
+      expect(repo.insertedNotes, hasLength(1));
+      expect(
+        container.read(claimReviewProvider).saveStatus,
+        ClaimDraftSaveStatus.saved,
+      );
+      expect(container.read(claimReviewProvider).isDraftAlreadySaved, isTrue);
+
+      await notifier.saveAsNewNote();
+
+      expect(repo.insertedNotes, hasLength(1));
+    });
+
+    testWidgets(
         'a save that resolves after the draft changed does not mark the new draft saved',
         (tester) async {
       final gate = Completer<void>();
