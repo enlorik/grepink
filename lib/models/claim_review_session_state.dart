@@ -6,6 +6,8 @@ enum ClaimReviewSessionStatus { idle, loading, success, error }
 
 enum ClaimDraftSaveStatus { idle, saving, saved, error }
 
+enum ClaimDraftAppendStatus { idle, appending, appended, error }
+
 class ClaimReviewSessionState {
   final ClaimReviewSessionStatus status;
   final String question;
@@ -18,6 +20,9 @@ class ClaimReviewSessionState {
   final ClaimDraftSaveStatus saveStatus;
   final String? saveErrorMessage;
   final String? savedDraftContent;
+  final String? targetNoteId;
+  final ClaimDraftAppendStatus appendStatus;
+  final String? appendErrorMessage;
 
   const ClaimReviewSessionState({
     this.status = ClaimReviewSessionStatus.idle,
@@ -31,6 +36,9 @@ class ClaimReviewSessionState {
     this.saveStatus = ClaimDraftSaveStatus.idle,
     this.saveErrorMessage,
     this.savedDraftContent,
+    this.targetNoteId,
+    this.appendStatus = ClaimDraftAppendStatus.idle,
+    this.appendErrorMessage,
   });
 
   bool get isLoading => status == ClaimReviewSessionStatus.loading;
@@ -59,10 +67,15 @@ class ClaimReviewSessionState {
     ClaimDraftSaveStatus? saveStatus,
     String? saveErrorMessage,
     String? savedDraftContent,
+    String? targetNoteId,
+    ClaimDraftAppendStatus? appendStatus,
+    String? appendErrorMessage,
     bool clearSelection = false,
     bool clearError = false,
     bool clearDraft = false,
     bool clearSaveError = false,
+    bool clearTargetNoteId = false,
+    bool clearAppendError = false,
   }) {
     return ClaimReviewSessionState(
       status: status ?? this.status,
@@ -77,6 +90,12 @@ class ClaimReviewSessionState {
       saveErrorMessage:
           clearSaveError ? null : (saveErrorMessage ?? this.saveErrorMessage),
       savedDraftContent: savedDraftContent ?? this.savedDraftContent,
+      targetNoteId:
+          clearTargetNoteId ? null : (targetNoteId ?? this.targetNoteId),
+      appendStatus: appendStatus ?? this.appendStatus,
+      appendErrorMessage: clearAppendError
+          ? null
+          : (appendErrorMessage ?? this.appendErrorMessage),
     );
   }
 }

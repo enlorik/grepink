@@ -88,6 +88,9 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
         clearDraft: true,
         saveStatus: ClaimDraftSaveStatus.idle,
         clearSaveError: true,
+        appendStatus: ClaimDraftAppendStatus.idle,
+        clearAppendError: true,
+        clearTargetNoteId: true,
       );
     } catch (error) {
       if (requestId != _requestSequence) return;
@@ -100,6 +103,9 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
         clearDraft: true,
         saveStatus: ClaimDraftSaveStatus.idle,
         clearSaveError: true,
+        appendStatus: ClaimDraftAppendStatus.idle,
+        clearAppendError: true,
+        clearTargetNoteId: true,
       );
     }
   }
@@ -112,6 +118,16 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
       clearDraft: true,
       saveStatus: ClaimDraftSaveStatus.idle,
       clearSaveError: true,
+      appendStatus: ClaimDraftAppendStatus.idle,
+      clearAppendError: true,
+    );
+  }
+
+  void selectTargetNote(String? noteId) {
+    state = state.copyWith(
+      targetNoteId: noteId,
+      clearTargetNoteId: noteId == null,
+      clearAppendError: true,
     );
   }
 
@@ -142,6 +158,8 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
           ? ClaimDraftSaveStatus.saved
           : ClaimDraftSaveStatus.idle,
       clearSaveError: true,
+      appendStatus: ClaimDraftAppendStatus.idle,
+      clearAppendError: true,
     );
   }
 
@@ -190,6 +208,73 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
         );
       }
     }
+  }
+
+  /// Appends [ClaimReviewSessionState.draft] to an existing note chosen via
+  /// [selectTargetNote], using the same repository as the note-draft review
+  /// flow's append action.
+  ///
+  /// Does nothing if there is no draft or the draft is not saveable
+  /// ([ClaimDraftResult.shouldSave] is false).
+  Future<void> appendToExistingNote() async {
+    final draft = state.draft;
+    if (draft == null || !draft.shouldSave) return;
+    if (state.appendStatus == ClaimDraftAppendStatus.appending) return;
+
+    final targetNoteId = state.targetNoteId;
+    if (targetNoteId == null || targetNoteId.isEmpty) {
+      state = state.copyWith(
+        appendStatus: ClaimDraftAppendStatus.error,
+        appendErrorMessage: 'Select a target note before appending.',
+      );
+      return;
+    }
+
+    state = state.copyWith(
+      appendStatus: ClaimDraftAppendStatus.appending,
+      clearAppendError: true,
+    );
+
+    try {
+      final repository = _ref.read(noteDraftReviewRepositoryProvider);
+      final existingNote = await repository.getNoteById(targetNoteId);
+      if (existingNote == null) {
+        if (state.draft?.markdownContent != draft.markdownContent) return;
+        state = state.copyWith(
+          appendStatus: ClaimDraftAppendStatus.error,
+          appendErrorMessage: 'Selected target note no longer exists.',
+        );
+        return;
+      }
+
+      final now = DateTime.now();
+      final updatedNote = existingNote.copyWith(
+        content: _appendDraftMarkdown(existingNote.content, draft),
+        updatedAt: now,
+        embeddingPending: true,
+        clearEmbedding: true,
+      );
+      await repository.updateNote(updatedNote);
+
+      // See saveAsNewNote for why this compares content rather than
+      // relying on the draft still being the current one.
+      if (state.draft?.markdownContent == draft.markdownContent) {
+        state = state.copyWith(appendStatus: ClaimDraftAppendStatus.appended);
+      }
+    } catch (error) {
+      if (state.draft?.markdownContent != draft.markdownContent) return;
+      state = state.copyWith(
+        appendStatus: ClaimDraftAppendStatus.error,
+        appendErrorMessage: error.toString(),
+      );
+    }
+  }
+
+  String _appendDraftMarkdown(String existingContent, ClaimDraftResult draft) {
+    final trimmedExisting = existingContent.trimRight();
+    final trimmedDraft = draft.markdownContent.trim();
+    if (trimmedExisting.isEmpty) return trimmedDraft;
+    return '$trimmedExisting\n\n---\n\n$trimmedDraft';
   }
 
   String _titleFor(String question) {
