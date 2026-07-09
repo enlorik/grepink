@@ -124,17 +124,20 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
   }
 
   void selectTargetNote(String? noteId) {
-    // Re-selecting the same note (e.g. the dropdown firing onChanged again
-    // for an unchanged value) must not undo the appended/duplicate guard.
-    // Only actually switching to a different note is a legitimate reason
-    // to allow a fresh append.
-    final isDifferentTarget = noteId != state.targetNoteId;
+    // A target note "already has" the current draft only if it's the exact
+    // note this draft's content was last appended to. That covers picking
+    // the same note again (including switching away and back to it), while
+    // any other note is treated as a genuinely new append target.
+    final matchesAppendedTarget = noteId != null &&
+        noteId == state.appendedTargetNoteId &&
+        state.draft != null &&
+        state.appendedDraftContent == state.draft!.markdownContent;
     state = state.copyWith(
       targetNoteId: noteId,
       clearTargetNoteId: noteId == null,
-      appendStatus: isDifferentTarget
-          ? ClaimDraftAppendStatus.idle
-          : state.appendStatus,
+      appendStatus: matchesAppendedTarget
+          ? ClaimDraftAppendStatus.appended
+          : ClaimDraftAppendStatus.idle,
       clearAppendError: true,
     );
   }
@@ -156,17 +159,22 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
       citations: state.citations,
     );
     // Regenerating an unchanged selection produces markdown identical to
-    // what was already saved. Keep it marked as saved instead of resetting
-    // to idle, otherwise the Save button re-enables and a repeat tap would
-    // insert a duplicate note with the same content.
+    // what was already saved/appended. Keep those statuses instead of
+    // resetting to idle, otherwise the Save/Append buttons re-enable and a
+    // repeat tap would persist a duplicate with the same content.
     final matchesSavedDraft = state.savedDraftContent == result.markdownContent;
+    final matchesAppendedDraft = state.targetNoteId != null &&
+        state.targetNoteId == state.appendedTargetNoteId &&
+        state.appendedDraftContent == result.markdownContent;
     state = state.copyWith(
       draft: result,
       saveStatus: matchesSavedDraft
           ? ClaimDraftSaveStatus.saved
           : ClaimDraftSaveStatus.idle,
       clearSaveError: true,
-      appendStatus: ClaimDraftAppendStatus.idle,
+      appendStatus: matchesAppendedDraft
+          ? ClaimDraftAppendStatus.appended
+          : ClaimDraftAppendStatus.idle,
       clearAppendError: true,
     );
   }
@@ -230,7 +238,7 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
     final draft = state.draft;
     if (draft == null || !draft.shouldSave) return;
     if (state.appendStatus == ClaimDraftAppendStatus.appending) return;
-    if (state.appendStatus == ClaimDraftAppendStatus.appended) return;
+    if (state.isDraftAlreadyAppended) return;
 
     final targetNoteId = state.targetNoteId;
     if (targetNoteId == null || targetNoteId.isEmpty) {
@@ -267,11 +275,19 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
       );
       await repository.updateNote(updatedNote);
 
-      // See saveAsNewNote for why this compares content rather than
-      // relying on the draft still being the current one.
-      if (state.draft?.markdownContent == draft.markdownContent) {
-        state = state.copyWith(appendStatus: ClaimDraftAppendStatus.appended);
-      }
+      // See saveAsNewNote for why appendedDraftContent is always recorded
+      // (so returning to this exact target+content combination later is
+      // still recognized as already appended) while appendStatus itself
+      // only flips to appended when the current draft is the one just
+      // persisted, so an unrelated in-progress draft isn't mislabeled.
+      final matchesCurrentDraft =
+          state.draft?.markdownContent == draft.markdownContent;
+      state = state.copyWith(
+        appendStatus:
+            matchesCurrentDraft ? ClaimDraftAppendStatus.appended : state.appendStatus,
+        appendedDraftContent: draft.markdownContent,
+        appendedTargetNoteId: targetNoteId,
+      );
     } catch (error) {
       if (state.draft?.markdownContent != draft.markdownContent) return;
       state = state.copyWith(

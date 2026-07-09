@@ -410,8 +410,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             onAppendToExistingNote: claimReviewState.draft!.shouldSave &&
                     claimReviewState.appendStatus !=
                         ClaimDraftAppendStatus.appending &&
-                    claimReviewState.appendStatus !=
-                        ClaimDraftAppendStatus.appended
+                    !claimReviewState.isDraftAlreadyAppended
                 ? _appendClaimDraftToExistingNote
                 : null,
           ),

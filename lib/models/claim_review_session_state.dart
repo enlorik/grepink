@@ -23,6 +23,8 @@ class ClaimReviewSessionState {
   final String? targetNoteId;
   final ClaimDraftAppendStatus appendStatus;
   final String? appendErrorMessage;
+  final String? appendedDraftContent;
+  final String? appendedTargetNoteId;
 
   const ClaimReviewSessionState({
     this.status = ClaimReviewSessionStatus.idle,
@@ -39,6 +41,8 @@ class ClaimReviewSessionState {
     this.targetNoteId,
     this.appendStatus = ClaimDraftAppendStatus.idle,
     this.appendErrorMessage,
+    this.appendedDraftContent,
+    this.appendedTargetNoteId,
   });
 
   bool get isLoading => status == ClaimReviewSessionStatus.loading;
@@ -55,6 +59,16 @@ class ClaimReviewSessionState {
       draft != null &&
       savedDraftContent == draft!.markdownContent;
 
+  /// True when the current [draft] has already been appended to the
+  /// currently selected target note and neither has changed since, so a
+  /// repeat append would duplicate that content in the same note.
+  bool get isDraftAlreadyAppended =>
+      appendStatus == ClaimDraftAppendStatus.appended &&
+      draft != null &&
+      targetNoteId != null &&
+      targetNoteId == appendedTargetNoteId &&
+      appendedDraftContent == draft!.markdownContent;
+
   ClaimReviewSessionState copyWith({
     ClaimReviewSessionStatus? status,
     String? question,
@@ -70,6 +84,8 @@ class ClaimReviewSessionState {
     String? targetNoteId,
     ClaimDraftAppendStatus? appendStatus,
     String? appendErrorMessage,
+    String? appendedDraftContent,
+    String? appendedTargetNoteId,
     bool clearSelection = false,
     bool clearError = false,
     bool clearDraft = false,
@@ -96,6 +112,9 @@ class ClaimReviewSessionState {
       appendErrorMessage: clearAppendError
           ? null
           : (appendErrorMessage ?? this.appendErrorMessage),
+      appendedDraftContent: appendedDraftContent ?? this.appendedDraftContent,
+      appendedTargetNoteId:
+          appendedTargetNoteId ?? this.appendedTargetNoteId,
     );
   }
 }

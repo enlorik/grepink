@@ -458,6 +458,133 @@ void main() {
       expect(repo.updatedNotes, hasLength(1));
     });
 
+    testWidgets(
+        'regenerating an unchanged draft after appending keeps it marked appended',
+        (tester) async {
+      final existing = _existingNote(content: 'Old content here.');
+      final repo = _AppendableNoteDraftReviewRepository()
+        ..existingNote = existing;
+      final provider = _FixedGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      final service = _buildIngestionService(
+        provider: provider,
+        claims: [_claim('n1', 'A brand new claim.')],
+        results: [
+          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+        ],
+      );
+
+      final container = await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repo,
+        availableNotes: [existing],
+      );
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+      final notifier = container.read(claimReviewProvider.notifier);
+      notifier.selectTargetNote(existing.id);
+      await _tapAppend(tester);
+
+      expect(repo.updatedNotes, hasLength(1));
+
+      // Tap "Generate draft" again with the same selection and the same
+      // target still picked. The regenerated markdown is identical to what
+      // was just appended, so it must stay reported as appended rather than
+      // re-enabling the append button.
+      await _generateDraft(tester);
+
+      expect(
+        container.read(claimReviewProvider).appendStatus,
+        ClaimDraftAppendStatus.appended,
+      );
+      expect(container.read(claimReviewProvider).isDraftAlreadyAppended, isTrue);
+
+      await notifier.appendToExistingNote();
+
+      expect(repo.updatedNotes, hasLength(1));
+    });
+
+    testWidgets(
+        'switching away and back to a previously appended target does not allow a duplicate',
+        (tester) async {
+      final existingA = _existingNote(content: 'Note A content.');
+      final existingB = Note(
+        id: 'existing-note-b',
+        title: 'Existing note B',
+        content: 'Note B content.',
+        tags: const [],
+        keywords: const [],
+        isPinned: false,
+        createdAt: DateTime(2026, 1, 1),
+        updatedAt: DateTime(2026, 1, 1),
+        embeddingPending: false,
+      );
+      final repo = _AppendableNoteDraftReviewRepository()
+        ..existingNote = existingA;
+      final provider = _FixedGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      final service = _buildIngestionService(
+        provider: provider,
+        claims: [_claim('n1', 'A brand new claim.')],
+        results: [
+          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+        ],
+      );
+
+      final container = await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repo,
+        availableNotes: [existingA, existingB],
+      );
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+      final notifier = container.read(claimReviewProvider.notifier);
+      notifier.selectTargetNote(existingA.id);
+      await _tapAppend(tester);
+
+      expect(repo.updatedNotes, hasLength(1));
+
+      // Switch to note B (a legitimately different, unappended target)...
+      repo.existingNote = existingB;
+      notifier.selectTargetNote(existingB.id);
+      await tester.pump();
+      expect(
+        container.read(claimReviewProvider).appendStatus,
+        ClaimDraftAppendStatus.idle,
+      );
+
+      // ...then switch back to note A, which already has this exact draft
+      // appended. That must be recognized as already done, not a fresh
+      // target to append to again.
+      notifier.selectTargetNote(existingA.id);
+      await tester.pump();
+
+      expect(
+        container.read(claimReviewProvider).appendStatus,
+        ClaimDraftAppendStatus.appended,
+      );
+
+      await notifier.appendToExistingNote();
+
+      expect(repo.updatedNotes, hasLength(1));
+    });
+
     testWidgets('no-save draft does not modify a note', (tester) async {
       final existing = _existingNote();
       final repo = _AppendableNoteDraftReviewRepository()
