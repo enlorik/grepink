@@ -1147,6 +1147,66 @@ void main() {
     });
 
     testWidgets(
+        'note-draft append button is disabled while a claim-draft append is in flight',
+        (tester) async {
+      final existingA = _existingNote(content: 'Note A content.');
+      final gate = Completer<void>();
+      final repo = _AppendableNoteDraftReviewRepository()
+        ..existingNote = existingA
+        ..updateGate = gate;
+      final provider = _FixedGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      final service = _buildIngestionService(
+        provider: provider,
+        claims: [_claim('n1', 'A brand new claim.')],
+        results: [
+          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+        ],
+      );
+
+      final container = await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repo,
+        availableNotes: [existingA],
+      );
+      // A single ask populates both the note-draft flow and the claim
+      // review flow from the same question.
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+
+      container.read(noteDraftReviewProvider.notifier).selectTargetNote(existingA.id);
+      final claimNotifier = container.read(claimReviewProvider.notifier);
+      claimNotifier.selectTargetNote(existingA.id);
+      await tester.pump();
+
+      // Start a claim-draft append and leave it in flight (the repository's
+      // updateGate holds it open) before it resolves.
+      final appending = claimNotifier.appendToExistingNote();
+      await tester.pump();
+      expect(container.read(claimReviewProvider).isAppendInFlight, isTrue);
+
+      // The note-draft flow's own append button must be disabled too --
+      // both write to Note content and picking the same target could
+      // otherwise let one write clobber the other.
+      final noteDraftAppendButton = tester.widget<OutlinedButton>(
+        find.widgetWithText(OutlinedButton, 'Append to existing note'),
+      );
+      expect(noteDraftAppendButton.onPressed, isNull);
+
+      gate.complete();
+      await appending;
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets(
         'target note disappearing from the list does not crash the dropdown',
         (tester) async {
       final existingA = _existingNote(content: 'Note A content.');
