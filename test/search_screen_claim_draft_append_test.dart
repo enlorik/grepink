@@ -586,6 +586,148 @@ void main() {
     });
 
     testWidgets(
+        'appending the same draft to two different notes remembers both as already appended',
+        (tester) async {
+      final existingA = _existingNote(content: 'Note A content.');
+      final existingB = Note(
+        id: 'existing-note-b',
+        title: 'Existing note B',
+        content: 'Note B content.',
+        tags: const [],
+        keywords: const [],
+        isPinned: false,
+        createdAt: DateTime(2026, 1, 1),
+        updatedAt: DateTime(2026, 1, 1),
+        embeddingPending: false,
+      );
+      final repo = _AppendableNoteDraftReviewRepository()
+        ..existingNote = existingA;
+      final provider = _FixedGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      final service = _buildIngestionService(
+        provider: provider,
+        claims: [_claim('n1', 'A brand new claim.')],
+        results: [
+          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+        ],
+      );
+
+      final container = await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repo,
+        availableNotes: [existingA, existingB],
+      );
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+      final notifier = container.read(claimReviewProvider.notifier);
+
+      // Append the same draft to A, then to B.
+      notifier.selectTargetNote(existingA.id);
+      await _tapAppend(tester);
+      expect(repo.updatedNotes, hasLength(1));
+
+      repo.existingNote = existingB;
+      notifier.selectTargetNote(existingB.id);
+      await tester.pump();
+      await _tapAppend(tester);
+      expect(repo.updatedNotes, hasLength(2));
+
+      // Selecting A again must recognize it as already appended too (not
+      // just the most recently appended note), and refuse a repeat append.
+      repo.existingNote = existingA;
+      notifier.selectTargetNote(existingA.id);
+      await tester.pump();
+
+      expect(
+        container.read(claimReviewProvider).appendStatus,
+        ClaimDraftAppendStatus.appended,
+      );
+      expect(container.read(claimReviewProvider).isDraftAlreadyAppended, isTrue);
+
+      await notifier.appendToExistingNote();
+
+      expect(repo.updatedNotes, hasLength(2));
+    });
+
+    testWidgets(
+        'selecting a target while an append is in flight does not start a second append',
+        (tester) async {
+      final existingA = _existingNote(content: 'Note A content.');
+      final existingB = Note(
+        id: 'existing-note-b',
+        title: 'Existing note B',
+        content: 'Note B content.',
+        tags: const [],
+        keywords: const [],
+        isPinned: false,
+        createdAt: DateTime(2026, 1, 1),
+        updatedAt: DateTime(2026, 1, 1),
+        embeddingPending: false,
+      );
+      final gate = Completer<void>();
+      final repo = _AppendableNoteDraftReviewRepository()
+        ..existingNote = existingA
+        ..updateGate = gate;
+      final provider = _FixedGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      final service = _buildIngestionService(
+        provider: provider,
+        claims: [_claim('n1', 'A brand new claim.')],
+        results: [
+          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+        ],
+      );
+
+      final container = await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repo,
+        availableNotes: [existingA, existingB],
+      );
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+      final notifier = container.read(claimReviewProvider.notifier);
+      notifier.selectTargetNote(existingA.id);
+
+      // Start the append but don't let updateNote resolve yet.
+      final appending = notifier.appendToExistingNote();
+      await tester.pump();
+      expect(
+        container.read(claimReviewProvider).appendStatus,
+        ClaimDraftAppendStatus.appending,
+      );
+
+      // Attempting to change the target (and a second append call) while
+      // the first is still in flight must not be allowed through.
+      notifier.selectTargetNote(existingB.id);
+      expect(
+        container.read(claimReviewProvider).targetNoteId,
+        existingA.id,
+      );
+      await notifier.appendToExistingNote();
+
+      gate.complete();
+      await appending;
+
+      expect(repo.updatedNotes, hasLength(1));
+    });
+
+    testWidgets(
         'target note disappearing from the list does not crash the dropdown',
         (tester) async {
       final existingA = _existingNote(content: 'Note A content.');

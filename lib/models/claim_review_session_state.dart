@@ -24,7 +24,7 @@ class ClaimReviewSessionState {
   final ClaimDraftAppendStatus appendStatus;
   final String? appendErrorMessage;
   final String? appendedDraftContent;
-  final String? appendedTargetNoteId;
+  final Set<String> appendedTargetNoteIds;
 
   const ClaimReviewSessionState({
     this.status = ClaimReviewSessionStatus.idle,
@@ -42,7 +42,7 @@ class ClaimReviewSessionState {
     this.appendStatus = ClaimDraftAppendStatus.idle,
     this.appendErrorMessage,
     this.appendedDraftContent,
-    this.appendedTargetNoteId,
+    this.appendedTargetNoteIds = const {},
   });
 
   bool get isLoading => status == ClaimReviewSessionStatus.loading;
@@ -61,13 +61,15 @@ class ClaimReviewSessionState {
 
   /// True when the current [draft] has already been appended to the
   /// currently selected target note and neither has changed since, so a
-  /// repeat append would duplicate that content in the same note.
+  /// repeat append would duplicate that content in the same note. Tracks
+  /// every note this exact content has been appended to (not just the most
+  /// recent one), so appending to A then B then switching back to A is
+  /// still recognized as already done.
   bool get isDraftAlreadyAppended =>
-      appendStatus == ClaimDraftAppendStatus.appended &&
       draft != null &&
       targetNoteId != null &&
-      targetNoteId == appendedTargetNoteId &&
-      appendedDraftContent == draft!.markdownContent;
+      appendedDraftContent == draft!.markdownContent &&
+      appendedTargetNoteIds.contains(targetNoteId);
 
   ClaimReviewSessionState copyWith({
     ClaimReviewSessionStatus? status,
@@ -85,7 +87,7 @@ class ClaimReviewSessionState {
     ClaimDraftAppendStatus? appendStatus,
     String? appendErrorMessage,
     String? appendedDraftContent,
-    String? appendedTargetNoteId,
+    Set<String>? appendedTargetNoteIds,
     bool clearSelection = false,
     bool clearError = false,
     bool clearDraft = false,
@@ -113,8 +115,8 @@ class ClaimReviewSessionState {
           ? null
           : (appendErrorMessage ?? this.appendErrorMessage),
       appendedDraftContent: appendedDraftContent ?? this.appendedDraftContent,
-      appendedTargetNoteId:
-          appendedTargetNoteId ?? this.appendedTargetNoteId,
+      appendedTargetNoteIds:
+          appendedTargetNoteIds ?? this.appendedTargetNoteIds,
     );
   }
 }

@@ -146,7 +146,12 @@ class ClaimDraftPreviewPanel extends StatelessWidget {
                   ),
                 )
                 .toList(),
-            onChanged: onTargetNoteSelected,
+            // Changing the target mid-append could race with the in-flight
+            // update, so lock the dropdown for the same duration the
+            // append button itself is disabled.
+            onChanged: appendStatus == ClaimDraftAppendStatus.appending
+                ? null
+                : onTargetNoteSelected,
           ),
           const SizedBox(height: 12),
           FilledButton(

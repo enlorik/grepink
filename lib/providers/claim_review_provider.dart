@@ -124,14 +124,19 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
   }
 
   void selectTargetNote(String? noteId) {
-    // A target note "already has" the current draft only if it's the exact
-    // note this draft's content was last appended to. That covers picking
-    // the same note again (including switching away and back to it), while
-    // any other note is treated as a genuinely new append target.
+    // Switching targets mid-append could race with the in-flight
+    // updateNote; the UI also disables the dropdown while appending, but
+    // guard here too in case this is ever called directly.
+    if (state.appendStatus == ClaimDraftAppendStatus.appending) return;
+
+    // A target note "already has" the current draft if it's one of the
+    // notes this exact draft content has been appended to. Tracking every
+    // such note (not just the most recent one) covers appending to A, then
+    // B, then switching back to A.
     final matchesAppendedTarget = noteId != null &&
-        noteId == state.appendedTargetNoteId &&
         state.draft != null &&
-        state.appendedDraftContent == state.draft!.markdownContent;
+        state.appendedDraftContent == state.draft!.markdownContent &&
+        state.appendedTargetNoteIds.contains(noteId);
     state = state.copyWith(
       targetNoteId: noteId,
       clearTargetNoteId: noteId == null,
@@ -164,8 +169,8 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
     // repeat tap would persist a duplicate with the same content.
     final matchesSavedDraft = state.savedDraftContent == result.markdownContent;
     final matchesAppendedDraft = state.targetNoteId != null &&
-        state.targetNoteId == state.appendedTargetNoteId &&
-        state.appendedDraftContent == result.markdownContent;
+        state.appendedDraftContent == result.markdownContent &&
+        state.appendedTargetNoteIds.contains(state.targetNoteId);
     state = state.copyWith(
       draft: result,
       saveStatus: matchesSavedDraft
@@ -280,13 +285,22 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
       // still recognized as already appended) while appendStatus itself
       // only flips to appended when the current draft is the one just
       // persisted, so an unrelated in-progress draft isn't mislabeled.
+      //
+      // appendedTargetNoteIds accumulates every note this exact content has
+      // been appended to (appending to A then B then re-selecting A must
+      // still count as already done), but resets to just this note the
+      // moment the tracked content actually changes to something new.
       final matchesCurrentDraft =
           state.draft?.markdownContent == draft.markdownContent;
+      final isNewContent = state.appendedDraftContent != draft.markdownContent;
+      final updatedTargets = isNewContent
+          ? <String>{targetNoteId}
+          : {...state.appendedTargetNoteIds, targetNoteId};
       state = state.copyWith(
         appendStatus:
             matchesCurrentDraft ? ClaimDraftAppendStatus.appended : state.appendStatus,
         appendedDraftContent: draft.markdownContent,
-        appendedTargetNoteId: targetNoteId,
+        appendedTargetNoteIds: updatedTargets,
       );
     } catch (error) {
       if (state.draft?.markdownContent != draft.markdownContent) return;
