@@ -440,6 +440,55 @@ void main() {
       await tester.pumpAndSettle();
     });
 
+    testWidgets(
+        'discard button stays disabled after a toggle resets the displayed save status',
+        (tester) async {
+      final gate = Completer<void>();
+      final repo = _GatedNoteDraftReviewRepository(gate);
+      final provider = _FixedGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      final service = _serviceWithOneNewClaim(provider);
+
+      final container = await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repo,
+      );
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+
+      final notifier = container.read(claimReviewProvider.notifier);
+      final saving = notifier.saveAsNewNote();
+      await tester.pump();
+
+      // Toggling a claim resets the displayed saveStatus to idle even
+      // though the insertNote call above is still awaiting the gate.
+      notifier.toggle('n1');
+      await tester.pump();
+
+      expect(
+        container.read(claimReviewProvider).saveStatus,
+        ClaimDraftSaveStatus.idle,
+      );
+      expect(container.read(claimReviewProvider).isSaveInFlight, isTrue);
+
+      final discardButton = tester.widget<TextButton>(
+        find.byKey(const Key('discard-claim-review-button')),
+      );
+      expect(discardButton.onPressed, isNull);
+
+      gate.complete();
+      await saving;
+      await tester.pumpAndSettle();
+    });
+
     testWidgets('discard button is not shown when there is nothing to discard',
         (tester) async {
       final repo = _RecordingNoteDraftReviewRepository();

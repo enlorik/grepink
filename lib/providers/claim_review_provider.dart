@@ -136,8 +136,11 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
   void selectTargetNote(String? noteId) {
     // Switching targets mid-append could race with the in-flight
     // updateNote; the UI also disables the dropdown while appending, but
-    // guard here too in case this is ever called directly.
-    if (state.appendStatus == ClaimDraftAppendStatus.appending) return;
+    // guard here too in case this is ever called directly. Checks the real
+    // in-flight flag rather than appendStatus, since toggling a claim can
+    // reset appendStatus to idle while the write for the previous draft is
+    // still running.
+    if (state.isAppendInFlight) return;
 
     // A target note "already has" the current draft if it's one of the
     // notes this exact draft content has been appended to. Tracking targets
@@ -228,6 +231,7 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
     state = state.copyWith(
       saveStatus: ClaimDraftSaveStatus.saving,
       clearSaveError: true,
+      isSaveInFlight: true,
     );
 
     try {
@@ -261,6 +265,7 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
       }
     } finally {
       _saveInFlight = false;
+      state = state.copyWith(isSaveInFlight: false);
     }
   }
 
@@ -291,6 +296,7 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
     state = state.copyWith(
       appendStatus: ClaimDraftAppendStatus.appending,
       clearAppendError: true,
+      isAppendInFlight: true,
     );
 
     try {
@@ -345,6 +351,7 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
       );
     } finally {
       _appendInFlight = false;
+      state = state.copyWith(isAppendInFlight: false);
     }
   }
 

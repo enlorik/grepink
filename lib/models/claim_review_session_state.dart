@@ -25,6 +25,16 @@ class ClaimReviewSessionState {
   final String? appendErrorMessage;
   final Map<String, Set<String>> appendedTargetsByContent;
 
+  /// True from the moment a save/append repository call actually starts
+  /// until it actually resolves. Unlike [saveStatus]/[appendStatus] (which
+  /// [toggle]/[generateDraft] on the notifier legitimately reset to idle to
+  /// reflect the currently-displayed draft), these are never reset except by
+  /// the write itself finishing, so other guards (the Discard button,
+  /// switching the append target) can tell a real write is still in flight
+  /// even after the displayed status has moved on.
+  final bool isSaveInFlight;
+  final bool isAppendInFlight;
+
   const ClaimReviewSessionState({
     this.status = ClaimReviewSessionStatus.idle,
     this.question = '',
@@ -41,6 +51,8 @@ class ClaimReviewSessionState {
     this.appendStatus = ClaimDraftAppendStatus.idle,
     this.appendErrorMessage,
     this.appendedTargetsByContent = const {},
+    this.isSaveInFlight = false,
+    this.isAppendInFlight = false,
   });
 
   bool get isLoading => status == ClaimReviewSessionStatus.loading;
@@ -89,6 +101,8 @@ class ClaimReviewSessionState {
     ClaimDraftAppendStatus? appendStatus,
     String? appendErrorMessage,
     Map<String, Set<String>>? appendedTargetsByContent,
+    bool? isSaveInFlight,
+    bool? isAppendInFlight,
     bool clearSelection = false,
     bool clearError = false,
     bool clearDraft = false,
@@ -117,6 +131,8 @@ class ClaimReviewSessionState {
           : (appendErrorMessage ?? this.appendErrorMessage),
       appendedTargetsByContent:
           appendedTargetsByContent ?? this.appendedTargetsByContent,
+      isSaveInFlight: isSaveInFlight ?? this.isSaveInFlight,
+      isAppendInFlight: isAppendInFlight ?? this.isAppendInFlight,
     );
   }
 }

@@ -426,8 +426,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           const SizedBox(height: 12),
           TextButton(
             key: const Key('discard-claim-review-button'),
-            onPressed: claimReviewState.saveStatus == ClaimDraftSaveStatus.saving ||
-                    claimReviewState.appendStatus == ClaimDraftAppendStatus.appending
+            onPressed: claimReviewState.isSaveInFlight || claimReviewState.isAppendInFlight
                 ? null
                 : _discardClaimReview,
             child: const Text('Discard'),
