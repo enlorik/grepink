@@ -323,6 +323,31 @@ void main() {
       expect(find.text('Draft discarded. Nothing was saved.'), findsAtLeastNWidgets(1));
     });
 
+    testWidgets(
+        'does not show a false no-answer claim review state when no grounded provider is configured',
+        (tester) async {
+      final repository = _FakeNoteDraftReviewRepository();
+
+      await _pumpSearchScreen(
+        tester,
+        ingestionService: _FakeKnowledgeIngestionService(
+          (_) async => _draft(
+            question: 'What changed?',
+            action: NoteDraftAction.createNewNote,
+          ),
+        ),
+        repository: repository,
+      );
+
+      await _askQuestion(tester, 'What changed?');
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('claim-review-empty-answer-state')),
+          findsNothing);
+      expect(find.byKey(const Key('claim-review-loading-indicator')),
+          findsNothing);
+    });
+
     testWidgets('loading disables asking again until the current draft resolves',
         (tester) async {
       final repository = _FakeNoteDraftReviewRepository();

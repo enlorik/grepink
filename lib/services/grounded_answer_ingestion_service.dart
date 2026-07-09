@@ -21,6 +21,12 @@ class GroundedAnswerIngestionService {
         _deduplicator = deduplicator,
         _localEvidence = localEvidence;
 
+  /// False when this pipeline is wired to the inert null provider (no real
+  /// grounded-answer provider configured yet). Callers use this to skip
+  /// running the review pipeline entirely instead of rendering a false
+  /// "no answer" result for every question.
+  bool get isProviderConfigured => _provider is! NullGroundedAnswerProvider;
+
   /// Fetches a grounded answer, extracts claims, and classifies them against
   /// local evidence.
   ///

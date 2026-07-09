@@ -94,7 +94,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           );
     }
 
-    await ref.read(claimReviewProvider.notifier).runReview(question);
+    final ingestionService = ref.read(groundedAnswerIngestionServiceProvider);
+    if (ingestionService.isProviderConfigured) {
+      await ref.read(claimReviewProvider.notifier).runReview(question);
+    }
   }
 
   void _toggleClaim(String claimId) {

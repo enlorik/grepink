@@ -111,6 +111,18 @@ GroundedAnswerIngestionService _service({
 
 void main() {
   group('GroundedAnswerIngestionService', () {
+    test('isProviderConfigured is false for the inert null provider', () {
+      final svc = _service(provider: const NullGroundedAnswerProvider());
+
+      expect(svc.isProviderConfigured, isFalse);
+    });
+
+    test('isProviderConfigured is true for a real provider', () {
+      final svc = _service(provider: const _FakeProvider(null));
+
+      expect(svc.isProviderConfigured, isTrue);
+    });
+
     test('null provider result returns safe empty result', () async {
       final svc = _service(provider: const _FakeProvider(null));
 
