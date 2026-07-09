@@ -211,12 +211,15 @@ class _ClaimReviewItemTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.dividerBorder),
       ),
-      child: CheckboxListTile(
-        value: selected,
-        onChanged: item.canBeSaved ? (_) => onToggle() : null,
-        controlAffinity: ListTileControlAffinity.leading,
-        title: Text(item.text, style: AppTextStyles.bodyMedium),
-        subtitle: _buildSubtitle(),
+      child: Material(
+        color: Colors.transparent,
+        child: CheckboxListTile(
+          value: selected,
+          onChanged: item.canBeSaved ? (_) => onToggle() : null,
+          controlAffinity: ListTileControlAffinity.leading,
+          title: Text(item.text, style: AppTextStyles.bodyMedium),
+          subtitle: _buildSubtitle(),
+        ),
       ),
     );
   }
