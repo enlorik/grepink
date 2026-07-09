@@ -130,13 +130,15 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
     if (state.appendStatus == ClaimDraftAppendStatus.appending) return;
 
     // A target note "already has" the current draft if it's one of the
-    // notes this exact draft content has been appended to. Tracking every
-    // such note (not just the most recent one) covers appending to A, then
-    // B, then switching back to A.
+    // notes this exact draft content has been appended to. Tracking targets
+    // per content (not just for the most recently appended content) covers
+    // appending to A, generating a different draft, then coming back to the
+    // original content and target.
     final matchesAppendedTarget = noteId != null &&
         state.draft != null &&
-        state.appendedDraftContent == state.draft!.markdownContent &&
-        state.appendedTargetNoteIds.contains(noteId);
+        (state.appendedTargetsByContent[state.draft!.markdownContent]
+                ?.contains(noteId) ??
+            false);
     state = state.copyWith(
       targetNoteId: noteId,
       clearTargetNoteId: noteId == null,
@@ -169,8 +171,9 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
     // repeat tap would persist a duplicate with the same content.
     final matchesSavedDraft = state.savedDraftContent == result.markdownContent;
     final matchesAppendedDraft = state.targetNoteId != null &&
-        state.appendedDraftContent == result.markdownContent &&
-        state.appendedTargetNoteIds.contains(state.targetNoteId);
+        (state.appendedTargetsByContent[result.markdownContent]
+                ?.contains(state.targetNoteId) ??
+            false);
     state = state.copyWith(
       draft: result,
       saveStatus: matchesSavedDraft
@@ -280,27 +283,28 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
       );
       await repository.updateNote(updatedNote);
 
-      // See saveAsNewNote for why appendedDraftContent is always recorded
-      // (so returning to this exact target+content combination later is
-      // still recognized as already appended) while appendStatus itself
-      // only flips to appended when the current draft is the one just
+      // See saveAsNewNote for why this is recorded unconditionally (so
+      // returning to this exact target+content combination later is still
+      // recognized as already appended) while appendStatus itself only
+      // flips to appended when the current draft is the one just
       // persisted, so an unrelated in-progress draft isn't mislabeled.
       //
-      // appendedTargetNoteIds accumulates every note this exact content has
-      // been appended to (appending to A then B then re-selecting A must
-      // still count as already done), but resets to just this note the
-      // moment the tracked content actually changes to something new.
+      // Targets are tracked per draft content (not just for the most
+      // recent content), so appending draft X to A, generating a
+      // different draft Y, then coming back to X doesn't lose the fact
+      // that X was already appended to A.
       final matchesCurrentDraft =
           state.draft?.markdownContent == draft.markdownContent;
-      final isNewContent = state.appendedDraftContent != draft.markdownContent;
-      final updatedTargets = isNewContent
-          ? <String>{targetNoteId}
-          : {...state.appendedTargetNoteIds, targetNoteId};
+      final existingTargetsForContent =
+          state.appendedTargetsByContent[draft.markdownContent] ??
+              const <String>{};
       state = state.copyWith(
         appendStatus:
             matchesCurrentDraft ? ClaimDraftAppendStatus.appended : state.appendStatus,
-        appendedDraftContent: draft.markdownContent,
-        appendedTargetNoteIds: updatedTargets,
+        appendedTargetsByContent: {
+          ...state.appendedTargetsByContent,
+          draft.markdownContent: {...existingTargetsForContent, targetNoteId},
+        },
       );
     } catch (error) {
       if (state.draft?.markdownContent != draft.markdownContent) return;

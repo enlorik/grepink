@@ -728,6 +728,89 @@ void main() {
     });
 
     testWidgets(
+        'returning to a draft content appended earlier is still recognized after appending a different draft',
+        (tester) async {
+      final existing = _existingNote(content: 'Old content here.');
+      final repo = _AppendableNoteDraftReviewRepository()
+        ..existingNote = existing;
+      final provider = _FixedGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      final service = _buildIngestionService(
+        provider: provider,
+        claims: [
+          _claim('n1', 'A brand new claim.'),
+          _claim('n2', 'Another brand new claim.'),
+        ],
+        results: [
+          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+          _result(
+            'n2',
+            'Another brand new claim.',
+            ClaimNoveltyClassification.newClaim,
+          ),
+        ],
+      );
+
+      final container = await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repo,
+        availableNotes: [existing],
+      );
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+      final notifier = container.read(claimReviewProvider.notifier);
+      final draftX = container.read(claimReviewProvider).draft!.markdownContent;
+      notifier.selectTargetNote(existing.id);
+      await _tapAppend(tester);
+
+      expect(repo.updatedNotes, hasLength(1));
+
+      // Deselect one claim to produce a genuinely different draft (Y), and
+      // append that too.
+      notifier.toggle('n2');
+      await tester.pumpAndSettle();
+      await _generateDraft(tester);
+      final draftY = container.read(claimReviewProvider).draft!.markdownContent;
+      expect(draftY, isNot(equals(draftX)));
+      expect(
+        container.read(claimReviewProvider).appendStatus,
+        ClaimDraftAppendStatus.idle,
+      );
+      await _tapAppend(tester);
+
+      expect(repo.updatedNotes, hasLength(2));
+
+      // Reselect the claim to regenerate the original draft X. Even though
+      // Y was the most recently appended content, X/existing was appended
+      // earlier and must still be recognized as already done.
+      notifier.toggle('n2');
+      await tester.pumpAndSettle();
+      await _generateDraft(tester);
+
+      expect(
+        container.read(claimReviewProvider).draft!.markdownContent,
+        draftX,
+      );
+      expect(
+        container.read(claimReviewProvider).appendStatus,
+        ClaimDraftAppendStatus.appended,
+      );
+      expect(container.read(claimReviewProvider).isDraftAlreadyAppended, isTrue);
+
+      await notifier.appendToExistingNote();
+
+      expect(repo.updatedNotes, hasLength(2));
+    });
+
+    testWidgets(
         'target note disappearing from the list does not crash the dropdown',
         (tester) async {
       final existingA = _existingNote(content: 'Note A content.');

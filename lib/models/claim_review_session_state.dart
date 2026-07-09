@@ -23,8 +23,7 @@ class ClaimReviewSessionState {
   final String? targetNoteId;
   final ClaimDraftAppendStatus appendStatus;
   final String? appendErrorMessage;
-  final String? appendedDraftContent;
-  final Set<String> appendedTargetNoteIds;
+  final Map<String, Set<String>> appendedTargetsByContent;
 
   const ClaimReviewSessionState({
     this.status = ClaimReviewSessionStatus.idle,
@@ -41,8 +40,7 @@ class ClaimReviewSessionState {
     this.targetNoteId,
     this.appendStatus = ClaimDraftAppendStatus.idle,
     this.appendErrorMessage,
-    this.appendedDraftContent,
-    this.appendedTargetNoteIds = const {},
+    this.appendedTargetsByContent = const {},
   });
 
   bool get isLoading => status == ClaimReviewSessionStatus.loading;
@@ -62,14 +60,15 @@ class ClaimReviewSessionState {
   /// True when the current [draft] has already been appended to the
   /// currently selected target note and neither has changed since, so a
   /// repeat append would duplicate that content in the same note. Tracks
-  /// every note this exact content has been appended to (not just the most
-  /// recent one), so appending to A then B then switching back to A is
-  /// still recognized as already done.
+  /// every note each distinct draft content has been appended to (keyed by
+  /// content), so appending draft X to A, generating a different draft Y,
+  /// then returning to X is still recognized as already-appended for X/A
+  /// rather than losing that history.
   bool get isDraftAlreadyAppended =>
       draft != null &&
       targetNoteId != null &&
-      appendedDraftContent == draft!.markdownContent &&
-      appendedTargetNoteIds.contains(targetNoteId);
+      (appendedTargetsByContent[draft!.markdownContent]?.contains(targetNoteId) ??
+          false);
 
   ClaimReviewSessionState copyWith({
     ClaimReviewSessionStatus? status,
@@ -86,8 +85,7 @@ class ClaimReviewSessionState {
     String? targetNoteId,
     ClaimDraftAppendStatus? appendStatus,
     String? appendErrorMessage,
-    String? appendedDraftContent,
-    Set<String>? appendedTargetNoteIds,
+    Map<String, Set<String>>? appendedTargetsByContent,
     bool clearSelection = false,
     bool clearError = false,
     bool clearDraft = false,
@@ -114,9 +112,8 @@ class ClaimReviewSessionState {
       appendErrorMessage: clearAppendError
           ? null
           : (appendErrorMessage ?? this.appendErrorMessage),
-      appendedDraftContent: appendedDraftContent ?? this.appendedDraftContent,
-      appendedTargetNoteIds:
-          appendedTargetNoteIds ?? this.appendedTargetNoteIds,
+      appendedTargetsByContent:
+          appendedTargetsByContent ?? this.appendedTargetsByContent,
     );
   }
 }
