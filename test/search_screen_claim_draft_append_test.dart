@@ -296,6 +296,116 @@ void main() {
       expect(draftIndex, greaterThan(separatorIndex));
     });
 
+    testWidgets('repeated append calls do not duplicate the content',
+        (tester) async {
+      final existing = _existingNote(content: 'Old content here.');
+      final repo = _AppendableNoteDraftReviewRepository()
+        ..existingNote = existing;
+      final provider = _FixedGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      final service = _buildIngestionService(
+        provider: provider,
+        claims: [_claim('n1', 'A brand new claim.')],
+        results: [
+          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+        ],
+      );
+
+      final container = await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repo,
+        availableNotes: [existing],
+      );
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+      container.read(claimReviewProvider.notifier).selectTargetNote(existing.id);
+      await _tapAppend(tester);
+
+      expect(repo.updatedNotes, hasLength(1));
+
+      // The button should now be disabled (or absent), so tapping again
+      // (directly through the notifier, since the widget is disabled) must
+      // not append the same content a second time.
+      await container.read(claimReviewProvider.notifier).appendToExistingNote();
+
+      expect(repo.updatedNotes, hasLength(1));
+    });
+
+    testWidgets(
+        'selecting a different target note allows appending the same draft again',
+        (tester) async {
+      final existingA = _existingNote(content: 'Note A content.');
+      final existingB = Note(
+        id: 'existing-note-b',
+        title: 'Existing note B',
+        content: 'Note B content.',
+        tags: const [],
+        keywords: const [],
+        isPinned: false,
+        createdAt: DateTime(2026, 1, 1),
+        updatedAt: DateTime(2026, 1, 1),
+        embeddingPending: false,
+      );
+      final repo = _AppendableNoteDraftReviewRepository()
+        ..existingNote = existingA;
+      final provider = _FixedGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      final service = _buildIngestionService(
+        provider: provider,
+        claims: [_claim('n1', 'A brand new claim.')],
+        results: [
+          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+        ],
+      );
+
+      final container = await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repo,
+        availableNotes: [existingA, existingB],
+      );
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+      final notifier = container.read(claimReviewProvider.notifier);
+      notifier.selectTargetNote(existingA.id);
+      await _tapAppend(tester);
+
+      expect(repo.updatedNotes, hasLength(1));
+      expect(
+        container.read(claimReviewProvider).appendStatus,
+        ClaimDraftAppendStatus.appended,
+      );
+
+      // Repository's getNoteById only knows about one note at a time in
+      // this fake; point it at note B before switching the target.
+      repo.existingNote = existingB;
+      notifier.selectTargetNote(existingB.id);
+      await tester.pump();
+      expect(
+        container.read(claimReviewProvider).appendStatus,
+        ClaimDraftAppendStatus.idle,
+      );
+      await _tapAppend(tester);
+
+      expect(repo.updatedNotes, hasLength(2));
+      expect(repo.updatedNotes.last.content, contains('Note B content.'));
+    });
+
     testWidgets('no-save draft does not modify a note', (tester) async {
       final existing = _existingNote();
       final repo = _AppendableNoteDraftReviewRepository()

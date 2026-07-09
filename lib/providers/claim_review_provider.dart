@@ -127,6 +127,9 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
     state = state.copyWith(
       targetNoteId: noteId,
       clearTargetNoteId: noteId == null,
+      // Appending to a different note is a legitimate new action even if
+      // the current draft was already appended elsewhere.
+      appendStatus: ClaimDraftAppendStatus.idle,
       clearAppendError: true,
     );
   }
@@ -214,12 +217,15 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
   /// [selectTargetNote], using the same repository as the note-draft review
   /// flow's append action.
   ///
-  /// Does nothing if there is no draft or the draft is not saveable
-  /// ([ClaimDraftResult.shouldSave] is false).
+  /// Does nothing if there is no draft, the draft is not saveable
+  /// ([ClaimDraftResult.shouldSave] is false), or this exact draft was
+  /// already appended to the currently selected target note (repeat taps
+  /// must not append the same content twice).
   Future<void> appendToExistingNote() async {
     final draft = state.draft;
     if (draft == null || !draft.shouldSave) return;
     if (state.appendStatus == ClaimDraftAppendStatus.appending) return;
+    if (state.appendStatus == ClaimDraftAppendStatus.appended) return;
 
     final targetNoteId = state.targetNoteId;
     if (targetNoteId == null || targetNoteId.isEmpty) {
