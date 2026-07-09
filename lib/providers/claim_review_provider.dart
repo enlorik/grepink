@@ -168,21 +168,25 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
         title: _titleFor(state.question),
         content: draft.markdownContent,
       );
-      // The draft may have changed (toggled, regenerated, or the session
-      // reset) while insertNote was in flight. Applying this result to a
-      // since-replaced draft would misreport it as saved, so only update
-      // state if the draft being saved is still the current one.
-      if (!identical(state.draft, draft)) return;
-      state = state.copyWith(
-        saveStatus: ClaimDraftSaveStatus.saved,
-        savedDraftContent: draft.markdownContent,
-      );
+      // The current draft may have been replaced (toggled, regenerated, or
+      // the session reset) while insertNote was in flight. Compare by
+      // content rather than object identity: regenerating with the same
+      // selection produces a new ClaimDraftResult instance with identical
+      // markdown, and that content was in fact just saved, so it should
+      // still be recorded as such rather than left looking unsaved.
+      if (state.draft?.markdownContent == draft.markdownContent) {
+        state = state.copyWith(
+          saveStatus: ClaimDraftSaveStatus.saved,
+          savedDraftContent: draft.markdownContent,
+        );
+      }
     } catch (error) {
-      if (!identical(state.draft, draft)) return;
-      state = state.copyWith(
-        saveStatus: ClaimDraftSaveStatus.error,
-        saveErrorMessage: error.toString(),
-      );
+      if (state.draft?.markdownContent == draft.markdownContent) {
+        state = state.copyWith(
+          saveStatus: ClaimDraftSaveStatus.error,
+          saveErrorMessage: error.toString(),
+        );
+      }
     }
   }
 
