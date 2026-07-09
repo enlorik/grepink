@@ -151,6 +151,7 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
     final draft = state.draft;
     if (draft == null || !draft.shouldSave) return;
     if (state.isDraftAlreadySaved) return;
+    if (state.saveStatus == ClaimDraftSaveStatus.saving) return;
 
     state = state.copyWith(
       saveStatus: ClaimDraftSaveStatus.saving,
