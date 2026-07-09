@@ -109,11 +109,17 @@ class _EmptyLocalEvidenceRetriever implements LocalEvidenceRetriever {
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
-ExtractedClaim _claim(String id, String text) => ExtractedClaim(
+ExtractedClaim _claim(
+  String id,
+  String text, {
+  List<String> citationUrls = const [],
+  List<String> citationTitles = const [],
+}) =>
+    ExtractedClaim(
       id: id,
       text: text,
-      citationUrls: const [],
-      citationTitles: const [],
+      citationUrls: citationUrls,
+      citationTitles: citationTitles,
       sourceAnswerProvider: 'test-provider',
       sourceQuestion: 'q',
       order: 0,
@@ -122,14 +128,16 @@ ExtractedClaim _claim(String id, String text) => ExtractedClaim(
 ClaimDeduplicationResult _result(
   String id,
   String text,
-  ClaimNoveltyClassification classification,
-) =>
+  ClaimNoveltyClassification classification, {
+  List<String> citationUrls = const [],
+  List<String> citationTitles = const [],
+}) =>
     ClaimDeduplicationResult(
-      claim: _claim(id, text),
+      claim: _claim(id, text, citationTitles: citationTitles),
       classification: classification,
       matchedLocalEvidence: const [],
       reason: 'test reason for $id',
-      citationUrls: const [],
+      citationUrls: citationUrls,
     );
 
 GroundedAnswerIngestionService _buildIngestionService({
@@ -239,6 +247,53 @@ void main() {
         ClaimDraftSaveStatus.saved,
       );
       expect(find.text('Saved as a new note.'), findsOneWidget);
+    });
+
+    testWidgets('saved note content keeps the selected claim source links',
+        (tester) async {
+      final repo = _RecordingNoteDraftReviewRepository();
+      final provider = _FixedGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      final service = _buildIngestionService(
+        provider: provider,
+        claims: [
+          _claim(
+            'n1',
+            'A brand new claim.',
+            citationUrls: const ['https://example.com/a'],
+            citationTitles: const ['Example A'],
+          ),
+        ],
+        results: [
+          _result(
+            'n1',
+            'A brand new claim.',
+            ClaimNoveltyClassification.newClaim,
+            citationUrls: const ['https://example.com/a'],
+            citationTitles: const ['Example A'],
+          ),
+        ],
+      );
+
+      await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repo,
+      );
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+      await _tapSave(tester);
+
+      expect(repo.insertedNotes, hasLength(1));
+      expect(repo.insertedNotes.first.content, contains('https://example.com/a'));
+      expect(repo.insertedNotes.first.content, contains('Example A'));
     });
 
     testWidgets('no-save draft does not create a note', (tester) async {
