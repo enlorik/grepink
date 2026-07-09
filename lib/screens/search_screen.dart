@@ -61,6 +61,16 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   Future<void> _onAsk() async {
+    final claimReviewState = ref.read(claimReviewProvider);
+    if (claimReviewState.isSaveInFlight || claimReviewState.isAppendInFlight) {
+      // A save/append write is still running against the current draft.
+      // Resetting the review session now would drop the public
+      // isSaveInFlight/isAppendInFlight flags while that write is still
+      // in progress, letting a new draft render Save/Append as enabled
+      // for a tap the notifier would silently ignore.
+      return;
+    }
+
     final question = _askController.text.trim();
     ref.read(noteDraftReviewProvider.notifier).clear();
 
@@ -237,7 +247,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     required List<Note> availableNotes,
     required ClaimReviewSessionState claimReviewState,
   }) {
-    final askDisabled = knowledgeState.isLoading || claimReviewState.isLoading;
+    final askDisabled = knowledgeState.isLoading ||
+        claimReviewState.isLoading ||
+        claimReviewState.isSaveInFlight ||
+        claimReviewState.isAppendInFlight;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
