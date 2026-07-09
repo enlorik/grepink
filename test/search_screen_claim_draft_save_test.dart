@@ -364,6 +364,61 @@ void main() {
       expect(repo.insertedNotes, hasLength(1));
     });
 
+    testWidgets(
+        'a save that resolves after the draft changed does not mark the new draft saved',
+        (tester) async {
+      final gate = Completer<void>();
+      final repo = _RecordingNoteDraftReviewRepository()..insertGate = gate;
+      final provider = _FixedGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      final service = _buildIngestionService(
+        provider: provider,
+        claims: [_claim('n1', 'A brand new claim.')],
+        results: [
+          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+        ],
+      );
+
+      final container = await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repo,
+      );
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+
+      final notifier = container.read(claimReviewProvider.notifier);
+      final saving = notifier.saveAsNewNote();
+
+      // The draft changes (e.g. the user toggles a claim) while the save
+      // from the old draft is still in flight.
+      notifier.toggle('n1');
+      expect(container.read(claimReviewProvider).draft, isNull);
+      expect(
+        container.read(claimReviewProvider).saveStatus,
+        ClaimDraftSaveStatus.idle,
+      );
+
+      gate.complete();
+      await saving;
+
+      // The old draft still got persisted (the insert had already started),
+      // but the now-current (cleared) draft must not be reported as saved.
+      expect(repo.insertedNotes, hasLength(1));
+      expect(container.read(claimReviewProvider).draft, isNull);
+      expect(
+        container.read(claimReviewProvider).saveStatus,
+        ClaimDraftSaveStatus.idle,
+      );
+    });
+
     testWidgets('save failure is shown and does not mark the draft saved',
         (tester) async {
       final repo = _RecordingNoteDraftReviewRepository()..shouldFail = true;
