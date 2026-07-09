@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -42,6 +44,37 @@ class _RecordingNoteDraftReviewRepository implements NoteDraftReviewRepository {
 
   @override
   Future<Note> insertNote({required String title, required String content}) async {
+    final note = Note(
+      id: 'note-${insertedNotes.length}',
+      title: title,
+      content: content,
+      tags: const [],
+      keywords: const [],
+      isPinned: false,
+      createdAt: DateTime(2026, 1, 1),
+      updatedAt: DateTime(2026, 1, 1),
+      embeddingPending: false,
+    );
+    insertedNotes.add(note);
+    return note;
+  }
+
+  @override
+  Future<void> updateNote(Note note) async {}
+}
+
+class _GatedNoteDraftReviewRepository implements NoteDraftReviewRepository {
+  final List<Note> insertedNotes = [];
+  final Completer<void> gate;
+
+  _GatedNoteDraftReviewRepository(this.gate);
+
+  @override
+  Future<Note?> getNoteById(String id) async => null;
+
+  @override
+  Future<Note> insertNote({required String title, required String content}) async {
+    await gate.future;
     final note = Note(
       id: 'note-${insertedNotes.length}',
       title: title,
@@ -363,6 +396,48 @@ void main() {
         container.read(claimReviewProvider).saveStatus,
         ClaimDraftSaveStatus.idle,
       );
+    });
+
+    testWidgets('discard button is disabled while a save is in flight',
+        (tester) async {
+      final gate = Completer<void>();
+      final repo = _GatedNoteDraftReviewRepository(gate);
+      final provider = _FixedGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      final service = _serviceWithOneNewClaim(provider);
+
+      final container = await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repo,
+      );
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+
+      final saveButton = find.byKey(const Key('save-claim-draft-button'));
+      await tester.ensureVisible(saveButton);
+      await tester.tap(saveButton);
+      await tester.pump();
+
+      expect(
+        container.read(claimReviewProvider).saveStatus,
+        ClaimDraftSaveStatus.saving,
+      );
+
+      final discardButton = tester.widget<TextButton>(
+        find.byKey(const Key('discard-claim-review-button')),
+      );
+      expect(discardButton.onPressed, isNull);
+
+      gate.complete();
+      await tester.pumpAndSettle();
     });
 
     testWidgets('discard button is not shown when there is nothing to discard',
