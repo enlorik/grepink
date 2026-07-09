@@ -203,6 +203,7 @@ Future<ProviderContainer> _pumpSearchScreen(
   required GroundedAnswerIngestionService ingestionService,
   NoteDraftReviewRepository? repository,
   ClaimReviewMapper? mapper,
+  List<Note> availableNotes = const <Note>[],
 }) async {
   final container = ProviderContainer(
     overrides: [
@@ -214,7 +215,7 @@ Future<ProviderContainer> _pumpSearchScreen(
       ),
       groundedAnswerIngestionServiceProvider.overrideWithValue(ingestionService),
       if (mapper != null) claimReviewMapperProvider.overrideWithValue(mapper),
-      allNotesProvider.overrideWithValue(const <Note>[]),
+      allNotesProvider.overrideWithValue(availableNotes),
       recentNotesProvider.overrideWithValue(const <Note>[]),
       refreshNotesProvider.overrideWithValue(() async {}),
     ],
@@ -428,6 +429,7 @@ void main() {
         tester,
         ingestionService: service,
         repository: repo,
+        availableNotes: [existing],
       );
       await _askQuestion(tester, 'question');
       await _generateDraft(tester);

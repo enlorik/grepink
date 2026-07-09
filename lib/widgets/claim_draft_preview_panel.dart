@@ -42,6 +42,9 @@ class ClaimDraftPreviewPanel extends StatelessWidget {
   bool get _targetNoteIsValid =>
       availableNotes.any((note) => note.id == selectedTargetNoteId);
 
+  bool get _hasStaleTargetNote =>
+      selectedTargetNoteId != null && !_targetNoteIsValid;
+
   @override
   Widget build(BuildContext context) {
     if (!draft.shouldSave) {
@@ -171,7 +174,14 @@ class ClaimDraftPreviewPanel extends StatelessWidget {
           const SizedBox(height: 12),
           FilledButton(
             key: const Key('append-claim-draft-button'),
-            onPressed: onAppendToExistingNote,
+            // The dropdown above already falls back to showing no selection
+            // once a previously chosen target note drops out of
+            // availableNotes; the button must agree with what's on screen
+            // instead of appending to the stale id still held in
+            // selectedTargetNoteId. No selection at all (null) is still
+            // allowed through so the provider's own "select a target"
+            // validation error can surface.
+            onPressed: _hasStaleTargetNote ? null : onAppendToExistingNote,
             child: Text(
               appendStatus == ClaimDraftAppendStatus.appending
                   ? 'Appending...'

@@ -1208,6 +1208,16 @@ void main() {
       await tester.pump();
 
       expect(tester.takeException(), isNull);
+
+      // The append button must agree with the dropdown showing no
+      // selection: it must not silently append to note A now that it's
+      // no longer in the visible list, even though selectedTargetNoteId
+      // still holds its id internally.
+      final appendButton = tester.widget<FilledButton>(
+        find.byKey(const Key('append-claim-draft-button')),
+      );
+      expect(appendButton.onPressed, isNull);
+      expect(repo.updatedNotes, isEmpty);
     });
 
     testWidgets('no-save draft does not modify a note', (tester) async {
