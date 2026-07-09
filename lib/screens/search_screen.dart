@@ -97,6 +97,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final ingestionService = ref.read(groundedAnswerIngestionServiceProvider);
     if (ingestionService.isProviderConfigured) {
       await ref.read(claimReviewProvider.notifier).runReview(question);
+    } else {
+      ref.read(claimReviewProvider.notifier).markProviderNotConfigured(question);
     }
   }
 
@@ -410,6 +412,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             ],
           ),
         ],
+        if (claimReviewState.isProviderNotConfigured) ...[
+          const SizedBox(height: 12),
+          _buildStatusCard(
+            key: const Key('claim-review-provider-not-configured-state'),
+            message:
+                'Claim review needs a grounded answer provider set up first. '
+                'Configure one in Settings to see review results for your questions.',
+          ),
+        ],
         if (claimReviewState.isError && claimReviewState.errorMessage != null) ...[
           const SizedBox(height: 12),
           _buildStatusCard(
@@ -451,6 +462,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             groups: claimReviewState.groups,
             selectedIds: claimReviewState.selection!.selectedIds,
             onToggle: _toggleClaim,
+            providerName: claimReviewState.providerName,
           ),
           const SizedBox(height: 12),
           FilledButton.icon(

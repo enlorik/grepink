@@ -18,11 +18,17 @@ class ClaimReviewGroupsPanel extends StatelessWidget {
   final Set<String> selectedIds;
   final ValueChanged<String> onToggle;
 
+  /// The grounded-answer provider's own display name, shown as a plain,
+  /// non-sensitive label only (e.g. "brave"). Never an API key or other
+  /// credential -- this comes straight from [GroundedAnswer.providerName].
+  final String providerName;
+
   const ClaimReviewGroupsPanel({
     super.key,
     required this.groups,
     required this.selectedIds,
     required this.onToggle,
+    this.providerName = '',
   });
 
   @override
@@ -46,6 +52,14 @@ class ClaimReviewGroupsPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Claim review', style: AppTextStyles.titleLarge),
+          if (providerName.trim().isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              key: const Key('claim-review-provider-label'),
+              'Answered via $providerName',
+              style: AppTextStyles.bodySmall,
+            ),
+          ],
           const SizedBox(height: 12),
           for (final group in visibleGroups) ...[
             _ClaimReviewGroupSection(

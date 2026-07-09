@@ -3,7 +3,17 @@ import 'claim_review_item.dart';
 import 'grounded_answer.dart';
 import '../services/selected_claims_draft_builder.dart';
 
-enum ClaimReviewSessionStatus { idle, loading, success, error }
+enum ClaimReviewSessionStatus {
+  idle,
+  loading,
+  success,
+  error,
+
+  /// No real [GroundedAnswerProvider] is configured (e.g. missing API key
+  /// or provider setup). The ask flow never ran the external provider in
+  /// this case, so this is distinct from [error].
+  providerNotConfigured,
+}
 
 enum ClaimDraftSaveStatus { idle, saving, saved, error }
 
@@ -64,6 +74,8 @@ class ClaimReviewSessionState {
   bool get isLoading => status == ClaimReviewSessionStatus.loading;
   bool get isSuccess => status == ClaimReviewSessionStatus.success;
   bool get isError => status == ClaimReviewSessionStatus.error;
+  bool get isProviderNotConfigured =>
+      status == ClaimReviewSessionStatus.providerNotConfigured;
 
   bool get hasReviewItems =>
       groups.any((group) => group.items.isNotEmpty);

@@ -62,6 +62,19 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
 
   ClaimReviewNotifier(this._ref) : super(const ClaimReviewSessionState());
 
+  /// Marks the session as blocked on missing provider setup instead of
+  /// silently doing nothing. Callers check
+  /// [GroundedAnswerIngestionService.isProviderConfigured] before calling
+  /// [runReview]; when that's false, this replaces the review pipeline call
+  /// so the user sees why nothing happened instead of a silent no-op.
+  void markProviderNotConfigured(String question) {
+    _requestSequence++;
+    state = ClaimReviewSessionState(
+      status: ClaimReviewSessionStatus.providerNotConfigured,
+      question: question.trim(),
+    );
+  }
+
   Future<void> runReview(String question) async {
     final trimmedQuestion = question.trim();
     if (trimmedQuestion.isEmpty) {
