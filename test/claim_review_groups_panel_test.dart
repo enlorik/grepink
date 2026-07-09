@@ -28,6 +28,7 @@ Future<void> _pumpPanel(
   WidgetTester tester, {
   required List<ClaimReviewGroup> groups,
   Set<String> selectedIds = const {},
+  String providerName = '',
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -37,6 +38,7 @@ Future<void> _pumpPanel(
             groups: groups,
             selectedIds: selectedIds,
             onToggle: (_) {},
+            providerName: providerName,
           ),
         ),
       ),
@@ -238,6 +240,45 @@ void main() {
       );
       expect(checkbox.onChanged, isNotNull);
       expect(checkbox.value, isTrue);
+    });
+  });
+
+  group('ClaimReviewGroupsPanel provider label safety', () {
+    testWidgets('shows a short plain provider name', (tester) async {
+      await _pumpPanel(
+        tester,
+        groups: [
+          ClaimReviewGroup(
+            label: 'New claims',
+            classification: ClaimNoveltyClassification.newClaim,
+            items: [_item('n1')],
+          ),
+        ],
+        providerName: 'brave',
+      );
+
+      final labelFinder = find.byKey(const Key('claim-review-provider-label'));
+      expect(labelFinder, findsOneWidget);
+      expect(tester.widget<Text>(labelFinder).data, contains('brave'));
+    });
+
+    testWidgets('hides a credential-shaped provider name instead of rendering it',
+        (tester) async {
+      const secretLookingValue = 'sk-live-supersecretkey1234567890';
+      await _pumpPanel(
+        tester,
+        groups: [
+          ClaimReviewGroup(
+            label: 'New claims',
+            classification: ClaimNoveltyClassification.newClaim,
+            items: [_item('n1')],
+          ),
+        ],
+        providerName: secretLookingValue,
+      );
+
+      expect(find.byKey(const Key('claim-review-provider-label')), findsNothing);
+      expect(find.textContaining(secretLookingValue), findsNothing);
     });
   });
 }

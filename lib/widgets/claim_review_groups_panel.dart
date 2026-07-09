@@ -31,6 +31,21 @@ class ClaimReviewGroupsPanel extends StatelessWidget {
     this.providerName = '',
   });
 
+  /// Only short, identifier-like provider names are ever rendered. This
+  /// guards against a misbehaving provider putting something credential-
+  /// shaped in [providerName] -- rather than trusting it, an unsafe-looking
+  /// value is treated as absent and the label is hidden.
+  static final RegExp _safeProviderNamePattern =
+      RegExp(r'^[A-Za-z0-9][A-Za-z0-9 _.-]{0,23}$');
+
+  String get _safeProviderName {
+    final trimmed = providerName.trim();
+    if (trimmed.isEmpty || !_safeProviderNamePattern.hasMatch(trimmed)) {
+      return '';
+    }
+    return trimmed;
+  }
+
   @override
   Widget build(BuildContext context) {
     final visibleGroups = groups.where((group) => group.items.isNotEmpty).toList();
@@ -52,11 +67,11 @@ class ClaimReviewGroupsPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Claim review', style: AppTextStyles.titleLarge),
-          if (providerName.trim().isNotEmpty) ...[
+          if (_safeProviderName.isNotEmpty) ...[
             const SizedBox(height: 2),
             Text(
               key: const Key('claim-review-provider-label'),
-              'Answered via $providerName',
+              'Answered via $_safeProviderName',
               style: AppTextStyles.bodySmall,
             ),
           ],
