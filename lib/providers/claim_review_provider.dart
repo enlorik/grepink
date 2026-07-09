@@ -102,14 +102,17 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
         clearAppendError: true,
         clearTargetNoteId: true,
       );
-    } catch (error) {
+    } catch (_) {
       if (requestId != _requestSequence) return;
       state = state.copyWith(
         status: ClaimReviewSessionStatus.error,
         question: trimmedQuestion,
         groups: const [],
         clearSelection: true,
-        errorMessage: error.toString(),
+        // Never surface the raw exception -- it could contain provider
+        // response details that shouldn't be shown to the user.
+        errorMessage:
+            'Could not review claims for this question. Please try again.',
         clearDraft: true,
         saveStatus: ClaimDraftSaveStatus.idle,
         clearSaveError: true,
@@ -172,12 +175,21 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
     if (selection == null) return;
 
     const builder = SelectedClaimsDraftBuilder();
-    final result = builder.build(
-      question: state.question,
-      selected: selection.selectedSaveableItems,
-      providerName: state.providerName,
-      citations: state.citations,
-    );
+    final ClaimDraftResult result;
+    try {
+      result = builder.build(
+        question: state.question,
+        selected: selection.selectedSaveableItems,
+        providerName: state.providerName,
+        citations: state.citations,
+      );
+    } catch (_) {
+      state = state.copyWith(
+        draftGenerationErrorMessage:
+            'Could not generate a draft from the selected claims. Please try again.',
+      );
+      return;
+    }
     // Regenerating an unchanged selection produces markdown identical to
     // what was already saved/appended. Keep those statuses instead of
     // resetting to idle, otherwise the Save/Append buttons re-enable and a
@@ -212,6 +224,7 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
               ? ClaimDraftAppendStatus.appending
               : ClaimDraftAppendStatus.idle),
       clearAppendError: true,
+      clearDraftGenerationError: true,
     );
   }
 
@@ -256,11 +269,13 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
             matchesCurrentDraft ? ClaimDraftSaveStatus.saved : state.saveStatus,
         savedDraftContents: {...state.savedDraftContents, draft.markdownContent},
       );
-    } catch (error) {
+    } catch (_) {
       if (state.draft?.markdownContent == draft.markdownContent) {
         state = state.copyWith(
           saveStatus: ClaimDraftSaveStatus.error,
-          saveErrorMessage: error.toString(),
+          // Never surface the raw exception -- it could contain repository
+          // or provider details that shouldn't be shown to the user.
+          saveErrorMessage: 'Could not save this draft as a note. Please try again.',
         );
       }
     } finally {
@@ -343,11 +358,13 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
           draft.markdownContent: {...existingTargetsForContent, targetNoteId},
         },
       );
-    } catch (error) {
+    } catch (_) {
       if (state.draft?.markdownContent != draft.markdownContent) return;
       state = state.copyWith(
         appendStatus: ClaimDraftAppendStatus.error,
-        appendErrorMessage: error.toString(),
+        // Never surface the raw exception -- it could contain repository
+        // or provider details that shouldn't be shown to the user.
+        appendErrorMessage: 'Could not append this draft to the note. Please try again.',
       );
     } finally {
       _appendInFlight = false;

@@ -237,7 +237,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     required List<Note> availableNotes,
     required ClaimReviewSessionState claimReviewState,
   }) {
-    final askDisabled = knowledgeState.isLoading;
+    final askDisabled = knowledgeState.isLoading || claimReviewState.isLoading;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -376,11 +376,57 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             errorMessage: reviewState.errorMessage,
           ),
         ],
+        if (claimReviewState.isLoading) ...[
+          const SizedBox(height: 12),
+          Row(
+            key: const Key('claim-review-loading-indicator'),
+            children: [
+              const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Reviewing claims against your notes...',
+                style: AppTextStyles.bodySmall,
+              ),
+            ],
+          ),
+        ],
         if (claimReviewState.isError && claimReviewState.errorMessage != null) ...[
           const SizedBox(height: 12),
           _buildStatusCard(
-            message: 'Could not review claims for this question.',
+            key: const Key('claim-review-error-state'),
+            message: claimReviewState.errorMessage!,
             borderColor: AppColors.pinHighlight.withValues(alpha: 0.45),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            key: const Key('claim-review-retry-button'),
+            onPressed: _onAsk,
+            child: const Text('Retry'),
+          ),
+        ],
+        if (claimReviewState.hasNoAnswer) ...[
+          const SizedBox(height: 12),
+          _buildStatusCard(
+            key: const Key('claim-review-empty-answer-state'),
+            message: 'No grounded answer was found for this question.',
+          ),
+        ],
+        if (claimReviewState.hasNoClaimsExtracted) ...[
+          const SizedBox(height: 12),
+          _buildStatusCard(
+            key: const Key('claim-review-no-claims-state'),
+            message: 'No claims could be extracted from the answer.',
+          ),
+        ],
+        if (claimReviewState.isAllClaimsAlreadyKnown) ...[
+          const SizedBox(height: 12),
+          _buildStatusCard(
+            key: const Key('claim-review-all-known-state'),
+            message: 'Everything in this answer is already in your notes.',
           ),
         ],
         if (claimReviewState.hasReviewItems && claimReviewState.selection != null) ...[
@@ -396,6 +442,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             onPressed: _generateClaimDraft,
             icon: const Icon(Icons.description_outlined),
             label: const Text('Generate draft'),
+          ),
+        ],
+        if (claimReviewState.draftGenerationErrorMessage != null) ...[
+          const SizedBox(height: 12),
+          _buildStatusCard(
+            key: const Key('claim-draft-generation-error-state'),
+            message: claimReviewState.draftGenerationErrorMessage!,
+            borderColor: AppColors.pinHighlight.withValues(alpha: 0.45),
           ),
         ],
         if (claimReviewState.draft != null) ...[
@@ -656,9 +710,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   Widget _buildStatusCard({
     required String message,
+    Key? key,
     Color borderColor = AppColors.dividerBorder,
   }) {
     return Container(
+      key: key,
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(

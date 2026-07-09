@@ -1,3 +1,4 @@
+import 'claim_deduplication_result.dart';
 import 'claim_review_item.dart';
 import 'grounded_answer.dart';
 import '../services/selected_claims_draft_builder.dart';
@@ -35,6 +36,10 @@ class ClaimReviewSessionState {
   final bool isSaveInFlight;
   final bool isAppendInFlight;
 
+  /// Set when building a markdown draft from the current selection throws.
+  /// Holds a safe, user-facing message only -- never the raw exception.
+  final String? draftGenerationErrorMessage;
+
   const ClaimReviewSessionState({
     this.status = ClaimReviewSessionStatus.idle,
     this.question = '',
@@ -53,6 +58,7 @@ class ClaimReviewSessionState {
     this.appendedTargetsByContent = const {},
     this.isSaveInFlight = false,
     this.isAppendInFlight = false,
+    this.draftGenerationErrorMessage,
   });
 
   bool get isLoading => status == ClaimReviewSessionStatus.loading;
@@ -61,6 +67,26 @@ class ClaimReviewSessionState {
 
   bool get hasReviewItems =>
       groups.any((group) => group.items.isNotEmpty);
+
+  /// True when the ask succeeded but no grounded answer came back at all
+  /// (as opposed to an answer that yielded zero claims -- see
+  /// [hasNoClaimsExtracted]).
+  bool get hasNoAnswer =>
+      isSuccess && !hasReviewItems && providerName.isEmpty;
+
+  /// True when the ask succeeded and a grounded answer came back, but no
+  /// claims could be extracted from it.
+  bool get hasNoClaimsExtracted =>
+      isSuccess && !hasReviewItems && providerName.isNotEmpty;
+
+  /// True when every extracted claim was classified as already known, so
+  /// there is nothing new worth reviewing or saving.
+  bool get isAllClaimsAlreadyKnown =>
+      isSuccess &&
+      hasReviewItems &&
+      groups
+          .where((g) => g.classification != ClaimNoveltyClassification.alreadyKnown)
+          .every((g) => g.items.isEmpty);
 
   /// True when the current [draft] has already been saved and hasn't
   /// changed since, so a repeat save would create a duplicate note. Tracks
@@ -103,12 +129,14 @@ class ClaimReviewSessionState {
     Map<String, Set<String>>? appendedTargetsByContent,
     bool? isSaveInFlight,
     bool? isAppendInFlight,
+    String? draftGenerationErrorMessage,
     bool clearSelection = false,
     bool clearError = false,
     bool clearDraft = false,
     bool clearSaveError = false,
     bool clearTargetNoteId = false,
     bool clearAppendError = false,
+    bool clearDraftGenerationError = false,
   }) {
     return ClaimReviewSessionState(
       status: status ?? this.status,
@@ -133,6 +161,9 @@ class ClaimReviewSessionState {
           appendedTargetsByContent ?? this.appendedTargetsByContent,
       isSaveInFlight: isSaveInFlight ?? this.isSaveInFlight,
       isAppendInFlight: isAppendInFlight ?? this.isAppendInFlight,
+      draftGenerationErrorMessage: clearDraftGenerationError
+          ? null
+          : (draftGenerationErrorMessage ?? this.draftGenerationErrorMessage),
     );
   }
 }
