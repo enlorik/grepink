@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -37,12 +39,16 @@ class _FakeKnowledgeIngestionService implements KnowledgeIngestionService {
 class _RecordingNoteDraftReviewRepository implements NoteDraftReviewRepository {
   final List<Note> insertedNotes = [];
   bool shouldFail = false;
+  Completer<void>? insertGate;
 
   @override
   Future<Note?> getNoteById(String id) async => null;
 
   @override
   Future<Note> insertNote({required String title, required String content}) async {
+    if (insertGate != null) {
+      await insertGate!.future;
+    }
     if (shouldFail) {
       throw Exception('insert failed');
     }
@@ -315,6 +321,45 @@ void main() {
       // (directly through the notifier, since the widget is disabled) must
       // not create a second note.
       await container.read(claimReviewProvider.notifier).saveAsNewNote();
+
+      expect(repo.insertedNotes, hasLength(1));
+    });
+
+    testWidgets('overlapping save calls before the first completes only save once',
+        (tester) async {
+      final gate = Completer<void>();
+      final repo = _RecordingNoteDraftReviewRepository()..insertGate = gate;
+      final provider = _FixedGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      final service = _buildIngestionService(
+        provider: provider,
+        claims: [_claim('n1', 'A brand new claim.')],
+        results: [
+          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+        ],
+      );
+
+      final container = await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repo,
+      );
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+
+      final notifier = container.read(claimReviewProvider.notifier);
+      // Fire two saves back to back, before the first insertNote resolves.
+      final first = notifier.saveAsNewNote();
+      final second = notifier.saveAsNewNote();
+      gate.complete();
+      await Future.wait([first, second]);
 
       expect(repo.insertedNotes, hasLength(1));
     });
