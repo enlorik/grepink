@@ -90,16 +90,16 @@ class ClaimDraftPreviewPanel extends StatelessWidget {
           if (saveStatus == ClaimDraftSaveStatus.saved) ...[
             const SizedBox(height: 8),
             Text(
-              key: const Key('claim-draft-saved-message'),
               'Saved as a new note.',
+              key: const Key('claim-draft-saved-message'),
               style: AppTextStyles.bodySmall,
             ),
           ],
           if (saveStatus == ClaimDraftSaveStatus.error) ...[
             const SizedBox(height: 8),
             Text(
-              key: const Key('claim-draft-save-error-message'),
               saveErrorMessage ?? 'Failed to save. Try again.',
+              key: const Key('claim-draft-save-error-message'),
               style: AppTextStyles.bodySmall,
             ),
           ],
