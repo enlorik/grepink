@@ -110,8 +110,8 @@ class _ClaimReviewItemTile extends StatelessWidget {
       final title = i < item.citationTitles.length ? item.citationTitles[i] : '';
       lines.add(
         Text(
-          key: Key('claim-review-source-${item.id}-$i'),
           title.trim().isEmpty ? url : '$title ($url)',
+          key: Key('claim-review-source-${item.id}-$i'),
           style: AppTextStyles.bodySmall,
           overflow: TextOverflow.ellipsis,
         ),
