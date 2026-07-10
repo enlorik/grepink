@@ -57,10 +57,10 @@ class ClaimDraftPreviewPanel extends StatelessWidget {
           Text('Draft preview', style: AppTextStyles.titleLarge),
           const SizedBox(height: 4),
           Text(
-            key: const Key('claim-draft-source-count'),
             draft.sourceCount == 1
                 ? '1 source'
                 : '${draft.sourceCount} sources',
+            key: const Key('claim-draft-source-count'),
             style: AppTextStyles.bodySmall,
           ),
           const SizedBox(height: 12),
