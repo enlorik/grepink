@@ -124,6 +124,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   void _discardDraft() {
     ref.read(noteDraftReviewProvider.notifier).discard();
     ref.read(knowledgeIngestionProvider.notifier).reset();
+    ref.read(claimReviewProvider.notifier).reset();
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Draft discarded. Nothing was saved.')),
     );

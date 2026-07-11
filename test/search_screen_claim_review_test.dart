@@ -175,6 +175,54 @@ Future<void> _askQuestion(WidgetTester tester, String question) async {
   await tester.pumpAndSettle();
 }
 
+class _CreateNoteKnowledgeIngestionService implements KnowledgeIngestionService {
+  @override
+  Future<NoteDraft> ingest(String question) async => NoteDraft(
+        question: question,
+        markdownContent: '# Note\n- Content',
+        action: NoteDraftAction.createNewNote,
+        deltas: const [],
+        localEvidence: const [],
+        webEvidence: const [],
+      );
+}
+
+Future<ProviderContainer> _pumpSearchScreenWithDraftReview(
+  WidgetTester tester, {
+  required GroundedAnswerIngestionService ingestionService,
+}) async {
+  final container = ProviderContainer(
+    overrides: [
+      knowledgeIngestionServiceProvider.overrideWith(
+        (ref) async => _CreateNoteKnowledgeIngestionService(),
+      ),
+      noteDraftReviewRepositoryProvider.overrideWithValue(
+        _FakeNoteDraftReviewRepository(),
+      ),
+      groundedAnswerIngestionServiceProvider.overrideWithValue(ingestionService),
+      allNotesProvider.overrideWithValue(const <Note>[]),
+      recentNotesProvider.overrideWithValue(const <Note>[]),
+      refreshNotesProvider.overrideWithValue(() async {}),
+    ],
+  );
+  await tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: container,
+      child: const MaterialApp(
+        home: Scaffold(
+          body: MediaQuery(
+            data: MediaQueryData(disableAnimations: true),
+            child: SearchScreen(),
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.pump();
+  addTearDown(container.dispose);
+  return container;
+}
+
 void main() {
   group('SearchScreen claim review flow', () {
     testWidgets('asking a question invokes the grounded-answer ingestion service',
@@ -376,6 +424,48 @@ void main() {
 
       expect(find.text('Example A (https://example.com/a)'), findsOneWidget);
       expect(find.text('https://example.com/b'), findsOneWidget);
+    });
+
+    testWidgets(
+        'discard resets claim review state and invalidates any in-flight review',
+        (tester) async {
+      final provider = _CountingGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      final service = _buildIngestionService(
+        provider: provider,
+        claims: [_claim('n1', 'A brand new claim.')],
+        results: [
+          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+        ],
+      );
+
+      final container = await _pumpSearchScreenWithDraftReview(
+        tester,
+        ingestionService: service,
+      );
+      await _askQuestion(tester, 'question');
+
+      // Claim review groups must be visible after the ask completes.
+      expect(find.byKey(const Key('claim-review-groups-panel')), findsOneWidget);
+      expect(container.read(claimReviewProvider).hasReviewItems, isTrue);
+
+      // Tap Discard on the note draft review widget.
+      await tester.ensureVisible(find.text('Discard'));
+      await tester.tap(find.text('Discard'));
+      await tester.pumpAndSettle();
+
+      // Discard must reset claimReviewProvider so no stale groups remain.
+      expect(find.byKey(const Key('claim-review-groups-panel')), findsNothing);
+      expect(container.read(claimReviewProvider).hasReviewItems, isFalse);
+      expect(container.read(claimReviewProvider).selection, isNull);
+      expect(container.read(claimReviewProvider).groups, isEmpty);
     });
   });
 }
