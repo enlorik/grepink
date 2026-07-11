@@ -138,12 +138,17 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
     // what was already saved. Keep it marked as saved instead of resetting
     // to idle, otherwise the Save button re-enables and a repeat tap would
     // insert a duplicate note with the same content.
+    // While a save is already in flight, keep it as saving so the button
+    // stays disabled until the repository write completes.
     final matchesSavedDraft = state.savedDraftContent == result.markdownContent;
+    final newSaveStatus = matchesSavedDraft
+        ? ClaimDraftSaveStatus.saved
+        : (state.saveStatus == ClaimDraftSaveStatus.saving
+            ? ClaimDraftSaveStatus.saving
+            : ClaimDraftSaveStatus.idle);
     state = state.copyWith(
       draft: result,
-      saveStatus: matchesSavedDraft
-          ? ClaimDraftSaveStatus.saved
-          : ClaimDraftSaveStatus.idle,
+      saveStatus: newSaveStatus,
       clearSaveError: true,
     );
   }

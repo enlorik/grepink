@@ -446,12 +446,12 @@ void main() {
       final saving = notifier.saveAsNewNote();
 
       // Regenerate with the exact same selection while the save is still
-      // in flight. This produces a new (but content-identical) draft
-      // instance and resets saveStatus to idle in the meantime.
+      // in flight. saveStatus must stay saving (not reset to idle) so the
+      // Save button cannot be tapped again before the insert completes.
       notifier.generateDraft();
       expect(
         container.read(claimReviewProvider).saveStatus,
-        ClaimDraftSaveStatus.idle,
+        ClaimDraftSaveStatus.saving,
       );
 
       gate.complete();
@@ -624,6 +624,60 @@ void main() {
         ClaimDraftSaveStatus.error,
       );
       expect(find.byKey(const Key('claim-draft-save-error-message')), findsOneWidget);
+    });
+
+    testWidgets(
+        'generating the same draft while saving keeps saveStatus as saving '
+        'and blocks a concurrent second save', (tester) async {
+      final gate = Completer<void>();
+      final repo = _RecordingNoteDraftReviewRepository()..insertGate = gate;
+      final provider = _FixedGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      final service = _buildIngestionService(
+        provider: provider,
+        claims: [_claim('n1', 'A brand new claim.')],
+        results: [
+          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+        ],
+      );
+
+      final container = await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repo,
+      );
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+
+      final notifier = container.read(claimReviewProvider.notifier);
+      final saving = notifier.saveAsNewNote();
+
+      // Regenerating the same selection while the insert is in flight must
+      // keep saveStatus as saving, not reset it to idle.
+      notifier.generateDraft();
+      expect(
+        container.read(claimReviewProvider).saveStatus,
+        ClaimDraftSaveStatus.saving,
+      );
+
+      // A second saveAsNewNote call must be blocked by the saving guard.
+      final second = notifier.saveAsNewNote();
+      gate.complete();
+      await Future.wait([saving, second]);
+
+      // Only one note must have been inserted.
+      expect(repo.insertedNotes, hasLength(1));
+      expect(
+        container.read(claimReviewProvider).saveStatus,
+        ClaimDraftSaveStatus.saved,
+      );
     });
   });
 }
