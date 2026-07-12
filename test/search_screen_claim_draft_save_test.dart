@@ -77,6 +77,9 @@ class _FixedGroundedAnswerProvider implements GroundedAnswerProvider {
   _FixedGroundedAnswerProvider(this.answer);
 
   @override
+  bool get isConfigured => true;
+
+  @override
   Future<GroundedAnswer?> fetchGroundedAnswer(String question) async => answer;
 }
 
@@ -587,6 +590,65 @@ void main() {
       await notifier.saveAsNewNote();
 
       expect(repo.insertedNotes, hasLength(1));
+    });
+
+    testWidgets(
+        'saving draft A then B then returning to A does not save A a second time',
+        (tester) async {
+      final repo = _RecordingNoteDraftReviewRepository();
+      final provider = _FixedGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      // Two distinct new claims so toggling one produces a different draft.
+      final service = _buildIngestionService(
+        provider: provider,
+        claims: [_claim('n1', 'First claim.'), _claim('n2', 'Second claim.')],
+        results: [
+          _result('n1', 'First claim.', ClaimNoveltyClassification.newClaim),
+          _result('n2', 'Second claim.', ClaimNoveltyClassification.newClaim),
+        ],
+      );
+
+      final container = await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repo,
+      );
+      await _askQuestion(tester, 'question');
+
+      final notifier = container.read(claimReviewProvider.notifier);
+
+      // Save draft A (both claims selected).
+      await _generateDraft(tester);
+      final draftAContent = container.read(claimReviewProvider).draft!.markdownContent;
+      await _tapSave(tester);
+      expect(repo.insertedNotes, hasLength(1));
+
+      // Deselect n1, generate and save draft B (only n2).
+      notifier.toggle('n1');
+      await tester.pumpAndSettle();
+      await _generateDraft(tester);
+      final draftBContent = container.read(claimReviewProvider).draft!.markdownContent;
+      expect(draftBContent, isNot(draftAContent));
+      await _tapSave(tester);
+      expect(repo.insertedNotes, hasLength(2));
+
+      // Return to draft A (re-select n1, generate).
+      notifier.toggle('n1');
+      await tester.pumpAndSettle();
+      await _generateDraft(tester);
+      expect(container.read(claimReviewProvider).draft!.markdownContent, draftAContent);
+      expect(container.read(claimReviewProvider).isDraftAlreadySaved, isTrue);
+
+      // A direct save attempt must be blocked — content already in savedDraftContents.
+      await notifier.saveAsNewNote();
+      expect(repo.insertedNotes, hasLength(2));
     });
 
     testWidgets('save failure is shown and does not mark the draft saved',

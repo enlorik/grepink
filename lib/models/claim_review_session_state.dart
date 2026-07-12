@@ -17,7 +17,7 @@ class ClaimReviewSessionState {
   final ClaimDraftResult? draft;
   final ClaimDraftSaveStatus saveStatus;
   final String? saveErrorMessage;
-  final String? savedDraftContent;
+  final Set<String> savedDraftContents;
 
   const ClaimReviewSessionState({
     this.status = ClaimReviewSessionStatus.idle,
@@ -30,7 +30,7 @@ class ClaimReviewSessionState {
     this.draft,
     this.saveStatus = ClaimDraftSaveStatus.idle,
     this.saveErrorMessage,
-    this.savedDraftContent,
+    this.savedDraftContents = const {},
   });
 
   bool get isLoading => status == ClaimReviewSessionStatus.loading;
@@ -40,12 +40,11 @@ class ClaimReviewSessionState {
   bool get hasReviewItems =>
       groups.any((group) => group.items.isNotEmpty);
 
-  /// True when the current [draft] has already been saved and hasn't
-  /// changed since, so a repeat save would create a duplicate note.
+  /// True when the current [draft]'s content was already saved this session,
+  /// so a repeat save would create a duplicate note.
   bool get isDraftAlreadySaved =>
-      saveStatus == ClaimDraftSaveStatus.saved &&
       draft != null &&
-      savedDraftContent == draft!.markdownContent;
+      savedDraftContents.contains(draft!.markdownContent);
 
   ClaimReviewSessionState copyWith({
     ClaimReviewSessionStatus? status,
@@ -58,7 +57,7 @@ class ClaimReviewSessionState {
     ClaimDraftResult? draft,
     ClaimDraftSaveStatus? saveStatus,
     String? saveErrorMessage,
-    String? savedDraftContent,
+    Set<String>? savedDraftContents,
     bool clearSelection = false,
     bool clearError = false,
     bool clearDraft = false,
@@ -76,7 +75,7 @@ class ClaimReviewSessionState {
       saveStatus: saveStatus ?? this.saveStatus,
       saveErrorMessage:
           clearSaveError ? null : (saveErrorMessage ?? this.saveErrorMessage),
-      savedDraftContent: savedDraftContent ?? this.savedDraftContent,
+      savedDraftContents: savedDraftContents ?? this.savedDraftContents,
     );
   }
 }

@@ -140,7 +140,7 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
     // insert a duplicate note with the same content.
     // While a save is already in flight, keep it as saving so the button
     // stays disabled until the repository write completes.
-    final matchesSavedDraft = state.savedDraftContent == result.markdownContent;
+    final matchesSavedDraft = state.savedDraftContents.contains(result.markdownContent);
     final newSaveStatus = matchesSavedDraft
         ? ClaimDraftSaveStatus.saved
         : (state.saveStatus == ClaimDraftSaveStatus.saving
@@ -177,18 +177,18 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
         content: draft.markdownContent,
       );
       // The current draft may have been replaced (toggled, regenerated, or
-      // the session reset) while insertNote was in flight. savedDraftContent
-      // always records the markdown that was actually persisted, so that if
-      // the user later returns to that same selection it is still
-      // recognized as already saved instead of being inserted again. Only
-      // flip saveStatus to saved when the current draft is the one that was
-      // just persisted, so an unrelated in-progress draft isn't mislabeled.
+      // the session reset) while insertNote was in flight. savedDraftContents
+      // always records every markdown that was actually persisted this session,
+      // so returning to any prior selection is still recognized as already
+      // saved instead of allowing a duplicate insert. Only flip saveStatus to
+      // saved when the current draft is the one that was just persisted, so an
+      // unrelated in-progress draft isn't mislabeled.
       final matchesCurrentDraft =
           state.draft?.markdownContent == draft.markdownContent;
       state = state.copyWith(
         saveStatus:
             matchesCurrentDraft ? ClaimDraftSaveStatus.saved : state.saveStatus,
-        savedDraftContent: draft.markdownContent,
+        savedDraftContents: {...state.savedDraftContents, draft.markdownContent},
       );
     } catch (error) {
       if (state.draft?.markdownContent == draft.markdownContent) {
