@@ -19,6 +19,9 @@ class _FakeProvider implements GroundedAnswerProvider {
       : _shouldThrow = shouldThrow;
 
   @override
+  bool get isConfigured => true;
+
+  @override
   Future<GroundedAnswer?> fetchGroundedAnswer(String question) async {
     if (_shouldThrow) throw Exception('provider failed');
     return _answer;
@@ -47,6 +50,9 @@ class _CallOrder {
 class _OrderTrackingProvider implements GroundedAnswerProvider {
   final _CallOrder _order;
   _OrderTrackingProvider(this._order);
+
+  @override
+  bool get isConfigured => true;
 
   @override
   Future<GroundedAnswer?> fetchGroundedAnswer(String question) async {

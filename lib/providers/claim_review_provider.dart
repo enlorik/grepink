@@ -57,6 +57,9 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
       return;
     }
 
+    // Skip the entire pipeline when no real provider is wired up.
+    if (!_ref.read(groundedAnswerIngestionServiceProvider).isConfigured) return;
+
     final requestId = ++_requestSequence;
 
     state = state.copyWith(

@@ -7,6 +7,7 @@ import 'package:grepink/models/extracted_claim.dart';
 import 'package:grepink/models/grounded_answer.dart';
 import 'package:grepink/models/note.dart';
 import 'package:grepink/models/note_draft.dart';
+import 'package:grepink/models/claim_review_session_state.dart';
 import 'package:grepink/providers/claim_review_provider.dart';
 import 'package:grepink/providers/knowledge_ingestion_provider.dart';
 import 'package:grepink/providers/note_draft_review_provider.dart';
@@ -51,6 +52,9 @@ class _CountingGroundedAnswerProvider implements GroundedAnswerProvider {
   final GroundedAnswer answer;
 
   _CountingGroundedAnswerProvider(this.answer);
+
+  @override
+  bool get isConfigured => true;
 
   @override
   Future<GroundedAnswer?> fetchGroundedAnswer(String question) async {
@@ -424,6 +428,25 @@ void main() {
 
       expect(find.text('Example A (https://example.com/a)'), findsOneWidget);
       expect(find.text('https://example.com/b'), findsOneWidget);
+    });
+
+    testWidgets(
+        'asking a question with NullGroundedAnswerProvider leaves claim review idle',
+        (tester) async {
+      final service = GroundedAnswerIngestionService(
+        provider: const NullGroundedAnswerProvider(),
+        extractor: _FixedClaimExtractionService(const []),
+        deduplicator: _FixedClaimDeduplicationService(const []),
+        localEvidence: _EmptyLocalEvidenceRetriever(),
+      );
+
+      final container = await _pumpSearchScreen(tester, ingestionService: service);
+      await _askQuestion(tester, 'What is photosynthesis?');
+
+      final state = container.read(claimReviewProvider);
+      expect(state.status, ClaimReviewSessionStatus.idle);
+      expect(state.groups, isEmpty);
+      expect(state.selection, isNull);
     });
 
     testWidgets(
