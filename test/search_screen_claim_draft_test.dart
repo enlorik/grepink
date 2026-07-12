@@ -52,6 +52,9 @@ class _FixedGroundedAnswerProvider implements GroundedAnswerProvider {
   _FixedGroundedAnswerProvider(this.answer);
 
   @override
+  bool get isConfigured => true;
+
+  @override
   Future<GroundedAnswer?> fetchGroundedAnswer(String question) async => answer;
 }
 
