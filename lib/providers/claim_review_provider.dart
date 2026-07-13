@@ -175,6 +175,7 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
     state = state.copyWith(
       saveStatus: ClaimDraftSaveStatus.saving,
       clearSaveError: true,
+      clearBackgroundSaveError: true,
       pendingDraftContents: {...state.pendingDraftContents, draft.markdownContent},
     );
 
@@ -202,6 +203,10 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
       );
     } catch (error) {
       final isCurrentDraft = state.draft?.markdownContent == draft.markdownContent;
+      // Always remove from pending so the user can retry.
+      // When the draft changed while the save was in flight, surface the
+      // failure via backgroundSaveError instead of marking the new draft
+      // as failed.
       if (isCurrentDraft) {
         state = state.copyWith(
           saveStatus: ClaimDraftSaveStatus.error,
@@ -211,6 +216,8 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
         );
       } else {
         state = state.copyWith(
+          backgroundSaveError:
+              'A save failed while you were editing. No note was created.',
           pendingDraftContents:
               state.pendingDraftContents.difference({draft.markdownContent}),
         );

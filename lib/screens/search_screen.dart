@@ -387,6 +387,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 : null,
           ),
         ],
+        if (claimReviewState.backgroundSaveError != null) ...[
+          const SizedBox(height: 12),
+          _buildStatusCard(
+            key: const Key('claim-draft-background-save-error'),
+            message: claimReviewState.backgroundSaveError!,
+            borderColor: AppColors.pinHighlight.withValues(alpha: 0.45),
+          ),
+        ],
       ],
     );
   }
@@ -610,10 +618,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   Widget _buildStatusCard({
+    Key? key,
     required String message,
     Color borderColor = AppColors.dividerBorder,
   }) {
     return Container(
+      key: key,
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(

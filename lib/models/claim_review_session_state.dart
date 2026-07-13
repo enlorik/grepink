@@ -22,6 +22,10 @@ class ClaimReviewSessionState {
   // completion (success or failure). Kept separate from savedDraftContents
   // so the UI can distinguish "saving now" from "already saved".
   final Set<String> pendingDraftContents;
+  // Non-null when a background save (started while the user was on a different
+  // draft) failed. Independent of saveStatus so the active draft is not
+  // incorrectly flagged. Cleared when the next save attempt begins.
+  final String? backgroundSaveError;
 
   const ClaimReviewSessionState({
     this.status = ClaimReviewSessionStatus.idle,
@@ -36,6 +40,7 @@ class ClaimReviewSessionState {
     this.saveErrorMessage,
     this.savedDraftContents = const {},
     this.pendingDraftContents = const {},
+    this.backgroundSaveError,
   });
 
   bool get isLoading => status == ClaimReviewSessionStatus.loading;
@@ -64,10 +69,12 @@ class ClaimReviewSessionState {
     String? saveErrorMessage,
     Set<String>? savedDraftContents,
     Set<String>? pendingDraftContents,
+    String? backgroundSaveError,
     bool clearSelection = false,
     bool clearError = false,
     bool clearDraft = false,
     bool clearSaveError = false,
+    bool clearBackgroundSaveError = false,
   }) {
     return ClaimReviewSessionState(
       status: status ?? this.status,
@@ -83,6 +90,9 @@ class ClaimReviewSessionState {
           clearSaveError ? null : (saveErrorMessage ?? this.saveErrorMessage),
       savedDraftContents: savedDraftContents ?? this.savedDraftContents,
       pendingDraftContents: pendingDraftContents ?? this.pendingDraftContents,
+      backgroundSaveError: clearBackgroundSaveError
+          ? null
+          : (backgroundSaveError ?? this.backgroundSaveError),
     );
   }
 }
