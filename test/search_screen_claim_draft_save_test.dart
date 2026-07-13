@@ -531,6 +531,67 @@ void main() {
     });
 
     testWidgets(
+        'returning to draft A while its save is in flight blocks a second save',
+        (tester) async {
+      final gate = Completer<void>();
+      final repo = _RecordingNoteDraftReviewRepository()..insertGate = gate;
+      final provider = _FixedGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      final service = _buildIngestionService(
+        provider: provider,
+        claims: [_claim('n1', 'A brand new claim.')],
+        results: [
+          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+        ],
+      );
+
+      final container = await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repo,
+      );
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+
+      final notifier = container.read(claimReviewProvider.notifier);
+      final saving = notifier.saveAsNewNote();
+
+      // Toggle away and back — this resets saveStatus to idle and clears the
+      // draft, but the first insertNote is still in flight.
+      notifier.toggle('n1');
+      notifier.toggle('n1');
+
+      // Regenerate the same draft while the save is still pending.
+      notifier.generateDraft();
+
+      // The save button must appear disabled (saveStatus == saving) because
+      // the content is still in pendingDraftContents.
+      expect(
+        container.read(claimReviewProvider).saveStatus,
+        ClaimDraftSaveStatus.saving,
+      );
+
+      // A second saveAsNewNote must be blocked by the pending-content guard.
+      await notifier.saveAsNewNote();
+
+      gate.complete();
+      await saving;
+
+      expect(repo.insertedNotes, hasLength(1));
+      expect(
+        container.read(claimReviewProvider).saveStatus,
+        ClaimDraftSaveStatus.saved,
+      );
+    });
+
+    testWidgets(
         'returning to a selection saved while a prior draft was in flight is recognized as already saved',
         (tester) async {
       final gate = Completer<void>();
@@ -569,9 +630,11 @@ void main() {
       notifier.toggle('n1');
       notifier.toggle('n1');
       notifier.generateDraft();
+      // The content is still in pendingDraftContents, so generateDraft must
+      // restore saveStatus to saving (not idle) to keep the button disabled.
       expect(
         container.read(claimReviewProvider).saveStatus,
-        ClaimDraftSaveStatus.idle,
+        ClaimDraftSaveStatus.saving,
       );
 
       gate.complete();

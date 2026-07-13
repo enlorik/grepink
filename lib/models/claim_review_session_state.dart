@@ -18,6 +18,10 @@ class ClaimReviewSessionState {
   final ClaimDraftSaveStatus saveStatus;
   final String? saveErrorMessage;
   final Set<String> savedDraftContents;
+  // Contents whose repository write is currently in flight. Cleared on
+  // completion (success or failure). Kept separate from savedDraftContents
+  // so the UI can distinguish "saving now" from "already saved".
+  final Set<String> pendingDraftContents;
 
   const ClaimReviewSessionState({
     this.status = ClaimReviewSessionStatus.idle,
@@ -31,6 +35,7 @@ class ClaimReviewSessionState {
     this.saveStatus = ClaimDraftSaveStatus.idle,
     this.saveErrorMessage,
     this.savedDraftContents = const {},
+    this.pendingDraftContents = const {},
   });
 
   bool get isLoading => status == ClaimReviewSessionStatus.loading;
@@ -58,6 +63,7 @@ class ClaimReviewSessionState {
     ClaimDraftSaveStatus? saveStatus,
     String? saveErrorMessage,
     Set<String>? savedDraftContents,
+    Set<String>? pendingDraftContents,
     bool clearSelection = false,
     bool clearError = false,
     bool clearDraft = false,
@@ -76,6 +82,7 @@ class ClaimReviewSessionState {
       saveErrorMessage:
           clearSaveError ? null : (saveErrorMessage ?? this.saveErrorMessage),
       savedDraftContents: savedDraftContents ?? this.savedDraftContents,
+      pendingDraftContents: pendingDraftContents ?? this.pendingDraftContents,
     );
   }
 }

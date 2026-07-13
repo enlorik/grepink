@@ -134,18 +134,21 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
       providerName: state.providerName,
       citations: state.citations,
     );
-    // Regenerating an unchanged selection produces markdown identical to
-    // what was already saved. Keep it marked as saved instead of resetting
-    // to idle, otherwise the Save button re-enables and a repeat tap would
-    // insert a duplicate note with the same content.
-    // While a save is already in flight, keep it as saving so the button
-    // stays disabled until the repository write completes.
-    final matchesSavedDraft = state.savedDraftContents.contains(result.markdownContent);
-    final newSaveStatus = matchesSavedDraft
-        ? ClaimDraftSaveStatus.saved
-        : (state.saveStatus == ClaimDraftSaveStatus.saving
-            ? ClaimDraftSaveStatus.saving
-            : ClaimDraftSaveStatus.idle);
+    // Determine the correct save status for this draft content:
+    // - already confirmed saved → saved
+    // - in-flight save for this content OR current state is saving → saving
+    //   (covers returning to A while A's insertNote is still pending)
+    // - otherwise → idle
+    final inSaved = state.savedDraftContents.contains(result.markdownContent);
+    final inPending = state.pendingDraftContents.contains(result.markdownContent);
+    final ClaimDraftSaveStatus newSaveStatus;
+    if (inSaved) {
+      newSaveStatus = ClaimDraftSaveStatus.saved;
+    } else if (inPending || state.saveStatus == ClaimDraftSaveStatus.saving) {
+      newSaveStatus = ClaimDraftSaveStatus.saving;
+    } else {
+      newSaveStatus = ClaimDraftSaveStatus.idle;
+    }
     state = state.copyWith(
       draft: result,
       saveStatus: newSaveStatus,
@@ -163,11 +166,16 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
     final draft = state.draft;
     if (draft == null || !draft.shouldSave) return;
     if (state.isDraftAlreadySaved) return;
+    // Block if this exact content is already being written — guards the window
+    // where the user toggles away, returns to the same selection, and taps
+    // Save again before the first insertNote resolves.
+    if (state.pendingDraftContents.contains(draft.markdownContent)) return;
     if (state.saveStatus == ClaimDraftSaveStatus.saving) return;
 
     state = state.copyWith(
       saveStatus: ClaimDraftSaveStatus.saving,
       clearSaveError: true,
+      pendingDraftContents: {...state.pendingDraftContents, draft.markdownContent},
     );
 
     try {
@@ -189,12 +197,22 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
         saveStatus:
             matchesCurrentDraft ? ClaimDraftSaveStatus.saved : state.saveStatus,
         savedDraftContents: {...state.savedDraftContents, draft.markdownContent},
+        pendingDraftContents:
+            state.pendingDraftContents.difference({draft.markdownContent}),
       );
     } catch (error) {
-      if (state.draft?.markdownContent == draft.markdownContent) {
+      final isCurrentDraft = state.draft?.markdownContent == draft.markdownContent;
+      if (isCurrentDraft) {
         state = state.copyWith(
           saveStatus: ClaimDraftSaveStatus.error,
           saveErrorMessage: error.toString(),
+          pendingDraftContents:
+              state.pendingDraftContents.difference({draft.markdownContent}),
+        );
+      } else {
+        state = state.copyWith(
+          pendingDraftContents:
+              state.pendingDraftContents.difference({draft.markdownContent}),
         );
       }
     }
