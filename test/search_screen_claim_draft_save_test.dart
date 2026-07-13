@@ -779,6 +779,104 @@ void main() {
       expect(container.read(claimReviewProvider).isDraftAlreadySaved, isFalse);
     });
 
+    testWidgets(
+        'old-session save success does not add content to the new session',
+        (tester) async {
+      final gate = Completer<void>();
+      final repo = _RecordingNoteDraftReviewRepository()..insertGate = gate;
+      final provider = _FixedGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      final service = _buildIngestionService(
+        provider: provider,
+        claims: [_claim('n1', 'A brand new claim.')],
+        results: [
+          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+        ],
+      );
+
+      final container = await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repo,
+      );
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+
+      final notifier = container.read(claimReviewProvider.notifier);
+      final saving = notifier.saveAsNewNote();
+
+      // Simulate a new question resetting the session while insertNote is
+      // still in flight.
+      notifier.reset();
+
+      gate.complete();
+      await saving;
+
+      // The insert succeeded, but the new session must not inherit the old
+      // draft's savedDraftContents entry.
+      expect(repo.insertedNotes, hasLength(1));
+      expect(container.read(claimReviewProvider).savedDraftContents, isEmpty);
+      expect(container.read(claimReviewProvider).saveStatus, ClaimDraftSaveStatus.idle);
+      expect(container.read(claimReviewProvider).pendingDraftContents, isEmpty);
+    });
+
+    testWidgets(
+        'old-session save failure does not set backgroundSaveError on the new session',
+        (tester) async {
+      final gate = Completer<void>();
+      final repo = _RecordingNoteDraftReviewRepository()
+        ..insertGate = gate
+        ..shouldFail = true;
+      final provider = _FixedGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      final service = _buildIngestionService(
+        provider: provider,
+        claims: [_claim('n1', 'A brand new claim.')],
+        results: [
+          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+        ],
+      );
+
+      final container = await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repo,
+      );
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+
+      final notifier = container.read(claimReviewProvider.notifier);
+      final saving = notifier.saveAsNewNote();
+
+      // Simulate a new question resetting the session while insertNote is
+      // still in flight.
+      notifier.reset();
+
+      gate.complete();
+      await saving;
+
+      // The insert failed, but the new session must not receive the
+      // backgroundSaveError from the old session's failure.
+      expect(repo.insertedNotes, isEmpty);
+      expect(container.read(claimReviewProvider).backgroundSaveError, isNull);
+      expect(container.read(claimReviewProvider).saveStatus, ClaimDraftSaveStatus.idle);
+      expect(container.read(claimReviewProvider).pendingDraftContents, isEmpty);
+    });
+
     testWidgets('save failure is shown and does not mark the draft saved',
         (tester) async {
       final repo = _RecordingNoteDraftReviewRepository()..shouldFail = true;
