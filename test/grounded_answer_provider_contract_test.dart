@@ -7,6 +7,9 @@ class FakeGroundedAnswerProvider implements GroundedAnswerProvider {
   FakeGroundedAnswerProvider(this._result);
 
   @override
+  bool get isConfigured => true;
+
+  @override
   Future<GroundedAnswer?> fetchGroundedAnswer(String question) async {
     if (question.trim().isEmpty) return null;
     return _result;

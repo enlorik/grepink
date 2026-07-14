@@ -21,6 +21,8 @@ class GroundedAnswerIngestionService {
         _deduplicator = deduplicator,
         _localEvidence = localEvidence;
 
+  bool get isConfigured => _provider.isConfigured;
+
   /// Fetches a grounded answer, extracts claims, and classifies them against
   /// local evidence.
   ///
