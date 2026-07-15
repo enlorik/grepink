@@ -877,6 +877,77 @@ void main() {
       expect(container.read(claimReviewProvider).pendingDraftContents, isEmpty);
     });
 
+    testWidgets(
+        'save success after draft changed mid-save triggers notes refresh and shows snackbar',
+        (tester) async {
+      final gate = Completer<void>();
+      final repo = _RecordingNoteDraftReviewRepository()..insertGate = gate;
+      final provider = _FixedGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      final service = _buildIngestionService(
+        provider: provider,
+        claims: [_claim('n1', 'A brand new claim.')],
+        results: [
+          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+        ],
+      );
+
+      var refreshCalled = false;
+      final container = ProviderContainer(
+        overrides: [
+          knowledgeIngestionServiceProvider.overrideWith(
+            (ref) async => _FakeKnowledgeIngestionService(),
+          ),
+          noteDraftReviewRepositoryProvider.overrideWithValue(repo),
+          groundedAnswerIngestionServiceProvider.overrideWithValue(service),
+          allNotesProvider.overrideWithValue(const <Note>[]),
+          recentNotesProvider.overrideWithValue(const <Note>[]),
+          refreshNotesProvider.overrideWithValue(() async { refreshCalled = true; }),
+        ],
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: MediaQuery(
+              data: MediaQueryData(disableAnimations: true),
+              child: SearchScreen(),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+
+      // Tap save but do not settle — insertNote blocks on the gate.
+      final button = find.byKey(const Key('save-claim-draft-button'));
+      await tester.ensureVisible(button);
+      await tester.tap(button);
+      await tester.pump();
+
+      // Change the draft while the save is in flight.
+      container.read(claimReviewProvider.notifier).toggle('n1');
+      await tester.pump();
+
+      // Unblock insertNote — saveAsNewNote returns success despite the draft change.
+      gate.complete();
+      await tester.pumpAndSettle();
+
+      expect(repo.insertedNotes, hasLength(1));
+      expect(refreshCalled, isTrue);
+      expect(find.text('Claim draft saved as a new note.'), findsOneWidget);
+    });
+
     testWidgets('save failure is shown and does not mark the draft saved',
         (tester) async {
       final repo = _RecordingNoteDraftReviewRepository()..shouldFail = true;

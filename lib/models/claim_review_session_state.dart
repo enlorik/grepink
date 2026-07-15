@@ -6,6 +6,8 @@ enum ClaimReviewSessionStatus { idle, loading, success, error }
 
 enum ClaimDraftSaveStatus { idle, saving, saved, error }
 
+enum ClaimDraftSaveOutcome { success, failure, cancelled, ignored }
+
 class ClaimReviewSessionState {
   final ClaimReviewSessionStatus status;
   final String question;

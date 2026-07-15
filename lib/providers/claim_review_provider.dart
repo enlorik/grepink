@@ -162,15 +162,15 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
   /// Does nothing if there is no draft, the draft is not saveable
   /// ([ClaimDraftResult.shouldSave] is false), or the exact same draft
   /// content was already saved successfully.
-  Future<void> saveAsNewNote() async {
+  Future<ClaimDraftSaveOutcome> saveAsNewNote() async {
     final draft = state.draft;
-    if (draft == null || !draft.shouldSave) return;
-    if (state.isDraftAlreadySaved) return;
+    if (draft == null || !draft.shouldSave) return ClaimDraftSaveOutcome.ignored;
+    if (state.isDraftAlreadySaved) return ClaimDraftSaveOutcome.ignored;
     // Block if this exact content is already being written — guards the window
     // where the user toggles away, returns to the same selection, and taps
     // Save again before the first insertNote resolves.
-    if (state.pendingDraftContents.contains(draft.markdownContent)) return;
-    if (state.saveStatus == ClaimDraftSaveStatus.saving) return;
+    if (state.pendingDraftContents.contains(draft.markdownContent)) return ClaimDraftSaveOutcome.ignored;
+    if (state.saveStatus == ClaimDraftSaveStatus.saving) return ClaimDraftSaveOutcome.ignored;
 
     // Snapshot the session token before the async gap. reset() increments
     // _requestSequence; any mismatch after the await means a new session
@@ -192,7 +192,7 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
       );
       // Abandon if reset() was called while insertNote was in flight —
       // the new session must not inherit old savedDraftContents entries.
-      if (saveSessionId != _requestSequence) return;
+      if (saveSessionId != _requestSequence) return ClaimDraftSaveOutcome.cancelled;
       // The current draft may have been replaced (toggled, regenerated, or
       // the session reset) while insertNote was in flight. savedDraftContents
       // always records every markdown that was actually persisted this session,
@@ -209,10 +209,11 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
         pendingDraftContents:
             state.pendingDraftContents.difference({draft.markdownContent}),
       );
+      return ClaimDraftSaveOutcome.success;
     } catch (error) {
       // Abandon if reset() was called — don't surface old errors in the new
       // session, and don't touch pending (reset already cleared it).
-      if (saveSessionId != _requestSequence) return;
+      if (saveSessionId != _requestSequence) return ClaimDraftSaveOutcome.cancelled;
       final isCurrentDraft = state.draft?.markdownContent == draft.markdownContent;
       // Always remove from pending so the user can retry.
       // When the draft changed while the save was in flight, surface the
@@ -233,6 +234,7 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
               state.pendingDraftContents.difference({draft.markdownContent}),
         );
       }
+      return ClaimDraftSaveOutcome.failure;
     }
   }
 

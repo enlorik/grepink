@@ -96,10 +96,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   Future<void> _saveClaimDraftAsNewNote() async {
-    await ref.read(claimReviewProvider.notifier).saveAsNewNote();
-    if (ref.read(claimReviewProvider).saveStatus != ClaimDraftSaveStatus.saved) {
-      return;
-    }
+    final outcome = await ref.read(claimReviewProvider.notifier).saveAsNewNote();
+    if (outcome != ClaimDraftSaveOutcome.success) return;
 
     await ref.read(refreshNotesProvider)();
     if (!mounted) return;
