@@ -6,6 +6,7 @@ import '../services/claim_extraction_service.dart';
 import '../services/claim_review_mapper.dart';
 import '../services/grounded_answer_ingestion_service.dart';
 import '../services/grounded_answer_provider.dart';
+import '../services/selected_claims_draft_builder.dart';
 import '../services/text_similarity_provider.dart';
 import 'knowledge_ingestion_provider.dart';
 
@@ -83,7 +84,10 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
         question: trimmedQuestion,
         groups: groups,
         selection: selection,
+        providerName: ingestion.providerName,
+        citations: ingestion.citations,
         clearError: true,
+        clearDraft: true,
       );
     } catch (error) {
       if (requestId != _requestSequence) return;
@@ -93,6 +97,7 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
         groups: const [],
         clearSelection: true,
         errorMessage: error.toString(),
+        clearDraft: true,
       );
     }
   }
@@ -100,7 +105,26 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
   void toggle(String claimId) {
     final selection = state.selection;
     if (selection == null) return;
-    state = state.copyWith(selection: selection.toggle(claimId));
+    state = state.copyWith(selection: selection.toggle(claimId), clearDraft: true);
+  }
+
+  /// Builds a markdown draft from the currently selected saveable claims.
+  ///
+  /// Uses only [ClaimReviewSelectionState.selectedSaveableItems], so
+  /// alreadyKnown and unselected claims are never included. Does not persist
+  /// anything.
+  void generateDraft() {
+    final selection = state.selection;
+    if (selection == null) return;
+
+    const builder = SelectedClaimsDraftBuilder();
+    final result = builder.build(
+      question: state.question,
+      selected: selection.selectedSaveableItems,
+      providerName: state.providerName,
+      citations: state.citations,
+    );
+    state = state.copyWith(draft: result);
   }
 
   void reset() {
