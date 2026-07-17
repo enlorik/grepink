@@ -95,6 +95,17 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     ref.read(claimReviewProvider.notifier).generateDraft();
   }
 
+  Future<void> _saveClaimDraftAsNewNote() async {
+    final outcome = await ref.read(claimReviewProvider.notifier).saveAsNewNote();
+    if (outcome != ClaimDraftSaveOutcome.success) return;
+
+    await ref.read(refreshNotesProvider)();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Claim draft saved as a new note.')),
+    );
+  }
+
   Future<void> _saveAsNewNote() async {
     final note = await ref.read(noteDraftReviewProvider.notifier).saveAsNewNote();
     if (note == null) return;
@@ -363,7 +374,24 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         ],
         if (claimReviewState.draft != null) ...[
           const SizedBox(height: 16),
-          ClaimDraftPreviewPanel(draft: claimReviewState.draft!),
+          ClaimDraftPreviewPanel(
+            draft: claimReviewState.draft!,
+            saveStatus: claimReviewState.saveStatus,
+            saveErrorMessage: claimReviewState.saveErrorMessage,
+            onSaveAsNewNote: claimReviewState.draft!.shouldSave &&
+                    claimReviewState.saveStatus != ClaimDraftSaveStatus.saving &&
+                    !claimReviewState.isDraftAlreadySaved
+                ? _saveClaimDraftAsNewNote
+                : null,
+          ),
+        ],
+        if (claimReviewState.backgroundSaveError != null) ...[
+          const SizedBox(height: 12),
+          _buildStatusCard(
+            key: const Key('claim-draft-background-save-error'),
+            message: claimReviewState.backgroundSaveError!,
+            borderColor: AppColors.pinHighlight.withValues(alpha: 0.45),
+          ),
         ],
       ],
     );
@@ -588,10 +616,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   Widget _buildStatusCard({
+    Key? key,
     required String message,
     Color borderColor = AppColors.dividerBorder,
   }) {
     return Container(
+      key: key,
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
