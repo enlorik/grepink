@@ -715,6 +715,66 @@ void main() {
     });
 
     testWidgets(
+        'generating a different draft while A is saving does not leave it stuck in saving',
+        (tester) async {
+      final gate = Completer<void>();
+      final repo = _RecordingNoteDraftReviewRepository()..insertGate = gate;
+      final provider = _FixedGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      final service = _buildIngestionService(
+        provider: provider,
+        claims: [_claim('n1', 'First claim.'), _claim('n2', 'Second claim.')],
+        results: [
+          _result('n1', 'First claim.', ClaimNoveltyClassification.newClaim),
+          _result('n2', 'Second claim.', ClaimNoveltyClassification.newClaim),
+        ],
+      );
+
+      final container = await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repo,
+      );
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+
+      final notifier = container.read(claimReviewProvider.notifier);
+      final saving = notifier.saveAsNewNote();
+
+      // While A's insertNote is blocked, deselect n1 and generate draft B.
+      notifier.toggle('n1');
+      notifier.generateDraft();
+      final draftB = container.read(claimReviewProvider).draft!;
+
+      // B's content is not in pendingDraftContents — it must be idle, not saving.
+      expect(
+        container.read(claimReviewProvider).saveStatus,
+        ClaimDraftSaveStatus.idle,
+      );
+
+      // Complete A's save.
+      gate.complete();
+      await saving;
+
+      // B remains idle — A completing must not change B's status.
+      expect(
+        container.read(claimReviewProvider).saveStatus,
+        ClaimDraftSaveStatus.idle,
+      );
+      expect(repo.insertedNotes, hasLength(1));
+      // B's save button must be enabled so the user can save it.
+      expect(container.read(claimReviewProvider).draft!.markdownContent,
+          draftB.markdownContent);
+    });
+
+    testWidgets(
         'save failure after draft changed surfaces backgroundSaveError '
         'without marking the new draft as failed', (tester) async {
       final gate = Completer<void>();

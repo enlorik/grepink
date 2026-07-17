@@ -136,15 +136,17 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
     );
     // Determine the correct save status for this draft content:
     // - already confirmed saved → saved
-    // - in-flight save for this content OR current state is saving → saving
-    //   (covers returning to A while A's insertNote is still pending)
+    // - in-flight save for this exact content → saving
     // - otherwise → idle
+    // Do NOT inherit saving from state.saveStatus: a different draft may be
+    // in flight, and marking unrelated content as saving would leave it stuck
+    // disabled after the in-flight insert completes.
     final inSaved = state.savedDraftContents.contains(result.markdownContent);
     final inPending = state.pendingDraftContents.contains(result.markdownContent);
     final ClaimDraftSaveStatus newSaveStatus;
     if (inSaved) {
       newSaveStatus = ClaimDraftSaveStatus.saved;
-    } else if (inPending || state.saveStatus == ClaimDraftSaveStatus.saving) {
+    } else if (inPending) {
       newSaveStatus = ClaimDraftSaveStatus.saving;
     } else {
       newSaveStatus = ClaimDraftSaveStatus.idle;
