@@ -106,6 +106,24 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     );
   }
 
+  void _selectClaimDraftTargetNote(String? noteId) {
+    ref.read(claimReviewProvider.notifier).selectTargetNote(noteId);
+  }
+
+  Future<void> _appendClaimDraftToExistingNote() async {
+    await ref.read(claimReviewProvider.notifier).appendToExistingNote();
+    if (ref.read(claimReviewProvider).appendStatus !=
+        ClaimDraftAppendStatus.appended) {
+      return;
+    }
+
+    await ref.read(refreshNotesProvider)();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Claim draft appended to the note.')),
+    );
+  }
+
   Future<void> _saveAsNewNote() async {
     final note = await ref.read(noteDraftReviewProvider.notifier).saveAsNewNote();
     if (note == null) return;
@@ -382,6 +400,17 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     claimReviewState.saveStatus != ClaimDraftSaveStatus.saving &&
                     !claimReviewState.isDraftAlreadySaved
                 ? _saveClaimDraftAsNewNote
+                : null,
+            availableNotes: availableNotes,
+            selectedTargetNoteId: claimReviewState.targetNoteId,
+            onTargetNoteSelected: _selectClaimDraftTargetNote,
+            appendStatus: claimReviewState.appendStatus,
+            appendErrorMessage: claimReviewState.appendErrorMessage,
+            onAppendToExistingNote: claimReviewState.draft!.shouldSave &&
+                    claimReviewState.appendStatus !=
+                        ClaimDraftAppendStatus.appending &&
+                    !claimReviewState.isDraftAlreadyAppended
+                ? _appendClaimDraftToExistingNote
                 : null,
           ),
         ],

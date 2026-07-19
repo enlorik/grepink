@@ -91,6 +91,9 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
         clearDraft: true,
         saveStatus: ClaimDraftSaveStatus.idle,
         clearSaveError: true,
+        appendStatus: ClaimDraftAppendStatus.idle,
+        clearAppendError: true,
+        clearTargetNoteId: true,
       );
     } catch (error) {
       if (requestId != _requestSequence) return;
@@ -103,6 +106,9 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
         clearDraft: true,
         saveStatus: ClaimDraftSaveStatus.idle,
         clearSaveError: true,
+        appendStatus: ClaimDraftAppendStatus.idle,
+        clearAppendError: true,
+        clearTargetNoteId: true,
       );
     }
   }
@@ -115,6 +121,8 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
       clearDraft: true,
       saveStatus: ClaimDraftSaveStatus.idle,
       clearSaveError: true,
+      appendStatus: ClaimDraftAppendStatus.idle,
+      clearAppendError: true,
     );
   }
 
@@ -151,10 +159,18 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
     } else {
       newSaveStatus = ClaimDraftSaveStatus.idle;
     }
+    final matchesAppendedTarget = state.targetNoteId != null &&
+        (state.appendedTargetsByContent[result.markdownContent]
+                ?.contains(state.targetNoteId) ??
+            false);
     state = state.copyWith(
       draft: result,
       saveStatus: newSaveStatus,
       clearSaveError: true,
+      appendStatus: matchesAppendedTarget
+          ? ClaimDraftAppendStatus.appended
+          : ClaimDraftAppendStatus.idle,
+      clearAppendError: true,
     );
   }
 
@@ -238,6 +254,103 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
       }
       return ClaimDraftSaveOutcome.failure;
     }
+  }
+
+  /// Selects the note to append to. Ignored while an append is in flight so
+  /// a target change cannot race with the in-flight [updateNote].
+  void selectTargetNote(String? noteId) {
+    if (state.appendStatus == ClaimDraftAppendStatus.appending) return;
+
+    final matchesAppendedTarget = noteId != null &&
+        state.draft != null &&
+        (state.appendedTargetsByContent[state.draft!.markdownContent]
+                ?.contains(noteId) ??
+            false);
+    state = state.copyWith(
+      targetNoteId: noteId,
+      clearTargetNoteId: noteId == null,
+      appendStatus: matchesAppendedTarget
+          ? ClaimDraftAppendStatus.appended
+          : ClaimDraftAppendStatus.idle,
+      clearAppendError: true,
+    );
+  }
+
+  /// Appends [ClaimReviewSessionState.draft] to an existing note chosen via
+  /// [selectTargetNote]. Does nothing when the draft is not saveable, already
+  /// appended to this target, or an append is already in flight.
+  Future<void> appendToExistingNote() async {
+    final draft = state.draft;
+    if (draft == null || !draft.shouldSave) return;
+    if (state.appendStatus == ClaimDraftAppendStatus.appending) return;
+    if (state.isDraftAlreadyAppended) return;
+
+    final targetNoteId = state.targetNoteId;
+    if (targetNoteId == null || targetNoteId.isEmpty) {
+      state = state.copyWith(
+        appendStatus: ClaimDraftAppendStatus.error,
+        appendErrorMessage: 'Select a target note before appending.',
+      );
+      return;
+    }
+
+    final appendSessionId = _requestSequence;
+
+    state = state.copyWith(
+      appendStatus: ClaimDraftAppendStatus.appending,
+      clearAppendError: true,
+    );
+
+    try {
+      final repository = _ref.read(noteDraftReviewRepositoryProvider);
+      final existingNote = await repository.getNoteById(targetNoteId);
+      if (appendSessionId != _requestSequence) return;
+      if (existingNote == null) {
+        state = state.copyWith(
+          appendStatus: ClaimDraftAppendStatus.error,
+          appendErrorMessage: 'Selected target note no longer exists.',
+        );
+        return;
+      }
+
+      final updatedNote = existingNote.copyWith(
+        content: _appendDraftMarkdown(existingNote.content, draft),
+        updatedAt: DateTime.now(),
+        embeddingPending: true,
+        clearEmbedding: true,
+      );
+      await repository.updateNote(updatedNote);
+      if (appendSessionId != _requestSequence) return;
+
+      final matchesCurrentDraft =
+          state.draft?.markdownContent == draft.markdownContent;
+      final existingTargets =
+          state.appendedTargetsByContent[draft.markdownContent] ??
+              const <String>{};
+      state = state.copyWith(
+        appendStatus: matchesCurrentDraft
+            ? ClaimDraftAppendStatus.appended
+            : state.appendStatus,
+        appendedTargetsByContent: {
+          ...state.appendedTargetsByContent,
+          draft.markdownContent: {...existingTargets, targetNoteId},
+        },
+      );
+    } catch (_) {
+      if (appendSessionId != _requestSequence) return;
+      if (state.draft?.markdownContent != draft.markdownContent) return;
+      state = state.copyWith(
+        appendStatus: ClaimDraftAppendStatus.error,
+        appendErrorMessage: 'Failed to append. Try again.',
+      );
+    }
+  }
+
+  String _appendDraftMarkdown(String existingContent, ClaimDraftResult draft) {
+    final trimmedExisting = existingContent.trimRight();
+    final trimmedDraft = draft.markdownContent.trim();
+    if (trimmedExisting.isEmpty) return trimmedDraft;
+    return '$trimmedExisting\n\n---\n\n$trimmedDraft';
   }
 
   String _titleFor(String question) {
