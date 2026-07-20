@@ -120,10 +120,16 @@ class ClaimDraftPreviewPanel extends StatelessWidget {
           if (saveStatus == ClaimDraftSaveStatus.error) ...[
             const SizedBox(height: 8),
             Text(
-              saveErrorMessage ?? 'Failed to save. Try again.',
+              saveErrorMessage ?? 'Could not save this draft as a note. Please try again.',
               key: const Key('claim-draft-save-error-message'),
               style: AppTextStyles.bodySmall,
             ),
+            if (onSaveAsNewNote != null)
+              TextButton(
+                key: const Key('claim-draft-save-retry-button'),
+                onPressed: onSaveAsNewNote,
+                child: const Text('Retry'),
+              ),
           ],
           const SizedBox(height: 16),
           Text('Append target', style: AppTextStyles.titleMedium),
@@ -177,10 +183,16 @@ class ClaimDraftPreviewPanel extends StatelessWidget {
           if (appendStatus == ClaimDraftAppendStatus.error) ...[
             const SizedBox(height: 8),
             Text(
-              appendErrorMessage ?? 'Failed to append. Try again.',
+              appendErrorMessage ?? 'Could not append this draft to the note. Please try again.',
               key: const Key('claim-draft-append-error-message'),
               style: AppTextStyles.bodySmall,
             ),
+            if (onAppendToExistingNote != null)
+              TextButton(
+                key: const Key('claim-draft-append-retry-button'),
+                onPressed: onAppendToExistingNote,
+                child: const Text('Retry'),
+              ),
           ],
         ],
       ),
