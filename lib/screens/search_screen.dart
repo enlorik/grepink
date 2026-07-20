@@ -62,7 +62,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   Future<void> _onAsk() async {
     final claimState = ref.read(claimReviewProvider);
-    if (claimState.isSaveInFlight ||
+    if (claimState.isLoading ||
+        claimState.isSaveInFlight ||
         claimState.appendStatus == ClaimDraftAppendStatus.appending) {
       return;
     }
@@ -90,6 +91,16 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     }
 
     await ref.read(claimReviewProvider.notifier).runReview(question);
+  }
+
+  Future<void> _retryClaimReview() async {
+    final claimState = ref.read(claimReviewProvider);
+    if (claimState.isLoading ||
+        claimState.isSaveInFlight ||
+        claimState.appendStatus == ClaimDraftAppendStatus.appending) {
+      return;
+    }
+    await ref.read(claimReviewProvider.notifier).runReview(claimState.question);
   }
 
   void _toggleClaim(String claimId) {
@@ -422,7 +433,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           const SizedBox(height: 8),
           TextButton(
             key: const Key('claim-review-retry-button'),
-            onPressed: askDisabled ? null : _onAsk,
+            onPressed: askDisabled ? null : _retryClaimReview,
             child: const Text('Retry'),
           ),
         ],
