@@ -10,6 +10,7 @@ import 'package:grepink/models/extracted_claim.dart';
 import 'package:grepink/models/grounded_answer.dart';
 import 'package:grepink/models/note.dart';
 import 'package:grepink/models/note_draft.dart';
+import 'package:grepink/models/note_draft_review_state.dart';
 import 'package:grepink/providers/claim_review_provider.dart';
 import 'package:grepink/providers/knowledge_ingestion_provider.dart';
 import 'package:grepink/providers/note_draft_review_provider.dart';
@@ -1454,6 +1455,88 @@ void main() {
       expect(
         container.read(claimReviewProvider).appendStatus,
         ClaimDraftAppendStatus.appended,
+      );
+    });
+
+    testWidgets(
+        'claim-draft append is blocked while the note-draft panel is appending',
+        (tester) async {
+      final updateGate = Completer<void>();
+      final existing = _existingNote(content: 'Old content here.');
+      final repo = _SaveableAndAppendableRepository()
+        ..existingNote = existing
+        ..updateGate = updateGate;
+      final provider = _FixedGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      final service = _buildIngestionService(
+        provider: provider,
+        claims: [_claim('n1', 'A brand new claim.')],
+        results: [
+          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+        ],
+      );
+
+      final container = await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repo,
+        availableNotes: [existing],
+      );
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+
+      final claimNotifier = container.read(claimReviewProvider.notifier);
+      final reviewNotifier = container.read(noteDraftReviewProvider.notifier);
+
+      // Put the note-draft panel into an in-flight append (status == saving).
+      reviewNotifier.startReview(const NoteDraft(
+        question: 'question',
+        markdownContent: 'note draft content',
+        action: NoteDraftAction.appendToExistingNote,
+        deltas: [],
+        localEvidence: [],
+        webEvidence: [],
+      ));
+      reviewNotifier.selectTargetNote(existing.id);
+      final noteDraftAppending = reviewNotifier.appendToExistingNote();
+      await tester.pump();
+
+      expect(
+        container.read(noteDraftReviewProvider).status,
+        NoteDraftReviewStatus.saving,
+        reason: 'note-draft panel must be in saving state before testing claim guard',
+      );
+
+      // Claim-draft append must be blocked — same target, concurrent write
+      // risk: each panel would read the same original note and overwrite it.
+      claimNotifier.selectTargetNote(existing.id);
+      await claimNotifier.appendToExistingNote();
+      await tester.pump();
+
+      // Only 0 updates so far — claim-draft append was blocked.
+      expect(repo.updatedNotes, isEmpty,
+          reason: 'noteDraftReviewStatus.saving guard must block claim-draft append');
+      expect(
+        container.read(claimReviewProvider).appendStatus,
+        ClaimDraftAppendStatus.idle,
+      );
+
+      // Completing the note-draft append releases the gate.
+      updateGate.complete();
+      await noteDraftAppending;
+      await tester.pump();
+
+      expect(repo.updatedNotes, hasLength(1));
+      expect(
+        container.read(noteDraftReviewProvider).status,
+        NoteDraftReviewStatus.saved,
       );
     });
   });

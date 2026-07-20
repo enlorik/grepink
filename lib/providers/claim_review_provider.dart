@@ -8,6 +8,7 @@ import '../services/grounded_answer_ingestion_service.dart';
 import '../services/grounded_answer_provider.dart';
 import '../services/selected_claims_draft_builder.dart';
 import '../services/text_similarity_provider.dart';
+import '../models/note_draft_review_state.dart';
 import 'knowledge_ingestion_provider.dart';
 import 'note_draft_review_provider.dart';
 
@@ -298,6 +299,7 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
     if (state.appendStatus == ClaimDraftAppendStatus.appending) return;
     if (state.isDraftAlreadySaved) return;
     if (state.pendingDraftContents.contains(draft.markdownContent)) return;
+    if (_ref.read(noteDraftReviewProvider).status == NoteDraftReviewStatus.saving) return;
     if (state.isDraftAlreadyAppended) return;
 
     final targetNoteId = state.targetNoteId;

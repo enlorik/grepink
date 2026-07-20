@@ -415,7 +415,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     claimReviewState.saveStatus != ClaimDraftSaveStatus.saving &&
                     claimReviewState.appendStatus !=
                         ClaimDraftAppendStatus.appending &&
-                    !claimReviewState.isDraftAlreadyAppended
+                    !claimReviewState.isDraftAlreadyAppended &&
+                    reviewState.status != NoteDraftReviewStatus.saving
                 ? _appendClaimDraftToExistingNote
                 : null,
           ),
