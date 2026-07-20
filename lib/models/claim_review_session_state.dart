@@ -8,6 +8,8 @@ enum ClaimDraftSaveStatus { idle, saving, saved, error }
 
 enum ClaimDraftSaveOutcome { success, failure, cancelled, ignored }
 
+enum ClaimDraftAppendStatus { idle, appending, appended, error }
+
 class ClaimReviewSessionState {
   final ClaimReviewSessionStatus status;
   final String question;
@@ -28,6 +30,17 @@ class ClaimReviewSessionState {
   // draft) failed. Independent of saveStatus so the active draft is not
   // incorrectly flagged. Cleared when the next save attempt begins.
   final String? backgroundSaveError;
+  // Non-null when a background append (started while the user was on a
+  // different draft) failed. Cleared when the next append attempt begins.
+  final String? backgroundAppendError;
+  // Append-to-existing-note state.
+  final String? targetNoteId;
+  final ClaimDraftAppendStatus appendStatus;
+  final String? appendErrorMessage;
+  // Maps draft content → set of note IDs that content has been appended to.
+  // Keyed by content (not a single slot) so switching between distinct drafts
+  // never loses earlier append history.
+  final Map<String, Set<String>> appendedTargetsByContent;
 
   const ClaimReviewSessionState({
     this.status = ClaimReviewSessionStatus.idle,
@@ -43,6 +56,11 @@ class ClaimReviewSessionState {
     this.savedDraftContents = const {},
     this.pendingDraftContents = const {},
     this.backgroundSaveError,
+    this.backgroundAppendError,
+    this.targetNoteId,
+    this.appendStatus = ClaimDraftAppendStatus.idle,
+    this.appendErrorMessage,
+    this.appendedTargetsByContent = const {},
   });
 
   bool get isLoading => status == ClaimReviewSessionStatus.loading;
@@ -58,6 +76,22 @@ class ClaimReviewSessionState {
       draft != null &&
       savedDraftContents.contains(draft!.markdownContent);
 
+  /// True when the current [draft] has already been appended to the currently
+  /// selected [targetNoteId]. Keyed by content so switching between distinct
+  /// drafts never loses earlier history for a given content+target pair.
+  bool get isDraftAlreadyAppended =>
+      draft != null &&
+      targetNoteId != null &&
+      (appendedTargetsByContent[draft!.markdownContent]?.contains(targetNoteId) ??
+          false);
+
+  /// True when the current [draft] has been appended to at least one note this
+  /// session. Used to block saving after appending so the same generated
+  /// markdown is not persisted twice via the two different actions.
+  bool get isDraftAlreadyAppendedAnywhere =>
+      draft != null &&
+      (appendedTargetsByContent[draft!.markdownContent]?.isNotEmpty ?? false);
+
   ClaimReviewSessionState copyWith({
     ClaimReviewSessionStatus? status,
     String? question,
@@ -72,11 +106,19 @@ class ClaimReviewSessionState {
     Set<String>? savedDraftContents,
     Set<String>? pendingDraftContents,
     String? backgroundSaveError,
+    String? backgroundAppendError,
+    String? targetNoteId,
+    ClaimDraftAppendStatus? appendStatus,
+    String? appendErrorMessage,
+    Map<String, Set<String>>? appendedTargetsByContent,
     bool clearSelection = false,
     bool clearError = false,
     bool clearDraft = false,
     bool clearSaveError = false,
     bool clearBackgroundSaveError = false,
+    bool clearBackgroundAppendError = false,
+    bool clearTargetNoteId = false,
+    bool clearAppendError = false,
   }) {
     return ClaimReviewSessionState(
       status: status ?? this.status,
@@ -95,6 +137,17 @@ class ClaimReviewSessionState {
       backgroundSaveError: clearBackgroundSaveError
           ? null
           : (backgroundSaveError ?? this.backgroundSaveError),
+      backgroundAppendError: clearBackgroundAppendError
+          ? null
+          : (backgroundAppendError ?? this.backgroundAppendError),
+      targetNoteId:
+          clearTargetNoteId ? null : (targetNoteId ?? this.targetNoteId),
+      appendStatus: appendStatus ?? this.appendStatus,
+      appendErrorMessage: clearAppendError
+          ? null
+          : (appendErrorMessage ?? this.appendErrorMessage),
+      appendedTargetsByContent:
+          appendedTargetsByContent ?? this.appendedTargetsByContent,
     );
   }
 }

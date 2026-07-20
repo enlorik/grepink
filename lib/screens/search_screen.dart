@@ -106,6 +106,25 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     );
   }
 
+  void _selectClaimDraftTargetNote(String? noteId) {
+    ref.read(claimReviewProvider.notifier).selectTargetNote(noteId);
+  }
+
+  Future<void> _appendClaimDraftToExistingNote() async {
+    await ref.read(claimReviewProvider.notifier).appendToExistingNote();
+    if (!mounted) return;
+    if (ref.read(claimReviewProvider).appendStatus !=
+        ClaimDraftAppendStatus.appended) {
+      return;
+    }
+
+    await ref.read(refreshNotesProvider)();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Claim draft appended to the note.')),
+    );
+  }
+
   Future<void> _saveAsNewNote() async {
     final note = await ref.read(noteDraftReviewProvider.notifier).saveAsNewNote();
     if (note == null) return;
@@ -118,6 +137,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   Future<void> _appendToExistingNote() async {
+    if (ref.read(claimReviewProvider).appendStatus ==
+        ClaimDraftAppendStatus.appending) {
+      return;
+    }
     final reviewState = ref.read(noteDraftReviewProvider);
     if (reviewState.targetNoteId == null || reviewState.targetNoteId!.isEmpty) {
       ref
@@ -338,8 +361,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           NoteDraftReviewPanel(
             noteDraft: reviewState.noteDraft!,
             onSaveAsNewNote: _saveAsNewNote,
-            onAppendToExistingNote: _appendToExistingNote,
-            onDiscard: _discardDraft,
+            onAppendToExistingNote: claimReviewState.appendStatus !=
+                    ClaimDraftAppendStatus.appending
+                ? _appendToExistingNote
+                : null,
+            onDiscard: claimReviewState.appendStatus !=
+                    ClaimDraftAppendStatus.appending
+                ? _discardDraft
+                : null,
             availableNotes: availableNotes,
             selectedTargetNoteId: reviewState.targetNoteId,
             onTargetNoteSelected: (noteId) {
@@ -380,8 +409,25 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             saveErrorMessage: claimReviewState.saveErrorMessage,
             onSaveAsNewNote: claimReviewState.draft!.shouldSave &&
                     claimReviewState.saveStatus != ClaimDraftSaveStatus.saving &&
-                    !claimReviewState.isDraftAlreadySaved
+                    !claimReviewState.isDraftAlreadySaved &&
+                    claimReviewState.appendStatus !=
+                        ClaimDraftAppendStatus.appending &&
+                    !claimReviewState.isDraftAlreadyAppendedAnywhere
                 ? _saveClaimDraftAsNewNote
+                : null,
+            availableNotes: availableNotes,
+            selectedTargetNoteId: claimReviewState.targetNoteId,
+            onTargetNoteSelected: _selectClaimDraftTargetNote,
+            appendStatus: claimReviewState.appendStatus,
+            appendErrorMessage: claimReviewState.appendErrorMessage,
+            onAppendToExistingNote: claimReviewState.draft!.shouldSave &&
+                    !claimReviewState.isDraftAlreadySaved &&
+                    claimReviewState.saveStatus != ClaimDraftSaveStatus.saving &&
+                    claimReviewState.appendStatus !=
+                        ClaimDraftAppendStatus.appending &&
+                    !claimReviewState.isDraftAlreadyAppended &&
+                    reviewState.status != NoteDraftReviewStatus.saving
+                ? _appendClaimDraftToExistingNote
                 : null,
           ),
         ],
@@ -390,6 +436,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           _buildStatusCard(
             key: const Key('claim-draft-background-save-error'),
             message: claimReviewState.backgroundSaveError!,
+            borderColor: AppColors.pinHighlight.withValues(alpha: 0.45),
+          ),
+        ],
+        if (claimReviewState.backgroundAppendError != null) ...[
+          const SizedBox(height: 12),
+          _buildStatusCard(
+            key: const Key('claim-draft-background-append-error'),
+            message: claimReviewState.backgroundAppendError!,
             borderColor: AppColors.pinHighlight.withValues(alpha: 0.45),
           ),
         ],
