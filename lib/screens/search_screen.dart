@@ -407,6 +407,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             appendStatus: claimReviewState.appendStatus,
             appendErrorMessage: claimReviewState.appendErrorMessage,
             onAppendToExistingNote: claimReviewState.draft!.shouldSave &&
+                    !claimReviewState.isDraftAlreadySaved &&
                     claimReviewState.appendStatus !=
                         ClaimDraftAppendStatus.appending &&
                     !claimReviewState.isDraftAlreadyAppended

@@ -294,6 +294,7 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
     final draft = state.draft;
     if (draft == null || !draft.shouldSave) return;
     if (state.appendStatus == ClaimDraftAppendStatus.appending) return;
+    if (state.isDraftAlreadySaved) return;
     if (state.isDraftAlreadyAppended) return;
 
     final targetNoteId = state.targetNoteId;
