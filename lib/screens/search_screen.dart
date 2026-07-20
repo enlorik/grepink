@@ -398,7 +398,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             saveErrorMessage: claimReviewState.saveErrorMessage,
             onSaveAsNewNote: claimReviewState.draft!.shouldSave &&
                     claimReviewState.saveStatus != ClaimDraftSaveStatus.saving &&
-                    !claimReviewState.isDraftAlreadySaved
+                    !claimReviewState.isDraftAlreadySaved &&
+                    !claimReviewState.isDraftAlreadyAppendedAnywhere
                 ? _saveClaimDraftAsNewNote
                 : null,
             availableNotes: availableNotes,
@@ -408,6 +409,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             appendErrorMessage: claimReviewState.appendErrorMessage,
             onAppendToExistingNote: claimReviewState.draft!.shouldSave &&
                     !claimReviewState.isDraftAlreadySaved &&
+                    claimReviewState.saveStatus != ClaimDraftSaveStatus.saving &&
                     claimReviewState.appendStatus !=
                         ClaimDraftAppendStatus.appending &&
                     !claimReviewState.isDraftAlreadyAppended

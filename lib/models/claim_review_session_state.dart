@@ -81,6 +81,13 @@ class ClaimReviewSessionState {
       (appendedTargetsByContent[draft!.markdownContent]?.contains(targetNoteId) ??
           false);
 
+  /// True when the current [draft] has been appended to at least one note this
+  /// session. Used to block saving after appending so the same generated
+  /// markdown is not persisted twice via the two different actions.
+  bool get isDraftAlreadyAppendedAnywhere =>
+      draft != null &&
+      (appendedTargetsByContent[draft!.markdownContent]?.isNotEmpty ?? false);
+
   ClaimReviewSessionState copyWith({
     ClaimReviewSessionStatus? status,
     String? question,

@@ -195,6 +195,7 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
     final draft = state.draft;
     if (draft == null || !draft.shouldSave) return ClaimDraftSaveOutcome.ignored;
     if (state.isDraftAlreadySaved) return ClaimDraftSaveOutcome.ignored;
+    if (state.isDraftAlreadyAppendedAnywhere) return ClaimDraftSaveOutcome.ignored;
     // Block if this exact content is already being written — guards the window
     // where the user toggles away, returns to the same selection, and taps
     // Save again before the first insertNote resolves.
@@ -295,6 +296,7 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
     if (draft == null || !draft.shouldSave) return;
     if (state.appendStatus == ClaimDraftAppendStatus.appending) return;
     if (state.isDraftAlreadySaved) return;
+    if (state.pendingDraftContents.contains(draft.markdownContent)) return;
     if (state.isDraftAlreadyAppended) return;
 
     final targetNoteId = state.targetNoteId;

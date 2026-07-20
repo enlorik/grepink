@@ -110,6 +110,7 @@ class _EmptyLocalEvidenceRetriever implements LocalEvidenceRetriever {
 // Supports both insertNote (save flow) and getNoteById/updateNote (append flow).
 class _SaveableAndAppendableRepository implements NoteDraftReviewRepository {
   Note? existingNote;
+  Completer<void>? insertGate;
   final List<Note> insertedNotes = [];
   final List<Note> updatedNotes = [];
 
@@ -122,6 +123,7 @@ class _SaveableAndAppendableRepository implements NoteDraftReviewRepository {
 
   @override
   Future<Note> insertNote({required String title, required String content}) async {
+    if (insertGate != null) await insertGate!.future;
     final note = Note(
       id: 'saved-note-${insertedNotes.length}',
       title: title,
@@ -1263,6 +1265,129 @@ void main() {
         container.read(claimReviewProvider).appendStatus,
         ClaimDraftAppendStatus.idle,
       );
+    });
+
+    testWidgets(
+        'append is a no-op while the same draft content is being saved',
+        (tester) async {
+      final gate = Completer<void>();
+      final existing = _existingNote(content: 'Old content here.');
+      final repo = _SaveableAndAppendableRepository()
+        ..existingNote = existing
+        ..insertGate = gate;
+      final provider = _FixedGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      final service = _buildIngestionService(
+        provider: provider,
+        claims: [_claim('n1', 'A brand new claim.')],
+        results: [
+          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+        ],
+      );
+
+      final container = await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repo,
+        availableNotes: [existing],
+      );
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+      final notifier = container.read(claimReviewProvider.notifier);
+      notifier.selectTargetNote(existing.id);
+
+      // Start a save but hold insertNote so it stays in flight.
+      final saving = notifier.saveAsNewNote();
+      await tester.pump();
+
+      expect(
+        container.read(claimReviewProvider).saveStatus,
+        ClaimDraftSaveStatus.saving,
+      );
+
+      // Append must be blocked while the save for the same content is in flight.
+      await notifier.appendToExistingNote();
+      await tester.pump();
+
+      expect(repo.updatedNotes, isEmpty,
+          reason: 'pendingDraftContents guard must block append');
+      expect(
+        container.read(claimReviewProvider).appendStatus,
+        ClaimDraftAppendStatus.idle,
+      );
+
+      // Completing the save releases the insert gate and save succeeds.
+      gate.complete();
+      await saving;
+      await tester.pump();
+
+      expect(repo.insertedNotes, hasLength(1));
+      expect(
+        container.read(claimReviewProvider).saveStatus,
+        ClaimDraftSaveStatus.saved,
+      );
+    });
+
+    testWidgets(
+        'save button is disabled and save is a no-op after appending the draft',
+        (tester) async {
+      final existing = _existingNote(content: 'Old content here.');
+      final repo = _SaveableAndAppendableRepository()..existingNote = existing;
+      final provider = _FixedGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      final service = _buildIngestionService(
+        provider: provider,
+        claims: [_claim('n1', 'A brand new claim.')],
+        results: [
+          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+        ],
+      );
+
+      final container = await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repo,
+        availableNotes: [existing],
+      );
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+      final notifier = container.read(claimReviewProvider.notifier);
+      notifier.selectTargetNote(existing.id);
+      await _tapAppend(tester);
+
+      expect(
+        container.read(claimReviewProvider).appendStatus,
+        ClaimDraftAppendStatus.appended,
+        reason: 'append must have succeeded before the save guard is meaningful',
+      );
+
+      // Save button must be disabled — isDraftAlreadyAppendedAnywhere blocks it.
+      final saveButton = tester.widget<FilledButton>(
+        find.byKey(const Key('save-claim-draft-button')),
+      );
+      expect(saveButton.onPressed, isNull);
+
+      // Calling saveAsNewNote directly must also be a no-op.
+      final outcome = await notifier.saveAsNewNote();
+      await tester.pump();
+
+      expect(outcome, ClaimDraftSaveOutcome.ignored);
+      expect(repo.insertedNotes, isEmpty,
+          reason: 'provider guard must block save when draft is already appended');
     });
   });
 }
