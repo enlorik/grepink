@@ -61,6 +61,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   Future<void> _onAsk() async {
+    final claimState = ref.read(claimReviewProvider);
+    if (claimState.isLoading ||
+        claimState.isSaveInFlight ||
+        claimState.appendStatus == ClaimDraftAppendStatus.appending) {
+      return;
+    }
     final question = _askController.text.trim();
     ref.read(noteDraftReviewProvider.notifier).clear();
 
@@ -85,6 +91,16 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     }
 
     await ref.read(claimReviewProvider.notifier).runReview(question);
+  }
+
+  Future<void> _retryClaimReview() async {
+    final claimState = ref.read(claimReviewProvider);
+    if (claimState.isLoading ||
+        claimState.isSaveInFlight ||
+        claimState.appendStatus == ClaimDraftAppendStatus.appending) {
+      return;
+    }
+    await ref.read(claimReviewProvider.notifier).runReview(claimState.question);
   }
 
   void _toggleClaim(String claimId) {
@@ -241,7 +257,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     required List<Note> availableNotes,
     required ClaimReviewSessionState claimReviewState,
   }) {
-    final askDisabled = knowledgeState.isLoading;
+    final askDisabled = knowledgeState.isLoading ||
+        claimReviewState.isLoading ||
+        claimReviewState.isSaveInFlight ||
+        claimReviewState.appendStatus == ClaimDraftAppendStatus.appending;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -386,11 +405,57 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             errorMessage: reviewState.errorMessage,
           ),
         ],
+        if (claimReviewState.isLoading) ...[
+          const SizedBox(height: 12),
+          Row(
+            key: const Key('claim-review-loading-indicator'),
+            children: [
+              const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Reviewing claims against your notes...',
+                style: AppTextStyles.bodySmall,
+              ),
+            ],
+          ),
+        ],
         if (claimReviewState.isError && claimReviewState.errorMessage != null) ...[
           const SizedBox(height: 12),
           _buildStatusCard(
-            message: 'Could not review claims for this question.',
+            key: const Key('claim-review-error-state'),
+            message: claimReviewState.errorMessage!,
             borderColor: AppColors.pinHighlight.withValues(alpha: 0.45),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            key: const Key('claim-review-retry-button'),
+            onPressed: askDisabled ? null : _retryClaimReview,
+            child: const Text('Retry'),
+          ),
+        ],
+        if (claimReviewState.hasNoAnswer) ...[
+          const SizedBox(height: 12),
+          _buildStatusCard(
+            key: const Key('claim-review-empty-answer-state'),
+            message: 'No grounded answer was found for this question.',
+          ),
+        ],
+        if (claimReviewState.hasNoClaimsExtracted) ...[
+          const SizedBox(height: 12),
+          _buildStatusCard(
+            key: const Key('claim-review-no-claims-state'),
+            message: 'No claims could be extracted from the answer.',
+          ),
+        ],
+        if (claimReviewState.isAllClaimsAlreadyKnown) ...[
+          const SizedBox(height: 12),
+          _buildStatusCard(
+            key: const Key('claim-review-all-known-state'),
+            message: 'Everything in this answer is already in your notes.',
           ),
         ],
         if (claimReviewState.hasReviewItems && claimReviewState.selection != null) ...[
@@ -406,6 +471,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             onPressed: _generateClaimDraft,
             icon: const Icon(Icons.description_outlined),
             label: const Text('Generate draft'),
+          ),
+        ],
+        if (claimReviewState.draftGenerationErrorMessage != null) ...[
+          const SizedBox(height: 12),
+          _buildStatusCard(
+            key: const Key('claim-draft-generation-error-state'),
+            message: claimReviewState.draftGenerationErrorMessage!,
+            borderColor: AppColors.pinHighlight.withValues(alpha: 0.45),
           ),
         ],
         if (claimReviewState.draft != null) ...[

@@ -1,3 +1,4 @@
+import 'claim_deduplication_result.dart';
 import 'claim_review_item.dart';
 import 'grounded_answer.dart';
 import '../services/selected_claims_draft_builder.dart';
@@ -33,6 +34,10 @@ class ClaimReviewSessionState {
   // Non-null when a background append (started while the user was on a
   // different draft) failed. Cleared when the next append attempt begins.
   final String? backgroundAppendError;
+  // Non-null when generateDraft() throws. Holds a safe, user-facing message
+  // only -- never the raw exception. Cleared on the next successful draft
+  // generation or when runReview starts a new session.
+  final String? draftGenerationErrorMessage;
   // Append-to-existing-note state.
   final String? targetNoteId;
   final ClaimDraftAppendStatus appendStatus;
@@ -57,6 +62,7 @@ class ClaimReviewSessionState {
     this.pendingDraftContents = const {},
     this.backgroundSaveError,
     this.backgroundAppendError,
+    this.draftGenerationErrorMessage,
     this.targetNoteId,
     this.appendStatus = ClaimDraftAppendStatus.idle,
     this.appendErrorMessage,
@@ -97,6 +103,26 @@ class ClaimReviewSessionState {
   /// resets [saveStatus] to idle even while [insertNote] is still awaiting.
   bool get isSaveInFlight => pendingDraftContents.isNotEmpty;
 
+  /// True when the review succeeded but the provider returned no grounded
+  /// answer at all. Distinct from [hasNoClaimsExtracted] (answer returned,
+  /// but the extractor found nothing) and from an unconfigured provider
+  /// (which skips the pipeline entirely and stays in the idle state).
+  bool get hasNoAnswer => isSuccess && !hasReviewItems && providerName.isEmpty;
+
+  /// True when the review succeeded, a grounded answer was returned, but
+  /// no claims could be extracted from it.
+  bool get hasNoClaimsExtracted =>
+      isSuccess && !hasReviewItems && providerName.isNotEmpty;
+
+  /// True when the review succeeded and claims were found, but every single
+  /// one was classified as already known — nothing new to save.
+  bool get isAllClaimsAlreadyKnown =>
+      isSuccess &&
+      hasReviewItems &&
+      groups
+          .where((g) => g.classification != ClaimNoveltyClassification.alreadyKnown)
+          .every((g) => g.items.isEmpty);
+
   ClaimReviewSessionState copyWith({
     ClaimReviewSessionStatus? status,
     String? question,
@@ -112,6 +138,7 @@ class ClaimReviewSessionState {
     Set<String>? pendingDraftContents,
     String? backgroundSaveError,
     String? backgroundAppendError,
+    String? draftGenerationErrorMessage,
     String? targetNoteId,
     ClaimDraftAppendStatus? appendStatus,
     String? appendErrorMessage,
@@ -122,6 +149,7 @@ class ClaimReviewSessionState {
     bool clearSaveError = false,
     bool clearBackgroundSaveError = false,
     bool clearBackgroundAppendError = false,
+    bool clearDraftGenerationError = false,
     bool clearTargetNoteId = false,
     bool clearAppendError = false,
   }) {
@@ -145,6 +173,9 @@ class ClaimReviewSessionState {
       backgroundAppendError: clearBackgroundAppendError
           ? null
           : (backgroundAppendError ?? this.backgroundAppendError),
+      draftGenerationErrorMessage: clearDraftGenerationError
+          ? null
+          : (draftGenerationErrorMessage ?? this.draftGenerationErrorMessage),
       targetNoteId:
           clearTargetNoteId ? null : (targetNoteId ?? this.targetNoteId),
       appendStatus: appendStatus ?? this.appendStatus,

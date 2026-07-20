@@ -37,6 +37,10 @@ final claimReviewMapperProvider = Provider<ClaimReviewMapper>(
   (ref) => const ClaimReviewMapper(),
 );
 
+final selectedClaimsDraftBuilderProvider = Provider<SelectedClaimsDraftBuilder>(
+  (ref) => const SelectedClaimsDraftBuilder(),
+);
+
 final groundedAnswerIngestionServiceProvider =
     Provider<GroundedAnswerIngestionService>(
   (ref) => GroundedAnswerIngestionService(
@@ -95,22 +99,24 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
         appendStatus: ClaimDraftAppendStatus.idle,
         clearAppendError: true,
         clearBackgroundAppendError: true,
+        clearDraftGenerationError: true,
         clearTargetNoteId: true,
       );
-    } catch (error) {
+    } catch (_) {
       if (requestId != _requestSequence) return;
       state = state.copyWith(
         status: ClaimReviewSessionStatus.error,
         question: trimmedQuestion,
         groups: const [],
         clearSelection: true,
-        errorMessage: error.toString(),
+        errorMessage: 'Could not review claims for this question. Please try again.',
         clearDraft: true,
         saveStatus: ClaimDraftSaveStatus.idle,
         clearSaveError: true,
         appendStatus: ClaimDraftAppendStatus.idle,
         clearAppendError: true,
         clearBackgroundAppendError: true,
+        clearDraftGenerationError: true,
         clearTargetNoteId: true,
       );
     }
@@ -142,13 +148,22 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
     final selection = state.selection;
     if (selection == null) return;
 
-    const builder = SelectedClaimsDraftBuilder();
-    final result = builder.build(
-      question: state.question,
-      selected: selection.selectedSaveableItems,
-      providerName: state.providerName,
-      citations: state.citations,
-    );
+    final builder = _ref.read(selectedClaimsDraftBuilderProvider);
+    final ClaimDraftResult result;
+    try {
+      result = builder.build(
+        question: state.question,
+        selected: selection.selectedSaveableItems,
+        providerName: state.providerName,
+        citations: state.citations,
+      );
+    } catch (_) {
+      state = state.copyWith(
+        draftGenerationErrorMessage:
+            'Could not generate a draft from the selected claims. Please try again.',
+      );
+      return;
+    }
     // Determine the correct save status for this draft content:
     // - already confirmed saved → saved
     // - in-flight save for this exact content → saving
@@ -185,6 +200,7 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
               ? ClaimDraftAppendStatus.appended
               : ClaimDraftAppendStatus.idle,
       clearAppendError: !appendInFlight,
+      clearDraftGenerationError: true,
     );
   }
 
@@ -256,7 +272,7 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
       if (isCurrentDraft) {
         state = state.copyWith(
           saveStatus: ClaimDraftSaveStatus.error,
-          saveErrorMessage: error.toString(),
+          saveErrorMessage: 'Could not save this draft as a note. Please try again.',
           pendingDraftContents:
               state.pendingDraftContents.difference({draft.markdownContent}),
         );
@@ -373,7 +389,7 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
       }
       state = state.copyWith(
         appendStatus: ClaimDraftAppendStatus.error,
-        appendErrorMessage: 'Failed to append. Try again.',
+        appendErrorMessage: 'Could not append this draft to the note. Please try again.',
       );
     }
   }
