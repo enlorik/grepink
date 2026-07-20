@@ -1098,5 +1098,51 @@ void main() {
         ClaimDraftSaveStatus.saved,
       );
     });
+
+    testWidgets('saved draft retains claim-level source title when URL is not in provider citations',
+        (tester) async {
+      const url = 'https://claim-source.example.com';
+      const claimTitle = 'Claim Level Source';
+
+      final repo = _RecordingNoteDraftReviewRepository();
+      const extractedClaim = ExtractedClaim(
+        id: 'c1',
+        text: 'A claim with a claim-level source.',
+        citationUrls: [url],
+        citationTitles: [claimTitle],
+        sourceAnswerProvider: 'test-provider',
+        sourceQuestion: 'q',
+        order: 0,
+      );
+      final service = _buildIngestionService(
+        provider: _FixedGroundedAnswerProvider(
+          GroundedAnswer(
+            question: 'q',
+            answerText: 'answer',
+            citations: const [], // URL deliberately absent from provider citations
+            providerName: 'test-provider',
+            generatedAt: DateTime(2026, 1, 1),
+          ),
+        ),
+        claims: [extractedClaim],
+        results: [
+          const ClaimDeduplicationResult(
+            claim: extractedClaim,
+            classification: ClaimNoveltyClassification.newClaim,
+            matchedLocalEvidence: [],
+            reason: 'new',
+            citationUrls: [url],
+          ),
+        ],
+      );
+
+      await _pumpSearchScreen(tester, ingestionService: service, repository: repo);
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+      await _tapSave(tester);
+
+      expect(repo.insertedNotes, hasLength(1));
+      expect(repo.insertedNotes.first.content, contains('$claimTitle — $url'));
+    });
   });
 }
