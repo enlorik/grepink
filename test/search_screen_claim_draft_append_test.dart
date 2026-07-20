@@ -1737,5 +1737,59 @@ void main() {
       expect(find.byKey(const Key('claim-draft-background-append-error')),
           findsOneWidget);
     });
+
+    testWidgets('appended draft retains claim-level source title when URL is not in provider citations',
+        (tester) async {
+      const url = 'https://claim-source.example.com';
+      const claimTitle = 'Claim Level Source';
+
+      final existing = _existingNote(content: 'Existing content.');
+      final repo = _AppendableNoteDraftReviewRepository()..existingNote = existing;
+
+      const extractedClaim = ExtractedClaim(
+        id: 'c1',
+        text: 'A claim with a claim-level source.',
+        citationUrls: [url],
+        citationTitles: [claimTitle],
+        sourceAnswerProvider: 'test-provider',
+        sourceQuestion: 'q',
+        order: 0,
+      );
+      final service = _buildIngestionService(
+        provider: _FixedGroundedAnswerProvider(
+          GroundedAnswer(
+            question: 'q',
+            answerText: 'answer',
+            citations: const [], // URL deliberately absent from provider citations
+            providerName: 'test-provider',
+            generatedAt: DateTime(2026, 1, 1),
+          ),
+        ),
+        claims: [extractedClaim],
+        results: [
+          const ClaimDeduplicationResult(
+            claim: extractedClaim,
+            classification: ClaimNoveltyClassification.newClaim,
+            matchedLocalEvidence: [],
+            reason: 'new',
+            citationUrls: [url],
+          ),
+        ],
+      );
+
+      final container = await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repo,
+        availableNotes: [existing],
+      );
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+      container.read(claimReviewProvider.notifier).selectTargetNote(existing.id);
+      await _tapAppend(tester);
+
+      expect(repo.updatedNotes, hasLength(1));
+      expect(repo.updatedNotes.first.content, contains('$claimTitle — $url'));
+    });
   });
 }

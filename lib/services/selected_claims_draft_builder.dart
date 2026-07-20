@@ -53,11 +53,25 @@ class SelectedClaimsDraftBuilder {
         .where((i) => i.classification == ClaimNoveltyClassification.contradiction)
         .toList();
 
-    final citationByUrl = {for (final c in citations) c.url: c};
+    // Titles are resolved primarily from the provider-level citations list,
+    // falling back to each claim's own citationTitles for URLs the provider
+    // list doesn't cover (e.g. a claim-level source not echoed back in the
+    // top-level answer citations).
+    final titleByUrl = <String, String>{
+      for (final c in citations)
+        if (c.title.isNotEmpty) c.url: c.title,
+    };
     // Collect all URL references used in saveable items for deduplication.
     final usedUrls = <String>{};
     for (final item in saveable) {
       usedUrls.addAll(item.citationUrls);
+      for (var i = 0; i < item.citationUrls.length; i++) {
+        final url = item.citationUrls[i];
+        final itemTitle = i < item.citationTitles.length ? item.citationTitles[i] : '';
+        if (itemTitle.isNotEmpty) {
+          titleByUrl.putIfAbsent(url, () => itemTitle);
+        }
+      }
     }
 
     final buf = StringBuffer();
@@ -111,9 +125,7 @@ class SelectedClaimsDraftBuilder {
       buf.writeln('## Sources');
       buf.writeln();
       for (final url in usedUrls) {
-        final citation = citationByUrl[url];
-        final label =
-            (citation?.title != null && citation!.title.isNotEmpty) ? citation.title : url;
+        final label = titleByUrl[url] ?? url;
         buf.writeln('- $label — $url');
       }
     }

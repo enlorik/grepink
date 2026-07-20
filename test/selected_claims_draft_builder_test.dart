@@ -11,6 +11,7 @@ ClaimReviewItem _item({
   String text = 'A claim.',
   ClaimNoveltyClassification classification = ClaimNoveltyClassification.newClaim,
   List<String> citationUrls = const [],
+  List<String> citationTitles = const [],
   bool canBeSaved = true,
   bool selectedByDefault = true,
 }) =>
@@ -19,7 +20,7 @@ ClaimReviewItem _item({
       text: text,
       classification: classification,
       citationUrls: citationUrls,
-      citationTitles: const [],
+      citationTitles: citationTitles,
       selectedByDefault: selectedByDefault,
       reason: 'test',
       matchedLocalEvidenceIds: const [],
@@ -206,6 +207,115 @@ void main() {
           _citation('c1', 'https://a.com', 'A'),
           _citation('c2', 'https://b.com', 'B'),
         ],
+      );
+
+      expect(result.sourceCount, 2);
+    });
+
+    // ─── Claim-level citation title fallback ──────────────────────────────────
+
+    test('claim-level title is used when URL is absent from provider citations', () {
+      const url = 'https://claim-only.example.com';
+      const claimTitle = 'Claim Only Source';
+      final result = builder.build(
+        question: 'q',
+        selected: [
+          _item(citationUrls: [url], citationTitles: [claimTitle]),
+        ],
+        providerName: 'test',
+        citations: const [], // URL not present in provider citations
+      );
+
+      expect(result.markdownContent, contains('$claimTitle — $url'));
+    });
+
+    test('provider-level title wins over a conflicting claim-level title', () {
+      const url = 'https://shared.example.com';
+      const providerTitle = 'Provider Title';
+      const claimTitle = 'Claim Title';
+      final result = builder.build(
+        question: 'q',
+        selected: [
+          _item(citationUrls: [url], citationTitles: [claimTitle]),
+        ],
+        providerName: 'test',
+        citations: [_citation('c1', url, providerTitle)],
+      );
+
+      expect(result.markdownContent, contains('$providerTitle — $url'));
+      expect(result.markdownContent, isNot(contains(claimTitle)));
+    });
+
+    test('missing or empty claim title falls back to the bare URL', () {
+      const url = 'https://no-title.example.com';
+      final result = builder.build(
+        question: 'q',
+        selected: [
+          _item(citationUrls: [url], citationTitles: ['']),
+        ],
+        providerName: 'test',
+        citations: [_citation('c1', url, '')], // empty provider title too
+      );
+
+      expect(result.markdownContent, contains('$url — $url'));
+    });
+
+    test('citationTitles shorter than citationUrls does not throw', () {
+      const url1 = 'https://a.example.com';
+      const url2 = 'https://b.example.com';
+      final result = builder.build(
+        question: 'q',
+        selected: [
+          _item(
+            citationUrls: [url1, url2],
+            citationTitles: ['Title A'], // only one title for two URLs
+          ),
+        ],
+        providerName: 'test',
+        citations: const [],
+      );
+
+      // Must not throw; the titled URL uses its title, the untitled URL falls back.
+      expect(result.shouldSave, isTrue);
+      expect(result.markdownContent, contains('Title A — $url1'));
+      expect(result.markdownContent, contains('$url2 — $url2'));
+    });
+
+    test('duplicate URLs across claims remain listed once in Sources with claim title', () {
+      const url = 'https://shared-claim.example.com';
+      const claimTitle = 'Shared Claim Source';
+      final result = builder.build(
+        question: 'q',
+        selected: [
+          _item(id: 'i1', text: 'Claim one.', citationUrls: [url], citationTitles: [claimTitle]),
+          _item(id: 'i2', text: 'Claim two.', citationUrls: [url], citationTitles: [claimTitle]),
+        ],
+        providerName: 'test',
+        citations: const [],
+      );
+
+      final sourcesSection = result.markdownContent.split('## Sources').last;
+      expect(url.allMatches(sourcesSection).length, 1);
+      expect(result.sourceCount, 1);
+    });
+
+    test('sourceCount is deduplicated when claim-level titles are mixed', () {
+      final result = builder.build(
+        question: 'q',
+        selected: [
+          _item(
+            id: 'a',
+            citationUrls: ['https://x.com', 'https://y.com'],
+            citationTitles: ['X', 'Y'],
+          ),
+          _item(
+            id: 'b',
+            citationUrls: ['https://x.com'],
+            citationTitles: ['X Duplicate'],
+          ),
+        ],
+        providerName: 'test',
+        citations: const [],
       );
 
       expect(result.sourceCount, 2);
