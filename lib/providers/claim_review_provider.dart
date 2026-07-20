@@ -116,13 +116,17 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
   void toggle(String claimId) {
     final selection = state.selection;
     if (selection == null) return;
+    // Do not reset an in-flight append: clearing appendStatus to idle while
+    // updateNote is awaiting would allow a second concurrent append to start,
+    // potentially duplicating or losing content in the target note.
+    final inFlight = state.appendStatus == ClaimDraftAppendStatus.appending;
     state = state.copyWith(
       selection: selection.toggle(claimId),
       clearDraft: true,
       saveStatus: ClaimDraftSaveStatus.idle,
       clearSaveError: true,
-      appendStatus: ClaimDraftAppendStatus.idle,
-      clearAppendError: true,
+      appendStatus: inFlight ? null : ClaimDraftAppendStatus.idle,
+      clearAppendError: !inFlight,
     );
   }
 
@@ -327,10 +331,13 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
       final existingTargets =
           state.appendedTargetsByContent[draft.markdownContent] ??
               const <String>{};
+      // Release the appending lock when the draft changed mid-write (e.g.
+      // the user toggled a claim). The write succeeded, so record the target,
+      // but reset to idle rather than leaving appendStatus stuck at appending.
       state = state.copyWith(
         appendStatus: matchesCurrentDraft
             ? ClaimDraftAppendStatus.appended
-            : state.appendStatus,
+            : ClaimDraftAppendStatus.idle,
         appendedTargetsByContent: {
           ...state.appendedTargetsByContent,
           draft.markdownContent: {...existingTargets, targetNoteId},
@@ -338,7 +345,13 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
       );
     } catch (_) {
       if (appendSessionId != _requestSequence) return;
-      if (state.draft?.markdownContent != draft.markdownContent) return;
+      if (state.draft?.markdownContent != draft.markdownContent) {
+        // Draft changed mid-write and the write failed; release the lock
+        // silently rather than surfacing an error for a draft the user is
+        // no longer looking at.
+        state = state.copyWith(appendStatus: ClaimDraftAppendStatus.idle);
+        return;
+      }
       state = state.copyWith(
         appendStatus: ClaimDraftAppendStatus.error,
         appendErrorMessage: 'Failed to append. Try again.',

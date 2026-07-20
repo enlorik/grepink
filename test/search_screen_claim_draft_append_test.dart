@@ -1012,5 +1012,80 @@ void main() {
         ClaimDraftAppendStatus.error,
       );
     });
+
+    testWidgets(
+        'toggling a claim while an append is in flight does not reset appendStatus to idle',
+        (tester) async {
+      final gate = Completer<void>();
+      final existing = _existingNote(content: 'Old content here.');
+      final repo = _AppendableNoteDraftReviewRepository()
+        ..existingNote = existing
+        ..updateGate = gate;
+      final provider = _FixedGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      final service = _buildIngestionService(
+        provider: provider,
+        claims: [_claim('n1', 'A brand new claim.')],
+        results: [
+          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+        ],
+      );
+
+      final container = await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repo,
+        availableNotes: [existing],
+      );
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+      final notifier = container.read(claimReviewProvider.notifier);
+      notifier.selectTargetNote(existing.id);
+
+      // Start the append but hold updateNote so it stays in flight.
+      final appending = notifier.appendToExistingNote();
+      await tester.pump();
+      expect(
+        container.read(claimReviewProvider).appendStatus,
+        ClaimDraftAppendStatus.appending,
+      );
+
+      // Toggling a claim clears the draft but must NOT reset appendStatus to
+      // idle — doing so would allow a second concurrent append to start while
+      // the first write is still in progress.
+      notifier.toggle('n1');
+      await tester.pump();
+      expect(
+        container.read(claimReviewProvider).appendStatus,
+        ClaimDraftAppendStatus.appending,
+      );
+
+      // Completing the write must release the lock (→ idle) since the draft
+      // changed mid-append, and record the append in history.
+      gate.complete();
+      await appending;
+      await tester.pump();
+
+      expect(repo.updatedNotes, hasLength(1));
+      expect(
+        container.read(claimReviewProvider).appendStatus,
+        ClaimDraftAppendStatus.idle,
+      );
+      // The write succeeded, so the note ID is recorded in appendedTargets
+      // even though the UI draft was cleared by the toggle.
+      final appendedTargets =
+          container.read(claimReviewProvider).appendedTargetsByContent;
+      expect(
+        appendedTargets.values.any((ids) => ids.contains(existing.id)),
+        isTrue,
+      );
+    });
   });
 }

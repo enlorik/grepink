@@ -37,6 +37,14 @@ class ClaimDraftPreviewPanel extends StatelessWidget {
     this.onAppendToExistingNote,
   });
 
+  // Null when selectedTargetNoteId is not present in availableNotes (e.g. the
+  // note was deleted). Used as both the key fragment and initialValue so the
+  // DropdownButtonFormField remounts — and its FormFieldState resets — when the
+  // selected note disappears from the list.
+  String? get _effectiveTarget => availableNotes.any((n) => n.id == selectedTargetNoteId)
+      ? selectedTargetNoteId
+      : null;
+
   @override
   Widget build(BuildContext context) {
     if (!draft.shouldSave) {
@@ -121,15 +129,15 @@ class ClaimDraftPreviewPanel extends StatelessWidget {
           Text('Append target', style: AppTextStyles.titleMedium),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
-            // Key includes selectedTargetNoteId so the widget remounts when
-            // the selected note disappears from availableNotes (e.g. deleted),
-            // preventing a stale value from crashing the dropdown.
+            // Key is based on effectiveTarget (null when the selected note is
+            // absent from availableNotes) so the widget remounts when a
+            // previously selected note is deleted from the list, resetting
+            // FormFieldState to null and preventing Flutter's "value not in
+            // items" assertion on the stale internal value.
             key: ValueKey<String>(
-              'claim-draft-append-target-${selectedTargetNoteId ?? 'none'}',
+              'claim-draft-append-target-${_effectiveTarget ?? 'none'}',
             ),
-            initialValue: availableNotes.any((n) => n.id == selectedTargetNoteId)
-                ? selectedTargetNoteId
-                : null,
+            initialValue: _effectiveTarget,
             isExpanded: true,
             decoration: const InputDecoration(
               border: OutlineInputBorder(),
