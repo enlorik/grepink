@@ -1539,5 +1539,72 @@ void main() {
         NoteDraftReviewStatus.saved,
       );
     });
+
+    testWidgets(
+        'note-draft panel append button is disabled while claim-draft append is in flight',
+        (tester) async {
+      final updateGate = Completer<void>();
+      final existing = _existingNote(content: 'Old content here.');
+      final repo = _SaveableAndAppendableRepository()
+        ..existingNote = existing
+        ..updateGate = updateGate;
+      final provider = _FixedGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      final service = _buildIngestionService(
+        provider: provider,
+        claims: [_claim('n1', 'A brand new claim.')],
+        results: [
+          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+        ],
+      );
+
+      final container = await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repo,
+        availableNotes: [existing],
+      );
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+
+      final claimNotifier = container.read(claimReviewProvider.notifier);
+
+      // Select a target note on both panels so both append buttons are enabled.
+      container.read(noteDraftReviewProvider.notifier).selectTargetNote(existing.id);
+      claimNotifier.selectTargetNote(existing.id);
+      await tester.pump();
+
+      // Start claim-draft append but hold updateNote in flight.
+      final claimAppending = claimNotifier.appendToExistingNote();
+      await tester.pump();
+
+      expect(
+        container.read(claimReviewProvider).appendStatus,
+        ClaimDraftAppendStatus.appending,
+      );
+
+      // The note-draft panel's "Append to existing note" button must be
+      // disabled — its onAppendToExistingNote callback is null when
+      // claimReviewState.appendStatus == appending.
+      final noteDraftAppendButton = tester.widget<OutlinedButton>(
+        find.widgetWithText(OutlinedButton, 'Append to existing note'),
+      );
+      expect(noteDraftAppendButton.onPressed, isNull,
+          reason: 'note-draft append must be blocked while claim-draft append is in flight');
+
+      // Complete the claim-draft append.
+      updateGate.complete();
+      await claimAppending;
+      await tester.pump();
+
+      expect(repo.updatedNotes, hasLength(1));
+    });
   });
 }

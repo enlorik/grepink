@@ -137,6 +137,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   Future<void> _appendToExistingNote() async {
+    if (ref.read(claimReviewProvider).appendStatus ==
+        ClaimDraftAppendStatus.appending) {
+      return;
+    }
     final reviewState = ref.read(noteDraftReviewProvider);
     if (reviewState.targetNoteId == null || reviewState.targetNoteId!.isEmpty) {
       ref
@@ -357,7 +361,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           NoteDraftReviewPanel(
             noteDraft: reviewState.noteDraft!,
             onSaveAsNewNote: _saveAsNewNote,
-            onAppendToExistingNote: _appendToExistingNote,
+            onAppendToExistingNote: claimReviewState.appendStatus !=
+                    ClaimDraftAppendStatus.appending
+                ? _appendToExistingNote
+                : null,
             onDiscard: _discardDraft,
             availableNotes: availableNotes,
             selectedTargetNoteId: reviewState.targetNoteId,
