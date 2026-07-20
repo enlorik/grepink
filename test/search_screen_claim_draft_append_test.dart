@@ -111,6 +111,7 @@ class _EmptyLocalEvidenceRetriever implements LocalEvidenceRetriever {
 class _SaveableAndAppendableRepository implements NoteDraftReviewRepository {
   Note? existingNote;
   Completer<void>? insertGate;
+  Completer<void>? updateGate;
   final List<Note> insertedNotes = [];
   final List<Note> updatedNotes = [];
 
@@ -141,6 +142,7 @@ class _SaveableAndAppendableRepository implements NoteDraftReviewRepository {
 
   @override
   Future<void> updateNote(Note note) async {
+    if (updateGate != null) await updateGate!.future;
     updatedNotes.add(note);
     existingNote = note;
   }
@@ -1388,6 +1390,71 @@ void main() {
       expect(outcome, ClaimDraftSaveOutcome.ignored);
       expect(repo.insertedNotes, isEmpty,
           reason: 'provider guard must block save when draft is already appended');
+    });
+
+    testWidgets(
+        'save is a no-op while the same draft is being appended',
+        (tester) async {
+      final gate = Completer<void>();
+      final existing = _existingNote(content: 'Old content here.');
+      final repo = _SaveableAndAppendableRepository()
+        ..existingNote = existing
+        ..updateGate = gate;
+      final provider = _FixedGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      final service = _buildIngestionService(
+        provider: provider,
+        claims: [_claim('n1', 'A brand new claim.')],
+        results: [
+          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+        ],
+      );
+
+      final container = await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repo,
+        availableNotes: [existing],
+      );
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+      final notifier = container.read(claimReviewProvider.notifier);
+      notifier.selectTargetNote(existing.id);
+
+      // Start the append but hold updateNote so it stays in flight.
+      final appending = notifier.appendToExistingNote();
+      await tester.pump();
+
+      expect(
+        container.read(claimReviewProvider).appendStatus,
+        ClaimDraftAppendStatus.appending,
+      );
+
+      // Save must be blocked while the append for the same draft is in flight.
+      final outcome = await notifier.saveAsNewNote();
+      await tester.pump();
+
+      expect(outcome, ClaimDraftSaveOutcome.ignored);
+      expect(repo.insertedNotes, isEmpty,
+          reason: 'appendStatus == appending guard must block save');
+
+      // Completing the append releases the gate and append succeeds.
+      gate.complete();
+      await appending;
+      await tester.pump();
+
+      expect(repo.updatedNotes, hasLength(1));
+      expect(
+        container.read(claimReviewProvider).appendStatus,
+        ClaimDraftAppendStatus.appended,
+      );
     });
   });
 }
