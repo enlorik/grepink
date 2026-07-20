@@ -112,6 +112,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   Future<void> _appendClaimDraftToExistingNote() async {
     await ref.read(claimReviewProvider.notifier).appendToExistingNote();
+    if (!mounted) return;
     if (ref.read(claimReviewProvider).appendStatus !=
         ClaimDraftAppendStatus.appended) {
       return;
