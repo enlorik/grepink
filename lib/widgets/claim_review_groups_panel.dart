@@ -85,8 +85,14 @@ class _ClaimReviewGroupSection extends StatelessWidget {
       // correct initiallyExpanded — preventing stale expansion state from
       // the previous session leaking into the new one.
       final collapsedByDefault = group.items.length > _alreadyKnownCollapseThreshold;
+      // Key includes a hash of item IDs so that a new review result (different
+      // items) always recreates the tile — even when both results are on the
+      // same side of the threshold (same bool, same stale expansion state).
       return _AlreadyKnownGroupSection(
-        key: ValueKey(collapsedByDefault),
+        key: ValueKey(Object.hashAll([
+          collapsedByDefault,
+          ...group.items.map((i) => i.id),
+        ])),
         group: group,
         headerText: headerText,
       );
@@ -188,7 +194,14 @@ class _ClaimReviewItemTile extends StatelessWidget {
         ),
       );
     }
-    if (item.matchedLocalEvidenceIds.isNotEmpty) {
+    // Only alreadyKnown and betterSource results have confirmed local matches.
+    // For newClaim and others the dedup service may return a low-similarity
+    // bestMatch in matchedLocalEvidence even though the claim is genuinely new,
+    // so showing "Matches your notes" there would be misleading.
+    final isConfirmedMatch =
+        item.classification == ClaimNoveltyClassification.alreadyKnown ||
+        item.classification == ClaimNoveltyClassification.betterSource;
+    if (isConfirmedMatch && item.matchedLocalEvidenceIds.isNotEmpty) {
       final matches = <String>[];
       for (var i = 0; i < item.matchedLocalEvidenceIds.length; i++) {
         final title = i < item.matchedLocalEvidenceTitles.length

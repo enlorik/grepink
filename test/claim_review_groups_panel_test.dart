@@ -187,6 +187,28 @@ void main() {
       expect(tile.initiallyExpanded, isTrue);
     });
 
+    testWidgets(
+        'regression: large → large resets to collapsed (same-bool key must not reuse expansion state)',
+        (tester) async {
+      // First review: 5 items → collapsed by default.
+      await _pumpPanel(tester, groups: [
+        _knownGroup(List.generate(5, (i) => _knownItem('a$i'))),
+      ]);
+      // User expands it manually.
+      await tester.tap(find.text('Already in notes (5)'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('claim-review-item-a0')), findsOneWidget);
+
+      // Second review: different 4 items — still above threshold, must reset
+      // to collapsed even though collapsedByDefault is still true.
+      await _pumpPanel(tester, groups: [
+        _knownGroup(List.generate(4, (i) => _knownItem('b$i'))),
+      ]);
+      final tile = tester
+          .widget<ExpansionTile>(find.byKey(const Key('already-known-section')));
+      expect(tile.initiallyExpanded, isFalse);
+    });
+
     testWidgets('already-known claims render unchecked and disabled',
         (tester) async {
       await _pumpPanel(
@@ -293,6 +315,27 @@ void main() {
 
       expect(
           find.byKey(const Key('claim-review-matched-evidence-k1')),
+          findsNothing);
+      expect(find.textContaining('Matches your notes'), findsNothing);
+    });
+
+    testWidgets(
+        'no matched-note line for newClaim even with evidence IDs (low-similarity bestMatch)',
+        (tester) async {
+      await _pumpPanel(tester, groups: [
+        ClaimReviewGroup(
+          label: 'New claims',
+          classification: ClaimNoveltyClassification.newClaim,
+          items: [
+            _item('n1',
+                matchedLocalEvidenceIds: ['ev-1'],
+                matchedLocalEvidenceTitles: ['Some note']),
+          ],
+        ),
+      ]);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('claim-review-matched-evidence-n1')),
           findsNothing);
       expect(find.textContaining('Matches your notes'), findsNothing);
     });
