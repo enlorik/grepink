@@ -169,6 +169,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     );
   }
 
+  void _discardClaimReview() {
+    ref.read(claimReviewProvider.notifier).reset();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Review discarded. Nothing was saved.')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final searchState = ref.watch(searchProvider);
@@ -445,6 +452,18 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             key: const Key('claim-draft-background-append-error'),
             message: claimReviewState.backgroundAppendError!,
             borderColor: AppColors.pinHighlight.withValues(alpha: 0.45),
+          ),
+        ],
+        if (claimReviewState.hasReviewItems || claimReviewState.draft != null) ...[
+          const SizedBox(height: 12),
+          TextButton(
+            key: const Key('discard-claim-review-button'),
+            onPressed: claimReviewState.isSaveInFlight ||
+                    claimReviewState.appendStatus ==
+                        ClaimDraftAppendStatus.appending
+                ? null
+                : _discardClaimReview,
+            child: const Text('Discard review'),
           ),
         ],
       ],

@@ -92,6 +92,11 @@ class ClaimReviewSessionState {
       draft != null &&
       (appendedTargetsByContent[draft!.markdownContent]?.isNotEmpty ?? false);
 
+  /// True when a save repository write is currently in flight.
+  /// More reliable than checking [saveStatus] == saving because [toggle]
+  /// resets [saveStatus] to idle even while [insertNote] is still awaiting.
+  bool get isSaveInFlight => pendingDraftContents.isNotEmpty;
+
   ClaimReviewSessionState copyWith({
     ClaimReviewSessionStatus? status,
     String? question,
