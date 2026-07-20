@@ -167,14 +167,21 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
         (state.appendedTargetsByContent[result.markdownContent]
                 ?.contains(state.targetNoteId) ??
             false);
+    // Do NOT clear an in-flight append lock: if appendToExistingNote is
+    // awaiting updateNote, resetting appendStatus → idle here re-enables the
+    // append button and can start a second concurrent write against the same
+    // target note before the first one finishes.
+    final appendInFlight = state.appendStatus == ClaimDraftAppendStatus.appending;
     state = state.copyWith(
       draft: result,
       saveStatus: newSaveStatus,
       clearSaveError: true,
-      appendStatus: matchesAppendedTarget
-          ? ClaimDraftAppendStatus.appended
-          : ClaimDraftAppendStatus.idle,
-      clearAppendError: true,
+      appendStatus: appendInFlight
+          ? null
+          : matchesAppendedTarget
+              ? ClaimDraftAppendStatus.appended
+              : ClaimDraftAppendStatus.idle,
+      clearAppendError: !appendInFlight,
     );
   }
 
