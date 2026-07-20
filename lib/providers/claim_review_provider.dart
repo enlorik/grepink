@@ -94,6 +94,7 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
         clearSaveError: true,
         appendStatus: ClaimDraftAppendStatus.idle,
         clearAppendError: true,
+        clearBackgroundAppendError: true,
         clearTargetNoteId: true,
       );
     } catch (error) {
@@ -109,6 +110,7 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
         clearSaveError: true,
         appendStatus: ClaimDraftAppendStatus.idle,
         clearAppendError: true,
+        clearBackgroundAppendError: true,
         clearTargetNoteId: true,
       );
     }
@@ -316,6 +318,7 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
     state = state.copyWith(
       appendStatus: ClaimDraftAppendStatus.appending,
       clearAppendError: true,
+      clearBackgroundAppendError: true,
     );
 
     try {
@@ -359,10 +362,13 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
     } catch (_) {
       if (appendSessionId != _requestSequence) return;
       if (state.draft?.markdownContent != draft.markdownContent) {
-        // Draft changed mid-write and the write failed; release the lock
-        // silently rather than surfacing an error for a draft the user is
-        // no longer looking at.
-        state = state.copyWith(appendStatus: ClaimDraftAppendStatus.idle);
+        // Draft changed mid-write and the write failed; release the lock and
+        // surface a background error rather than silently swallowing it.
+        state = state.copyWith(
+          appendStatus: ClaimDraftAppendStatus.idle,
+          backgroundAppendError:
+              'An append failed while you were editing. The target note was not updated.',
+        );
         return;
       }
       state = state.copyWith(

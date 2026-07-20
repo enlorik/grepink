@@ -30,6 +30,9 @@ class ClaimReviewSessionState {
   // draft) failed. Independent of saveStatus so the active draft is not
   // incorrectly flagged. Cleared when the next save attempt begins.
   final String? backgroundSaveError;
+  // Non-null when a background append (started while the user was on a
+  // different draft) failed. Cleared when the next append attempt begins.
+  final String? backgroundAppendError;
   // Append-to-existing-note state.
   final String? targetNoteId;
   final ClaimDraftAppendStatus appendStatus;
@@ -53,6 +56,7 @@ class ClaimReviewSessionState {
     this.savedDraftContents = const {},
     this.pendingDraftContents = const {},
     this.backgroundSaveError,
+    this.backgroundAppendError,
     this.targetNoteId,
     this.appendStatus = ClaimDraftAppendStatus.idle,
     this.appendErrorMessage,
@@ -102,6 +106,7 @@ class ClaimReviewSessionState {
     Set<String>? savedDraftContents,
     Set<String>? pendingDraftContents,
     String? backgroundSaveError,
+    String? backgroundAppendError,
     String? targetNoteId,
     ClaimDraftAppendStatus? appendStatus,
     String? appendErrorMessage,
@@ -111,6 +116,7 @@ class ClaimReviewSessionState {
     bool clearDraft = false,
     bool clearSaveError = false,
     bool clearBackgroundSaveError = false,
+    bool clearBackgroundAppendError = false,
     bool clearTargetNoteId = false,
     bool clearAppendError = false,
   }) {
@@ -131,6 +137,9 @@ class ClaimReviewSessionState {
       backgroundSaveError: clearBackgroundSaveError
           ? null
           : (backgroundSaveError ?? this.backgroundSaveError),
+      backgroundAppendError: clearBackgroundAppendError
+          ? null
+          : (backgroundAppendError ?? this.backgroundAppendError),
       targetNoteId:
           clearTargetNoteId ? null : (targetNoteId ?? this.targetNoteId),
       appendStatus: appendStatus ?? this.appendStatus,

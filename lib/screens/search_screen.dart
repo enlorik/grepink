@@ -365,7 +365,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     ClaimDraftAppendStatus.appending
                 ? _appendToExistingNote
                 : null,
-            onDiscard: _discardDraft,
+            onDiscard: claimReviewState.appendStatus !=
+                    ClaimDraftAppendStatus.appending
+                ? _discardDraft
+                : null,
             availableNotes: availableNotes,
             selectedTargetNoteId: reviewState.targetNoteId,
             onTargetNoteSelected: (noteId) {
@@ -433,6 +436,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           _buildStatusCard(
             key: const Key('claim-draft-background-save-error'),
             message: claimReviewState.backgroundSaveError!,
+            borderColor: AppColors.pinHighlight.withValues(alpha: 0.45),
+          ),
+        ],
+        if (claimReviewState.backgroundAppendError != null) ...[
+          const SizedBox(height: 12),
+          _buildStatusCard(
+            key: const Key('claim-draft-background-append-error'),
+            message: claimReviewState.backgroundAppendError!,
             borderColor: AppColors.pinHighlight.withValues(alpha: 0.45),
           ),
         ],

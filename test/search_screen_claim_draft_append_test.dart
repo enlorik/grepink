@@ -111,6 +111,7 @@ class _EmptyLocalEvidenceRetriever implements LocalEvidenceRetriever {
 // Supports both insertNote (save flow) and getNoteById/updateNote (append flow).
 class _SaveableAndAppendableRepository implements NoteDraftReviewRepository {
   Note? existingNote;
+  bool shouldFail = false;
   Completer<void>? insertGate;
   Completer<void>? updateGate;
   final List<Note> insertedNotes = [];
@@ -144,6 +145,7 @@ class _SaveableAndAppendableRepository implements NoteDraftReviewRepository {
   @override
   Future<void> updateNote(Note note) async {
     if (updateGate != null) await updateGate!.future;
+    if (shouldFail) throw Exception('update failed');
     updatedNotes.add(note);
     existingNote = note;
   }
@@ -1605,6 +1607,135 @@ void main() {
       await tester.pump();
 
       expect(repo.updatedNotes, hasLength(1));
+    });
+
+    testWidgets(
+        'discard button is disabled while claim-draft append is in flight',
+        (tester) async {
+      final updateGate = Completer<void>();
+      final existing = _existingNote(content: 'Old content here.');
+      final repo = _SaveableAndAppendableRepository()
+        ..existingNote = existing
+        ..updateGate = updateGate;
+      final provider = _FixedGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      final service = _buildIngestionService(
+        provider: provider,
+        claims: [_claim('n1', 'A brand new claim.')],
+        results: [
+          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+        ],
+      );
+
+      final container = await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repo,
+        availableNotes: [existing],
+      );
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+
+      final claimNotifier = container.read(claimReviewProvider.notifier);
+      claimNotifier.selectTargetNote(existing.id);
+
+      // Start claim-draft append but hold updateNote in flight.
+      final claimAppending = claimNotifier.appendToExistingNote();
+      await tester.pump();
+
+      expect(
+        container.read(claimReviewProvider).appendStatus,
+        ClaimDraftAppendStatus.appending,
+      );
+
+      // The note-draft panel's Discard button must be null while claim-draft
+      // append is in flight — calling _discardDraft would reset claimReviewProvider
+      // and increment _requestSequence, but updateNote would still complete,
+      // modifying the target note after the user chose to discard.
+      final discardButton = tester.widget<TextButton>(
+        find.widgetWithText(TextButton, 'Discard'),
+      );
+      expect(discardButton.onPressed, isNull,
+          reason: 'discard must be blocked while claim-draft append is in flight');
+
+      // Complete the append normally.
+      updateGate.complete();
+      await claimAppending;
+      await tester.pump();
+
+      expect(repo.updatedNotes, hasLength(1));
+    });
+
+    testWidgets(
+        'background append error is shown when append fails after draft changes',
+        (tester) async {
+      final updateGate = Completer<void>();
+      final existing = _existingNote(content: 'Old content here.');
+      final repo = _SaveableAndAppendableRepository()
+        ..existingNote = existing
+        ..updateGate = updateGate
+        ..shouldFail = true;
+      final provider = _FixedGroundedAnswerProvider(
+        GroundedAnswer(
+          question: 'q',
+          answerText: 'answer',
+          citations: const [],
+          providerName: 'test-provider',
+          generatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+      final service = _buildIngestionService(
+        provider: provider,
+        claims: [_claim('n1', 'A brand new claim.')],
+        results: [
+          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+        ],
+      );
+
+      final container = await _pumpSearchScreen(
+        tester,
+        ingestionService: service,
+        repository: repo,
+        availableNotes: [existing],
+      );
+      await _askQuestion(tester, 'question');
+      await _generateDraft(tester);
+
+      final notifier = container.read(claimReviewProvider.notifier);
+      notifier.selectTargetNote(existing.id);
+
+      // Start the append but hold updateNote so it stays in flight.
+      final appending = notifier.appendToExistingNote();
+      await tester.pump();
+
+      // Toggle a claim so the draft changes while the append is in flight.
+      notifier.toggle('n1');
+      await tester.pump();
+
+      // Release the gate — updateNote throws because shouldFail = true.
+      updateGate.complete();
+      await appending;
+      await tester.pump();
+
+      // The error must be surfaced as backgroundAppendError, not silently swallowed.
+      expect(
+        container.read(claimReviewProvider).backgroundAppendError,
+        isNotNull,
+        reason: 'background append failure must be surfaced to the user',
+      );
+      expect(
+        container.read(claimReviewProvider).appendStatus,
+        ClaimDraftAppendStatus.idle,
+      );
+      expect(find.byKey(const Key('claim-draft-background-append-error')),
+          findsOneWidget);
     });
   });
 }
