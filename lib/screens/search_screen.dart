@@ -22,6 +22,7 @@ import '../widgets/grepink_bottom_nav.dart';
 import '../widgets/note_draft_review_panel.dart';
 import '../widgets/claim_review_groups_panel.dart';
 import '../widgets/claim_draft_preview_panel.dart';
+import '../services/provider_name_formatter.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
@@ -112,7 +113,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   Future<void> _saveClaimDraftAsNewNote() async {
-    final outcome = await ref.read(claimReviewProvider.notifier).saveAsNewNote();
+    final outcome =
+        await ref.read(claimReviewProvider.notifier).saveAsNewNote();
     if (outcome != ClaimDraftSaveOutcome.success) return;
 
     await ref.read(refreshNotesProvider)();
@@ -142,7 +144,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   Future<void> _saveAsNewNote() async {
-    final note = await ref.read(noteDraftReviewProvider.notifier).saveAsNewNote();
+    final note =
+        await ref.read(noteDraftReviewProvider.notifier).saveAsNewNote();
     if (note == null) return;
 
     await ref.read(refreshNotesProvider)();
@@ -229,7 +232,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       const SizedBox(height: 24),
                       if (searchState.isEmpty)
                         _buildEmptyState(
-                          reviewState.noteDraft == null ? recentNotes : const <Note>[],
+                          reviewState.noteDraft == null
+                              ? recentNotes
+                              : const <Note>[],
                         )
                       else
                         _buildResults(searchState),
@@ -305,15 +310,18 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   fillColor: AppColors.aiResponseBackground,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.dividerBorder),
+                    borderSide:
+                        const BorderSide(color: AppColors.dividerBorder),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.dividerBorder),
+                    borderSide:
+                        const BorderSide(color: AppColors.dividerBorder),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.primaryAccent),
+                    borderSide:
+                        const BorderSide(color: AppColors.primaryAccent),
                   ),
                 ),
               ),
@@ -334,7 +342,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                           )
                         : const Icon(Icons.auto_awesome_outlined),
                     label: Text(
-                      knowledgeState.isLoading ? 'Generating draft...' : 'Ask Grepink',
+                      knowledgeState.isLoading
+                          ? 'Generating draft...'
+                          : 'Ask Grepink',
                     ),
                   ),
                   if (knowledgeState.isLoading) ...[
@@ -380,7 +390,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             availableNotes: availableNotes,
             selectedTargetNoteId: reviewState.targetNoteId,
             onTargetSelected: (noteId) {
-              ref.read(noteDraftReviewProvider.notifier).selectTargetNote(noteId);
+              ref
+                  .read(noteDraftReviewProvider.notifier)
+                  .selectTargetNote(noteId);
             },
           ),
           const SizedBox(height: 16),
@@ -398,7 +410,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             availableNotes: availableNotes,
             selectedTargetNoteId: reviewState.targetNoteId,
             onTargetNoteSelected: (noteId) {
-              ref.read(noteDraftReviewProvider.notifier).selectTargetNote(noteId);
+              ref
+                  .read(noteDraftReviewProvider.notifier)
+                  .selectTargetNote(noteId);
             },
             status: reviewState.status,
             selectedDecision: reviewState.selectedDecision,
@@ -423,7 +437,16 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             ],
           ),
         ],
-        if (claimReviewState.isError && claimReviewState.errorMessage != null) ...[
+        if (claimReviewState.isProviderNotConfigured) ...[
+          const SizedBox(height: 12),
+          _buildStatusCard(
+            key: const Key('claim-review-provider-not-configured-state'),
+            message:
+                'Grounded claim review is not available yet in this build.',
+          ),
+        ],
+        if (claimReviewState.isError &&
+            claimReviewState.errorMessage != null) ...[
           const SizedBox(height: 12),
           _buildStatusCard(
             key: const Key('claim-review-error-state'),
@@ -458,12 +481,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             message: 'Everything in this answer is already in your notes.',
           ),
         ],
-        if (claimReviewState.hasReviewItems && claimReviewState.selection != null) ...[
+        if (claimReviewState.hasReviewItems &&
+            claimReviewState.selection != null) ...[
           const SizedBox(height: 16),
           ClaimReviewGroupsPanel(
             groups: claimReviewState.groups,
             selectedIds: claimReviewState.selection!.selectedIds,
             onToggle: _toggleClaim,
+            providerLabel:
+                safeProviderDisplayName(claimReviewState.providerName),
           ),
           const SizedBox(height: 12),
           FilledButton.icon(
@@ -488,7 +514,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             saveStatus: claimReviewState.saveStatus,
             saveErrorMessage: claimReviewState.saveErrorMessage,
             onSaveAsNewNote: claimReviewState.draft!.shouldSave &&
-                    claimReviewState.saveStatus != ClaimDraftSaveStatus.saving &&
+                    claimReviewState.saveStatus !=
+                        ClaimDraftSaveStatus.saving &&
                     !claimReviewState.isDraftAlreadySaved &&
                     claimReviewState.appendStatus !=
                         ClaimDraftAppendStatus.appending &&
@@ -502,7 +529,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             appendErrorMessage: claimReviewState.appendErrorMessage,
             onAppendToExistingNote: claimReviewState.draft!.shouldSave &&
                     !claimReviewState.isDraftAlreadySaved &&
-                    claimReviewState.saveStatus != ClaimDraftSaveStatus.saving &&
+                    claimReviewState.saveStatus !=
+                        ClaimDraftSaveStatus.saving &&
                     claimReviewState.appendStatus !=
                         ClaimDraftAppendStatus.appending &&
                     !claimReviewState.isDraftAlreadyAppended &&
@@ -527,7 +555,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             borderColor: AppColors.pinHighlight.withValues(alpha: 0.45),
           ),
         ],
-        if (claimReviewState.hasReviewItems || claimReviewState.draft != null) ...[
+        if (claimReviewState.hasReviewItems ||
+            claimReviewState.draft != null) ...[
           const SizedBox(height: 12),
           TextButton(
             key: const Key('discard-claim-review-button'),
@@ -620,94 +649,98 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-          if (memoryResults.isNotEmpty) ...[
-            _buildSectionHeader('🧠 MEMORY', AppColors.pinHighlight),
-            const SizedBox(height: 12),
-            ...memoryResults.asMap().entries.map((e) {
-              final delay = e.key * 30;
-              return _AnimatedResultItem(
-                delay: delay,
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: ExcerptQuoteCard(
-                    result: e.value,
-                    onTap: () => context.push('/note/${e.value.note.id}'),
-                  ),
+        if (memoryResults.isNotEmpty) ...[
+          _buildSectionHeader('🧠 MEMORY', AppColors.pinHighlight),
+          const SizedBox(height: 12),
+          ...memoryResults.asMap().entries.map((e) {
+            final delay = e.key * 30;
+            return _AnimatedResultItem(
+              delay: delay,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: ExcerptQuoteCard(
+                  result: e.value,
+                  onTap: () => context.push('/note/${e.value.note.id}'),
                 ),
-              );
-            }),
-            const SizedBox(height: 20),
-          ],
-          if (noteResults.isNotEmpty) ...[
-            _buildSectionHeader('YOUR NOTES', AppColors.primaryAccent),
-            const SizedBox(height: 12),
-            ...noteResults.asMap().entries.map((e) {
-              final delay = (memoryResults.length + e.key) * 30;
-              return _AnimatedResultItem(
-                delay: delay,
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: NoteCard(
-                    note: e.value,
-                    index: memoryResults.length + e.key,
-                  ),
-                ),
-              );
-            }),
-            const SizedBox(height: 20),
-          ],
-          if (memoryResults.isNotEmpty || noteResults.isNotEmpty || isAiLoading || aiResponse != null) ...[
-            _buildSectionHeader('AI RESPONSE', AppColors.primaryAccent),
-            const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.aiResponseBackground,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.dividerBorder),
               ),
-              child: isAiLoading && aiResponse == null
-                  ? const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        MemoryPulseIndicator(),
-                        SizedBox(width: 12),
-                        AiLoadingDots(),
-                      ],
-                    )
-                  : aiResponse != null
-                      ? MarkdownBody(
-                          data: aiResponse,
-                          styleSheet: MarkdownStyleSheet(
-                            p: AppTextStyles.aiResponse,
-                            code: AppTextStyles.codeBlock,
-                          ),
-                        )
-                      : Text(
-                          'Set your API key in Settings to enable AI responses.',
-                          style: AppTextStyles.bodyMedium,
+            );
+          }),
+          const SizedBox(height: 20),
+        ],
+        if (noteResults.isNotEmpty) ...[
+          _buildSectionHeader('YOUR NOTES', AppColors.primaryAccent),
+          const SizedBox(height: 12),
+          ...noteResults.asMap().entries.map((e) {
+            final delay = (memoryResults.length + e.key) * 30;
+            return _AnimatedResultItem(
+              delay: delay,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: NoteCard(
+                  note: e.value,
+                  index: memoryResults.length + e.key,
+                ),
+              ),
+            );
+          }),
+          const SizedBox(height: 20),
+        ],
+        if (memoryResults.isNotEmpty ||
+            noteResults.isNotEmpty ||
+            isAiLoading ||
+            aiResponse != null) ...[
+          _buildSectionHeader('AI RESPONSE', AppColors.primaryAccent),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.aiResponseBackground,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.dividerBorder),
+            ),
+            child: isAiLoading && aiResponse == null
+                ? const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      MemoryPulseIndicator(),
+                      SizedBox(width: 12),
+                      AiLoadingDots(),
+                    ],
+                  )
+                : aiResponse != null
+                    ? MarkdownBody(
+                        data: aiResponse,
+                        styleSheet: MarkdownStyleSheet(
+                          p: AppTextStyles.aiResponse,
+                          code: AppTextStyles.codeBlock,
                         ),
+                      )
+                    : Text(
+                        'Set your API key in Settings to enable AI responses.',
+                        style: AppTextStyles.bodyMedium,
+                      ),
+          ),
+        ],
+        if (memoryResults.isEmpty && noteResults.isEmpty && !isSearching) ...[
+          const SizedBox(height: 40),
+          Center(
+            child: Column(
+              children: [
+                const Icon(Icons.search_off,
+                    size: 48, color: AppColors.placeholderText),
+                const SizedBox(height: 12),
+                Text('No results found', style: AppTextStyles.titleMedium),
+                const SizedBox(height: 4),
+                Text(
+                  'Try different keywords or add more notes',
+                  style: AppTextStyles.bodyMedium,
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ),
-          ],
-          if (memoryResults.isEmpty && noteResults.isEmpty && !isSearching) ...[
-            const SizedBox(height: 40),
-            Center(
-              child: Column(
-                children: [
-                  const Icon(Icons.search_off, size: 48, color: AppColors.placeholderText),
-                  const SizedBox(height: 12),
-                  Text('No results found', style: AppTextStyles.titleMedium),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Try different keywords or add more notes',
-                    style: AppTextStyles.bodyMedium,
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
-          ],
+          ),
+        ],
       ],
     );
   }
@@ -736,7 +769,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             isExpanded: true,
             decoration: const InputDecoration(
               border: OutlineInputBorder(),
-              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              contentPadding:
+                  EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             ),
             hint: const Text('Select a target note'),
             items: availableNotes

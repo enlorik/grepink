@@ -64,8 +64,16 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
       return;
     }
 
-    // Skip the entire pipeline when no real provider is wired up.
-    if (!_ref.read(groundedAnswerIngestionServiceProvider).isConfigured) return;
+    // When no real provider is wired up, show a distinct not-configured state
+    // instead of silently doing nothing. No loading indicator, no pipeline call.
+    if (!_ref.read(groundedAnswerIngestionServiceProvider).isConfigured) {
+      _requestSequence++;
+      state = ClaimReviewSessionState(
+        status: ClaimReviewSessionStatus.providerNotConfigured,
+        question: trimmedQuestion,
+      );
+      return;
+    }
 
     final requestId = ++_requestSequence;
 
@@ -109,7 +117,8 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
         question: trimmedQuestion,
         groups: const [],
         clearSelection: true,
-        errorMessage: 'Could not review claims for this question. Please try again.',
+        errorMessage:
+            'Could not review claims for this question. Please try again.',
         clearDraft: true,
         saveStatus: ClaimDraftSaveStatus.idle,
         clearSaveError: true,
@@ -172,7 +181,8 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
     // in flight, and marking unrelated content as saving would leave it stuck
     // disabled after the in-flight insert completes.
     final inSaved = state.savedDraftContents.contains(result.markdownContent);
-    final inPending = state.pendingDraftContents.contains(result.markdownContent);
+    final inPending =
+        state.pendingDraftContents.contains(result.markdownContent);
     final ClaimDraftSaveStatus newSaveStatus;
     if (inSaved) {
       newSaveStatus = ClaimDraftSaveStatus.saved;
@@ -189,7 +199,8 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
     // awaiting updateNote, resetting appendStatus → idle here re-enables the
     // append button and can start a second concurrent write against the same
     // target note before the first one finishes.
-    final appendInFlight = state.appendStatus == ClaimDraftAppendStatus.appending;
+    final appendInFlight =
+        state.appendStatus == ClaimDraftAppendStatus.appending;
     state = state.copyWith(
       draft: result,
       saveStatus: newSaveStatus,
@@ -231,7 +242,10 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
       saveStatus: ClaimDraftSaveStatus.saving,
       clearSaveError: true,
       clearBackgroundSaveError: true,
-      pendingDraftContents: {...state.pendingDraftContents, draft.markdownContent},
+      pendingDraftContents: {
+        ...state.pendingDraftContents,
+        draft.markdownContent
+      },
     );
 
     try {
@@ -255,7 +269,10 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
       state = state.copyWith(
         saveStatus:
             matchesCurrentDraft ? ClaimDraftSaveStatus.saved : state.saveStatus,
-        savedDraftContents: {...state.savedDraftContents, draft.markdownContent},
+        savedDraftContents: {
+          ...state.savedDraftContents,
+          draft.markdownContent
+        },
         pendingDraftContents:
             state.pendingDraftContents.difference({draft.markdownContent}),
       );
@@ -264,7 +281,8 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
       // Abandon if reset() was called — don't surface old errors in the new
       // session, and don't touch pending (reset already cleared it).
       if (saveSessionId != _requestSequence) return ClaimDraftSaveOutcome.cancelled;
-      final isCurrentDraft = state.draft?.markdownContent == draft.markdownContent;
+      final isCurrentDraft =
+          state.draft?.markdownContent == draft.markdownContent;
       // Always remove from pending so the user can retry.
       // When the draft changed while the save was in flight, surface the
       // failure via backgroundSaveError instead of marking the new draft
@@ -272,7 +290,8 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
       if (isCurrentDraft) {
         state = state.copyWith(
           saveStatus: ClaimDraftSaveStatus.error,
-          saveErrorMessage: 'Could not save this draft as a note. Please try again.',
+          saveErrorMessage:
+              'Could not save this draft as a note. Please try again.',
           pendingDraftContents:
               state.pendingDraftContents.difference({draft.markdownContent}),
         );
@@ -389,7 +408,8 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
       }
       state = state.copyWith(
         appendStatus: ClaimDraftAppendStatus.error,
-        appendErrorMessage: 'Could not append this draft to the note. Please try again.',
+        appendErrorMessage:
+            'Could not append this draft to the note. Please try again.',
       );
     }
   }

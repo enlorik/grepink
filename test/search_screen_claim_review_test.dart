@@ -431,7 +431,7 @@ void main() {
     });
 
     testWidgets(
-        'asking a question with NullGroundedAnswerProvider leaves claim review idle',
+        'asking a question with NullGroundedAnswerProvider produces providerNotConfigured',
         (tester) async {
       final service = GroundedAnswerIngestionService(
         provider: const NullGroundedAnswerProvider(),
@@ -444,7 +444,7 @@ void main() {
       await _askQuestion(tester, 'What is photosynthesis?');
 
       final state = container.read(claimReviewProvider);
-      expect(state.status, ClaimReviewSessionStatus.idle);
+      expect(state.status, ClaimReviewSessionStatus.providerNotConfigured);
       expect(state.groups, isEmpty);
       expect(state.selection, isNull);
     });
