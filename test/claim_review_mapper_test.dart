@@ -31,10 +31,10 @@ ClaimDeduplicationResult _result({
       citationUrls: citationUrls,
     );
 
-EvidenceItem _evidence(String id) => EvidenceItem(
+EvidenceItem _evidence(String id, {String title = 'Note'}) => EvidenceItem(
       id: id,
       type: EvidenceType.localNote,
-      title: 'Note',
+      title: title,
       content: 'content',
     );
 
@@ -155,6 +155,66 @@ void main() {
           .items
           .first;
       expect(item.matchedLocalEvidenceIds, contains('local-ev-1'));
+    });
+
+    test('matched local evidence titles are preserved in review items', () {
+      final ev = _evidence('local-ev-1', title: 'My existing note');
+      final groups = mapper.toGroups(_ingestion(
+        knownClaims: [
+          _result(
+            id: 'k1',
+            classification: ClaimNoveltyClassification.alreadyKnown,
+            matchedLocal: [ev],
+          ),
+        ],
+      ));
+
+      final item = groups
+          .firstWhere((g) => g.classification == ClaimNoveltyClassification.alreadyKnown)
+          .items
+          .first;
+      expect(item.matchedLocalEvidenceTitles, contains('My existing note'));
+    });
+
+    test('empty evidence title is stored as empty string, not thrown', () {
+      final ev = _evidence('local-ev-1', title: '');
+      final groups = mapper.toGroups(_ingestion(
+        knownClaims: [
+          _result(
+            id: 'k1',
+            classification: ClaimNoveltyClassification.alreadyKnown,
+            matchedLocal: [ev],
+          ),
+        ],
+      ));
+
+      final item = groups
+          .firstWhere((g) => g.classification == ClaimNoveltyClassification.alreadyKnown)
+          .items
+          .first;
+      expect(item.matchedLocalEvidenceTitles, hasLength(1));
+      expect(item.matchedLocalEvidenceTitles.first, isEmpty);
+    });
+
+    test('IDs and titles are index-aligned from the same evidence sequence', () {
+      final ev1 = _evidence('ev-a', title: 'Note A');
+      final ev2 = _evidence('ev-b', title: 'Note B');
+      final groups = mapper.toGroups(_ingestion(
+        knownClaims: [
+          _result(
+            id: 'k1',
+            classification: ClaimNoveltyClassification.alreadyKnown,
+            matchedLocal: [ev1, ev2],
+          ),
+        ],
+      ));
+
+      final item = groups
+          .firstWhere((g) => g.classification == ClaimNoveltyClassification.alreadyKnown)
+          .items
+          .first;
+      expect(item.matchedLocalEvidenceIds, equals(['ev-a', 'ev-b']));
+      expect(item.matchedLocalEvidenceTitles, equals(['Note A', 'Note B']));
     });
 
     test('no source URLs are dropped from review items', () {

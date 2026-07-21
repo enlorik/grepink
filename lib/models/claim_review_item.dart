@@ -9,6 +9,7 @@ class ClaimReviewItem {
   final bool selectedByDefault;
   final String reason;
   final List<String> matchedLocalEvidenceIds;
+  final List<String> matchedLocalEvidenceTitles;
   final bool canBeSaved;
 
   const ClaimReviewItem({
@@ -20,6 +21,7 @@ class ClaimReviewItem {
     required this.selectedByDefault,
     required this.reason,
     required this.matchedLocalEvidenceIds,
+    this.matchedLocalEvidenceTitles = const [],
     required this.canBeSaved,
   });
 }

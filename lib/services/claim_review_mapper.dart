@@ -90,6 +90,8 @@ class ClaimReviewMapper {
         reason: r.reason,
         matchedLocalEvidenceIds:
             List.unmodifiable(r.matchedLocalEvidence.map((e) => e.id)),
+        matchedLocalEvidenceTitles:
+            List.unmodifiable(r.matchedLocalEvidence.map((e) => e.title)),
         canBeSaved: canBeSaved,
       );
     }).toList();
