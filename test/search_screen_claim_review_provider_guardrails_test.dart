@@ -657,9 +657,17 @@ void main() {
       expect(safeProviderDisplayName('sk-live-abc123'), isNull);
     });
 
+    test('embedded sk- is rejected (e.g. "OpenAI sk-live-...")', () {
+      expect(safeProviderDisplayName('OpenAI sk-live-abc123'), isNull);
+    });
+
     test('Bearer prefix is rejected case-insensitively', () {
       expect(safeProviderDisplayName('Bearer token123'), isNull);
       expect(safeProviderDisplayName('bearer token123'), isNull);
+    });
+
+    test('embedded bearer is rejected (e.g. "Brave Bearer ...")', () {
+      expect(safeProviderDisplayName('Brave Bearer abc123'), isNull);
     });
 
     test('api_key substring is rejected', () {

@@ -22,7 +22,7 @@ String? safeProviderDisplayName(String? raw) {
 
   // Reject obvious credential-like values.
   final lower = collapsed.toLowerCase();
-  if (_credentialPatterns.any((p) => lower.startsWith(p))) return null;
+  if (_credentialPatterns.any((p) => lower.contains(p))) return null;
   if (_credentialSubstrings.any((s) => lower.contains(s))) return null;
 
   return collapsed;
