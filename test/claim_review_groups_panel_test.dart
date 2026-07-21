@@ -8,7 +8,8 @@ import 'package:grepink/widgets/claim_review_groups_panel.dart';
 
 ClaimReviewItem _item(
   String id, {
-  ClaimNoveltyClassification classification = ClaimNoveltyClassification.newClaim,
+  ClaimNoveltyClassification classification =
+      ClaimNoveltyClassification.newClaim,
   bool canBeSaved = true,
   List<String> matchedLocalEvidenceIds = const [],
   List<String> matchedLocalEvidenceTitles = const [],
@@ -26,7 +27,8 @@ ClaimReviewItem _item(
       canBeSaved: canBeSaved,
     );
 
-ClaimReviewItem _knownItem(String id, {
+ClaimReviewItem _knownItem(
+  String id, {
   List<String> matchedLocalEvidenceIds = const [],
   List<String> matchedLocalEvidenceTitles = const [],
 }) =>
@@ -76,8 +78,8 @@ void main() {
             _knownGroup(List.generate(count, (i) => _knownItem('k$i'))),
           ]);
 
-          final tile = tester
-              .widget<ExpansionTile>(find.byKey(const Key('already-known-section')));
+          final tile = tester.widget<ExpansionTile>(
+              find.byKey(const Key('already-known-section')));
           expect(tile.initiallyExpanded, isTrue);
         });
       }
@@ -87,8 +89,8 @@ void main() {
           _knownGroup(List.generate(4, (i) => _knownItem('k$i'))),
         ]);
 
-        final tile = tester
-            .widget<ExpansionTile>(find.byKey(const Key('already-known-section')));
+        final tile = tester.widget<ExpansionTile>(
+            find.byKey(const Key('already-known-section')));
         expect(tile.initiallyExpanded, isFalse);
       });
 
@@ -97,8 +99,8 @@ void main() {
           _knownGroup(List.generate(5, (i) => _knownItem('k$i'))),
         ]);
 
-        final tile = tester
-            .widget<ExpansionTile>(find.byKey(const Key('already-known-section')));
+        final tile = tester.widget<ExpansionTile>(
+            find.byKey(const Key('already-known-section')));
         expect(tile.initiallyExpanded, isFalse);
       });
     });
@@ -154,16 +156,16 @@ void main() {
       await _pumpPanel(tester, groups: [
         _knownGroup([_knownItem('k0'), _knownItem('k1')]),
       ]);
-      var tile = tester
-          .widget<ExpansionTile>(find.byKey(const Key('already-known-section')));
+      var tile = tester.widget<ExpansionTile>(
+          find.byKey(const Key('already-known-section')));
       expect(tile.initiallyExpanded, isTrue);
 
       // Second: 5 items → must start collapsed (crossing threshold recreates tile).
       await _pumpPanel(tester, groups: [
         _knownGroup(List.generate(5, (i) => _knownItem('k$i'))),
       ]);
-      tile = tester
-          .widget<ExpansionTile>(find.byKey(const Key('already-known-section')));
+      tile = tester.widget<ExpansionTile>(
+          find.byKey(const Key('already-known-section')));
       expect(tile.initiallyExpanded, isFalse);
     });
 
@@ -174,46 +176,53 @@ void main() {
       await _pumpPanel(tester, groups: [
         _knownGroup(List.generate(5, (i) => _knownItem('k$i'))),
       ]);
-      var tile = tester
-          .widget<ExpansionTile>(find.byKey(const Key('already-known-section')));
+      var tile = tester.widget<ExpansionTile>(
+          find.byKey(const Key('already-known-section')));
       expect(tile.initiallyExpanded, isFalse);
 
       // Second: 2 items → must start expanded.
       await _pumpPanel(tester, groups: [
         _knownGroup([_knownItem('k0'), _knownItem('k1')]),
       ]);
-      tile = tester
-          .widget<ExpansionTile>(find.byKey(const Key('already-known-section')));
+      tile = tester.widget<ExpansionTile>(
+          find.byKey(const Key('already-known-section')));
       expect(tile.initiallyExpanded, isTrue);
     });
 
     testWidgets(
         'regression: large → large resets to collapsed (same-bool key must not reuse expansion state)',
         (tester) async {
-      // First review: 5 items → collapsed by default.
+      // First review: 5 items (a0–a4) — collapsed by default.
       await _pumpPanel(tester, groups: [
         _knownGroup(List.generate(5, (i) => _knownItem('a$i'))),
       ]);
-      // User expands it manually.
+      // User manually expands it; a0 must become visible.
       await tester.tap(find.text('Already in notes (5)'));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('claim-review-item-a0')), findsOneWidget);
 
-      // Second review: different 4 items — still above threshold, must reset
-      // to collapsed even though collapsedByDefault is still true.
+      // Second review: different 4 items (b0–b3) — still above threshold.
+      // The widget must recreate (different key) and start collapsed, so b0
+      // must be absent without any user interaction.
       await _pumpPanel(tester, groups: [
         _knownGroup(List.generate(4, (i) => _knownItem('b$i'))),
       ]);
-      final tile = tester
-          .widget<ExpansionTile>(find.byKey(const Key('already-known-section')));
-      expect(tile.initiallyExpanded, isFalse);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('claim-review-item-b0')), findsNothing);
+
+      // User can still expand the new result manually.
+      await tester.tap(find.text('Already in notes (4)'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('claim-review-item-b0')), findsOneWidget);
     });
 
     testWidgets('already-known claims render unchecked and disabled',
         (tester) async {
       await _pumpPanel(
         tester,
-        groups: [_knownGroup([_knownItem('k1')])],
+        groups: [
+          _knownGroup([_knownItem('k1')])
+        ],
         // Even if selectedIds unexpectedly contains the id, tile must
         // render disabled and unchecked.
         selectedIds: {'k1'},
@@ -235,7 +244,9 @@ void main() {
       var toggleCalled = false;
       await _pumpPanel(
         tester,
-        groups: [_knownGroup([_knownItem('k1')])],
+        groups: [
+          _knownGroup([_knownItem('k1')])
+        ],
         onToggle: (_) => toggleCalled = true,
       );
       await tester.pumpAndSettle();
@@ -258,8 +269,7 @@ void main() {
       ]);
       await tester.pumpAndSettle();
 
-      expect(
-          find.byKey(const Key('claim-review-matched-evidence-k1')),
+      expect(find.byKey(const Key('claim-review-matched-evidence-k1')),
           findsOneWidget);
       expect(find.textContaining('My existing note'), findsOneWidget);
     });
@@ -277,19 +287,24 @@ void main() {
       expect(find.textContaining('ev-1'), findsOneWidget);
     });
 
-    testWidgets('missing title (shorter list) falls back to evidence ID without throwing',
+    testWidgets(
+        'missing title (shorter list) falls back to evidence ID without throwing',
         (tester) async {
       await _pumpPanel(tester, groups: [
         _knownGroup([
-          _knownItem('k1',
-              matchedLocalEvidenceIds: ['ev-1', 'ev-2'],
-              matchedLocalEvidenceTitles: ['Note A']), // only one title for two IDs
+          _knownItem('k1', matchedLocalEvidenceIds: [
+            'ev-1',
+            'ev-2'
+          ], matchedLocalEvidenceTitles: [
+            'Note A'
+          ]), // only one title for two IDs
         ]),
       ]);
       await tester.pumpAndSettle();
 
       expect(find.textContaining('Note A'), findsOneWidget);
-      expect(find.textContaining('ev-2'), findsOneWidget); // fallback for missing title
+      expect(find.textContaining('ev-2'),
+          findsOneWidget); // fallback for missing title
     });
 
     testWidgets('multiple matched notes are all represented', (tester) async {
@@ -313,8 +328,7 @@ void main() {
       ]);
       await tester.pumpAndSettle();
 
-      expect(
-          find.byKey(const Key('claim-review-matched-evidence-k1')),
+      expect(find.byKey(const Key('claim-review-matched-evidence-k1')),
           findsNothing);
       expect(find.textContaining('Matches your notes'), findsNothing);
     });
@@ -348,14 +362,18 @@ void main() {
         ClaimReviewGroup(
           label: 'Better sources',
           classification: ClaimNoveltyClassification.betterSource,
-          items: [_item('b1', classification: ClaimNoveltyClassification.betterSource)],
+          items: [
+            _item('b1', classification: ClaimNoveltyClassification.betterSource)
+          ],
         ),
       ]);
 
-      expect(find.byKey(const Key('better-source-helper-text')), findsOneWidget);
+      expect(
+          find.byKey(const Key('better-source-helper-text')), findsOneWidget);
     });
 
-    testWidgets('helper text does not appear for new-claim groups', (tester) async {
+    testWidgets('helper text does not appear for new-claim groups',
+        (tester) async {
       await _pumpPanel(tester, groups: [
         ClaimReviewGroup(
           label: 'New claims',
@@ -375,7 +393,10 @@ void main() {
           ClaimReviewGroup(
             label: 'Better sources',
             classification: ClaimNoveltyClassification.betterSource,
-            items: [_item('b1', classification: ClaimNoveltyClassification.betterSource)],
+            items: [
+              _item('b1',
+                  classification: ClaimNoveltyClassification.betterSource)
+            ],
           ),
         ],
         selectedIds: {'b1'},
@@ -419,7 +440,8 @@ void main() {
           label: 'Contradictions',
           classification: ClaimNoveltyClassification.contradiction,
           items: [
-            _item('c1', classification: ClaimNoveltyClassification.contradiction),
+            _item('c1',
+                classification: ClaimNoveltyClassification.contradiction),
           ],
         ),
       ]);
@@ -466,7 +488,9 @@ void main() {
         ClaimReviewGroup(
           label: 'Better sources',
           classification: ClaimNoveltyClassification.betterSource,
-          items: [_item('b1', classification: ClaimNoveltyClassification.betterSource)],
+          items: [
+            _item('b1', classification: ClaimNoveltyClassification.betterSource)
+          ],
         ),
       ]);
 

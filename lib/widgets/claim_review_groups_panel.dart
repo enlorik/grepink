@@ -27,7 +27,8 @@ class ClaimReviewGroupsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final visibleGroups = groups.where((group) => group.items.isNotEmpty).toList();
+    final visibleGroups =
+        groups.where((group) => group.items.isNotEmpty).toList();
 
     if (visibleGroups.isEmpty) {
       return const SizedBox.shrink();
@@ -84,15 +85,17 @@ class _ClaimReviewGroupSection extends StatelessWidget {
       // crosses the collapse threshold recreates the ExpansionTile with the
       // correct initiallyExpanded — preventing stale expansion state from
       // the previous session leaking into the new one.
-      final collapsedByDefault = group.items.length > _alreadyKnownCollapseThreshold;
-      // Key includes a hash of item IDs so that a new review result (different
-      // items) always recreates the tile — even when both results are on the
-      // same side of the threshold (same bool, same stale expansion state).
+      final collapsedByDefault =
+          group.items.length > _alreadyKnownCollapseThreshold;
+      // Deterministic string key: encodes the collapse-default flag and the
+      // ordered item IDs so that (a) the same result with ordinary rebuilds
+      // preserves user expansion state, and (b) a genuinely different result
+      // (different IDs or threshold side) recreates the tile and re-applies
+      // initiallyExpanded — no hash-collision risk.
+      final sectionKey =
+          '${collapsedByDefault}_${group.items.map((i) => i.id).join('|')}';
       return _AlreadyKnownGroupSection(
-        key: ValueKey(Object.hashAll([
-          collapsedByDefault,
-          ...group.items.map((i) => i.id),
-        ])),
+        key: ValueKey(sectionKey),
         group: group,
         headerText: headerText,
       );
@@ -102,7 +105,8 @@ class _ClaimReviewGroupSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(headerText, style: AppTextStyles.titleMedium),
-        if (group.classification == ClaimNoveltyClassification.betterSource) ...[
+        if (group.classification ==
+            ClaimNoveltyClassification.betterSource) ...[
           const SizedBox(height: 4),
           Text(
             key: const Key('better-source-helper-text'),
@@ -138,28 +142,35 @@ class _AlreadyKnownGroupSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final collapsedByDefault = group.items.length > _alreadyKnownCollapseThreshold;
-    return Theme(
-      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-      child: ExpansionTile(
-        key: const Key('already-known-section'),
-        initiallyExpanded: !collapsedByDefault,
-        tilePadding: EdgeInsets.zero,
-        childrenPadding: EdgeInsets.zero,
-        title: Text(headerText, style: AppTextStyles.titleMedium),
-        subtitle: Text(
-          'Not saved — shown so you know Grepink already has this.',
-          style: AppTextStyles.bodySmall,
+    final collapsedByDefault =
+        group.items.length > _alreadyKnownCollapseThreshold;
+    // Material is required so that the ExpansionTile's internal ListTile paints
+    // ink/splashes onto this surface rather than the panel's outer DecoratedBox.
+    // Without it Flutter 3.44+ throws an assertion (ListTile in DecoratedBox).
+    return Material(
+      color: Colors.transparent,
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          key: const Key('already-known-section'),
+          initiallyExpanded: !collapsedByDefault,
+          tilePadding: EdgeInsets.zero,
+          childrenPadding: EdgeInsets.zero,
+          title: Text(headerText, style: AppTextStyles.titleMedium),
+          subtitle: Text(
+            'Not saved — shown so you know Grepink already has this.',
+            style: AppTextStyles.bodySmall,
+          ),
+          children: [
+            for (final item in group.items)
+              _ClaimReviewItemTile(
+                key: Key('claim-review-item-${item.id}'),
+                item: item,
+                selected: false,
+                onToggle: () {},
+              ),
+          ],
         ),
-        children: [
-          for (final item in group.items)
-            _ClaimReviewItemTile(
-              key: Key('claim-review-item-${item.id}'),
-              item: item,
-              selected: false,
-              onToggle: () {},
-            ),
-        ],
       ),
     );
   }
@@ -184,7 +195,8 @@ class _ClaimReviewItemTile extends StatelessWidget {
     }
     for (var i = 0; i < item.citationUrls.length; i++) {
       final url = item.citationUrls[i];
-      final title = i < item.citationTitles.length ? item.citationTitles[i] : '';
+      final title =
+          i < item.citationTitles.length ? item.citationTitles[i] : '';
       lines.add(
         Text(
           title.trim().isEmpty ? url : '$title ($url)',
@@ -200,7 +212,7 @@ class _ClaimReviewItemTile extends StatelessWidget {
     // so showing "Matches your notes" there would be misleading.
     final isConfirmedMatch =
         item.classification == ClaimNoveltyClassification.alreadyKnown ||
-        item.classification == ClaimNoveltyClassification.betterSource;
+            item.classification == ClaimNoveltyClassification.betterSource;
     if (isConfirmedMatch && item.matchedLocalEvidenceIds.isNotEmpty) {
       final matches = <String>[];
       for (var i = 0; i < item.matchedLocalEvidenceIds.length; i++) {
@@ -221,7 +233,8 @@ class _ClaimReviewItemTile extends StatelessWidget {
       );
     }
     if (lines.isEmpty) return null;
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: lines);
+    return Column(
+        crossAxisAlignment: CrossAxisAlignment.start, children: lines);
   }
 
   @override
