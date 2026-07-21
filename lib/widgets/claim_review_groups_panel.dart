@@ -17,12 +17,15 @@ class ClaimReviewGroupsPanel extends StatelessWidget {
   final List<ClaimReviewGroup> groups;
   final Set<String> selectedIds;
   final ValueChanged<String> onToggle;
+  // Safe, already-normalized provider label — null means no label is shown.
+  final String? providerLabel;
 
   const ClaimReviewGroupsPanel({
     super.key,
     required this.groups,
     required this.selectedIds,
     required this.onToggle,
+    this.providerLabel,
   });
 
   @override
@@ -47,6 +50,14 @@ class ClaimReviewGroupsPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Claim review', style: AppTextStyles.titleLarge),
+          if (providerLabel != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              key: const Key('claim-review-provider-label'),
+              'Answered via $providerLabel',
+              style: AppTextStyles.bodySmall,
+            ),
+          ],
           const SizedBox(height: 12),
           for (final group in visibleGroups) ...[
             _ClaimReviewGroupSection(

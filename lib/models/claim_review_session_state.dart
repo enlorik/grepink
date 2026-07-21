@@ -3,7 +3,17 @@ import 'claim_review_item.dart';
 import 'grounded_answer.dart';
 import '../services/selected_claims_draft_builder.dart';
 
-enum ClaimReviewSessionStatus { idle, loading, success, error }
+enum ClaimReviewSessionStatus {
+  idle,
+  loading,
+  success,
+  error,
+
+  /// No real [GroundedAnswerProvider] is configured. The pipeline did not run;
+  /// this is distinct from [error] (pipeline ran but threw) and from [idle]
+  /// (nothing was asked yet).
+  providerNotConfigured,
+}
 
 enum ClaimDraftSaveStatus { idle, saving, saved, error }
 
@@ -72,15 +82,15 @@ class ClaimReviewSessionState {
   bool get isLoading => status == ClaimReviewSessionStatus.loading;
   bool get isSuccess => status == ClaimReviewSessionStatus.success;
   bool get isError => status == ClaimReviewSessionStatus.error;
+  bool get isProviderNotConfigured =>
+      status == ClaimReviewSessionStatus.providerNotConfigured;
 
-  bool get hasReviewItems =>
-      groups.any((group) => group.items.isNotEmpty);
+  bool get hasReviewItems => groups.any((group) => group.items.isNotEmpty);
 
   /// True when the current [draft]'s content was already saved this session,
   /// so a repeat save would create a duplicate note.
   bool get isDraftAlreadySaved =>
-      draft != null &&
-      savedDraftContents.contains(draft!.markdownContent);
+      draft != null && savedDraftContents.contains(draft!.markdownContent);
 
   /// True when the current [draft] has already been appended to the currently
   /// selected [targetNoteId]. Keyed by content so switching between distinct
@@ -88,7 +98,8 @@ class ClaimReviewSessionState {
   bool get isDraftAlreadyAppended =>
       draft != null &&
       targetNoteId != null &&
-      (appendedTargetsByContent[draft!.markdownContent]?.contains(targetNoteId) ??
+      (appendedTargetsByContent[draft!.markdownContent]
+              ?.contains(targetNoteId) ??
           false);
 
   /// True when the current [draft] has been appended to at least one note this
@@ -120,7 +131,8 @@ class ClaimReviewSessionState {
       isSuccess &&
       hasReviewItems &&
       groups
-          .where((g) => g.classification != ClaimNoveltyClassification.alreadyKnown)
+          .where((g) =>
+              g.classification != ClaimNoveltyClassification.alreadyKnown)
           .every((g) => g.items.isEmpty);
 
   ClaimReviewSessionState copyWith({
