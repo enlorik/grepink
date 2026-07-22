@@ -116,12 +116,37 @@ class _ClaimReviewGroupSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(headerText, style: AppTextStyles.titleMedium),
+        if (group.classification == ClaimNoveltyClassification.newClaim) ...[
+          const SizedBox(height: 4),
+          Text(
+            key: const Key('new-claim-helper-text'),
+            'New claims are selected by default.',
+            style: AppTextStyles.bodySmall,
+          ),
+        ],
         if (group.classification ==
             ClaimNoveltyClassification.betterSource) ...[
           const SizedBox(height: 4),
           Text(
             key: const Key('better-source-helper-text'),
             'Already in your notes, but this source may improve the existing claim.',
+            style: AppTextStyles.bodySmall,
+          ),
+        ],
+        if (group.classification ==
+            ClaimNoveltyClassification.contradiction) ...[
+          const SizedBox(height: 4),
+          Text(
+            key: const Key('contradiction-helper-text'),
+            'Not selected by default. Include only after reviewing the conflict.',
+            style: AppTextStyles.bodySmall,
+          ),
+        ],
+        if (group.classification == ClaimNoveltyClassification.uncertain) ...[
+          const SizedBox(height: 4),
+          Text(
+            key: const Key('uncertain-claim-helper-text'),
+            'Uncertain claims cannot be added to a draft.',
             style: AppTextStyles.bodySmall,
           ),
         ],

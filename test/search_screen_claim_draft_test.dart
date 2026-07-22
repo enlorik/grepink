@@ -38,7 +38,8 @@ class _FakeNoteDraftReviewRepository implements NoteDraftReviewRepository {
   Future<Note?> getNoteById(String id) async => null;
 
   @override
-  Future<Note> insertNote({required String title, required String content}) async {
+  Future<Note> insertNote(
+      {required String title, required String content}) async {
     throw UnimplementedError();
   }
 
@@ -143,7 +144,8 @@ Future<ProviderContainer> _pumpSearchScreen(
       noteDraftReviewRepositoryProvider.overrideWithValue(
         _FakeNoteDraftReviewRepository(),
       ),
-      groundedAnswerIngestionServiceProvider.overrideWithValue(ingestionService),
+      groundedAnswerIngestionServiceProvider
+          .overrideWithValue(ingestionService),
       allNotesProvider.overrideWithValue(const <Note>[]),
       recentNotesProvider.overrideWithValue(const <Note>[]),
       refreshNotesProvider.overrideWithValue(() async {}),
@@ -181,13 +183,15 @@ Future<void> _generateDraft(WidgetTester tester) async {
 
 void main() {
   group('SearchScreen claim draft generation', () {
-    testWidgets('selected new claims appear in markdown preview', (tester) async {
+    testWidgets('selected new claims appear in markdown preview',
+        (tester) async {
       final provider = _FixedGroundedAnswerProvider(
         GroundedAnswer(
           question: 'q',
           answerText: 'answer',
           citations: const [
-            GroundedAnswerCitation(id: 'c1', title: 'Source A', url: 'https://a.example'),
+            GroundedAnswerCitation(
+                id: 'c1', title: 'Source A', url: 'https://a.example'),
           ],
           providerName: 'test-provider',
           generatedAt: DateTime(2026, 1, 1),
@@ -196,22 +200,26 @@ void main() {
       final service = _buildIngestionService(
         provider: provider,
         claims: [
-          _claim('n1', 'A brand new claim.', citationUrls: const ['https://a.example']),
+          _claim('n1', 'A brand new claim.',
+              citationUrls: const ['https://a.example']),
         ],
         results: [
-          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim,
+          _result(
+              'n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim,
               citationUrls: const ['https://a.example']),
         ],
       );
 
-      final container = await _pumpSearchScreen(tester, ingestionService: service);
+      final container =
+          await _pumpSearchScreen(tester, ingestionService: service);
       await _askQuestion(tester, 'question');
       await _generateDraft(tester);
 
       final draft = container.read(claimReviewProvider).draft;
       expect(draft, isNotNull);
       expect(draft!.markdownContent, contains('A brand new claim.'));
-      expect(find.byKey(const Key('claim-draft-preview-panel')), findsOneWidget);
+      expect(
+          find.byKey(const Key('claim-draft-preview-panel')), findsOneWidget);
     });
 
     testWidgets('selected betterSource claims appear in markdown preview',
@@ -234,7 +242,8 @@ void main() {
         ],
       );
 
-      final container = await _pumpSearchScreen(tester, ingestionService: service);
+      final container =
+          await _pumpSearchScreen(tester, ingestionService: service);
       await _askQuestion(tester, 'question');
       await _generateDraft(tester);
 
@@ -260,13 +269,15 @@ void main() {
           _claim('c1', 'A contradicting claim.'),
         ],
         results: [
-          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+          _result(
+              'n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
           _result('c1', 'A contradicting claim.',
               ClaimNoveltyClassification.contradiction),
         ],
       );
 
-      final container = await _pumpSearchScreen(tester, ingestionService: service);
+      final container =
+          await _pumpSearchScreen(tester, ingestionService: service);
       await _askQuestion(tester, 'question');
       // c1 (contradiction) is not selected by default; leave it untouched.
       await _generateDraft(tester);
@@ -276,8 +287,7 @@ void main() {
       expect(draft.markdownContent, isNot(contains('A contradicting claim.')));
     });
 
-    testWidgets(
-        'alreadyKnown claims do not appear even if somehow selected',
+    testWidgets('alreadyKnown claims do not appear even if somehow selected',
         (tester) async {
       final provider = _FixedGroundedAnswerProvider(
         GroundedAnswer(
@@ -295,13 +305,15 @@ void main() {
           _claim('k1', 'An already known claim.'),
         ],
         results: [
-          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+          _result(
+              'n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
           _result('k1', 'An already known claim.',
               ClaimNoveltyClassification.alreadyKnown),
         ],
       );
 
-      final container = await _pumpSearchScreen(tester, ingestionService: service);
+      final container =
+          await _pumpSearchScreen(tester, ingestionService: service);
       await _askQuestion(tester, 'question');
 
       // alreadyKnown claims are not selected by default; force-select it to
@@ -316,7 +328,8 @@ void main() {
       await _generateDraft(tester);
 
       final draft = container.read(claimReviewProvider).draft;
-      expect(draft!.markdownContent, isNot(contains('An already known claim.')));
+      expect(
+          draft!.markdownContent, isNot(contains('An already known claim.')));
     });
 
     testWidgets('empty selection shows no-save empty state', (tester) async {
@@ -333,18 +346,24 @@ void main() {
         provider: provider,
         claims: [_claim('n1', 'A brand new claim.')],
         results: [
-          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+          _result(
+              'n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
         ],
       );
 
-      final container = await _pumpSearchScreen(tester, ingestionService: service);
+      final container =
+          await _pumpSearchScreen(tester, ingestionService: service);
       await _askQuestion(tester, 'question');
 
       // Deselect the only selected (default-selected) claim.
       container.read(claimReviewProvider.notifier).toggle('n1');
       await tester.pumpAndSettle();
 
-      await _generateDraft(tester);
+      // Generate button is disabled when no saveable claims are selected, so
+      // bypass the UI and call the notifier directly to reach the empty-draft
+      // state (reachable programmatically, e.g. from tests or edge cases).
+      container.read(claimReviewProvider.notifier).generateDraft();
+      await tester.pumpAndSettle();
 
       final draft = container.read(claimReviewProvider).draft;
       expect(draft!.shouldSave, isFalse);
@@ -358,7 +377,8 @@ void main() {
           question: 'q',
           answerText: 'answer',
           citations: const [
-            GroundedAnswerCitation(id: 'c1', title: 'Example A', url: 'https://example.com/a'),
+            GroundedAnswerCitation(
+                id: 'c1', title: 'Example A', url: 'https://example.com/a'),
           ],
           providerName: 'test-provider',
           generatedAt: DateTime(2026, 1, 1),
@@ -371,12 +391,14 @@ void main() {
               citationUrls: const ['https://example.com/a']),
         ],
         results: [
-          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim,
+          _result(
+              'n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim,
               citationUrls: const ['https://example.com/a']),
         ],
       );
 
-      final container = await _pumpSearchScreen(tester, ingestionService: service);
+      final container =
+          await _pumpSearchScreen(tester, ingestionService: service);
       await _askQuestion(tester, 'question');
       await _generateDraft(tester);
 
