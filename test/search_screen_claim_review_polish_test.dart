@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:grepink/models/claim_deduplication_result.dart';
-import 'package:grepink/models/claim_review_item.dart';
 import 'package:grepink/models/evidence_item.dart';
 import 'package:grepink/models/extracted_claim.dart';
 import 'package:grepink/models/grounded_answer.dart';
