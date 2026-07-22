@@ -45,7 +45,8 @@ class _RecordingNoteDraftReviewRepository implements NoteDraftReviewRepository {
   Future<Note?> getNoteById(String id) async => null;
 
   @override
-  Future<Note> insertNote({required String title, required String content}) async {
+  Future<Note> insertNote(
+      {required String title, required String content}) async {
     if (insertGate != null) {
       await insertGate!.future;
     }
@@ -159,7 +160,8 @@ Future<ProviderContainer> _pumpSearchScreen(
         (ref) async => _FakeKnowledgeIngestionService(),
       ),
       noteDraftReviewRepositoryProvider.overrideWithValue(repository),
-      groundedAnswerIngestionServiceProvider.overrideWithValue(ingestionService),
+      groundedAnswerIngestionServiceProvider
+          .overrideWithValue(ingestionService),
       allNotesProvider.overrideWithValue(const <Note>[]),
       recentNotesProvider.overrideWithValue(const <Note>[]),
       refreshNotesProvider.overrideWithValue(() async {}),
@@ -220,7 +222,8 @@ void main() {
         provider: provider,
         claims: [_claim('n1', 'A brand new claim.')],
         results: [
-          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+          _result(
+              'n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
         ],
       );
 
@@ -259,7 +262,8 @@ void main() {
         provider: provider,
         claims: [_claim('n1', 'A brand new claim.')],
         results: [
-          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+          _result(
+              'n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
         ],
       );
 
@@ -270,10 +274,12 @@ void main() {
       );
       await _askQuestion(tester, 'question');
 
-      // Deselect the only default-selected claim so the draft is empty.
+      // Deselect the only default-selected claim so the draft would be empty.
+      // The Generate button is disabled when no saveable claims are selected,
+      // so call the notifier directly to reach the no-save draft state.
       container.read(claimReviewProvider.notifier).toggle('n1');
+      container.read(claimReviewProvider.notifier).generateDraft();
       await tester.pumpAndSettle();
-      await _generateDraft(tester);
 
       expect(container.read(claimReviewProvider).draft!.shouldSave, isFalse);
 
@@ -305,7 +311,8 @@ void main() {
         provider: provider,
         claims: [_claim('n1', 'A brand new claim.')],
         results: [
-          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+          _result(
+              'n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
         ],
       );
 
@@ -345,7 +352,8 @@ void main() {
         provider: provider,
         claims: [_claim('n1', 'A brand new claim.')],
         results: [
-          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+          _result(
+              'n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
         ],
       );
 
@@ -376,7 +384,8 @@ void main() {
       expect(repo.insertedNotes, hasLength(1));
     });
 
-    testWidgets('overlapping save calls before the first completes only save once',
+    testWidgets(
+        'overlapping save calls before the first completes only save once',
         (tester) async {
       final gate = Completer<void>();
       final repo = _RecordingNoteDraftReviewRepository()..insertGate = gate;
@@ -393,7 +402,8 @@ void main() {
         provider: provider,
         claims: [_claim('n1', 'A brand new claim.')],
         results: [
-          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+          _result(
+              'n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
         ],
       );
 
@@ -433,7 +443,8 @@ void main() {
         provider: provider,
         claims: [_claim('n1', 'A brand new claim.')],
         results: [
-          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+          _result(
+              'n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
         ],
       );
 
@@ -493,7 +504,8 @@ void main() {
         provider: provider,
         claims: [_claim('n1', 'A brand new claim.')],
         results: [
-          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+          _result(
+              'n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
         ],
       );
 
@@ -548,7 +560,8 @@ void main() {
         provider: provider,
         claims: [_claim('n1', 'A brand new claim.')],
         results: [
-          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+          _result(
+              'n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
         ],
       );
 
@@ -609,7 +622,8 @@ void main() {
         provider: provider,
         claims: [_claim('n1', 'A brand new claim.')],
         results: [
-          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+          _result(
+              'n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
         ],
       );
 
@@ -689,7 +703,8 @@ void main() {
 
       // Save draft A (both claims selected).
       await _generateDraft(tester);
-      final draftAContent = container.read(claimReviewProvider).draft!.markdownContent;
+      final draftAContent =
+          container.read(claimReviewProvider).draft!.markdownContent;
       await _tapSave(tester);
       expect(repo.insertedNotes, hasLength(1));
 
@@ -697,7 +712,8 @@ void main() {
       notifier.toggle('n1');
       await tester.pumpAndSettle();
       await _generateDraft(tester);
-      final draftBContent = container.read(claimReviewProvider).draft!.markdownContent;
+      final draftBContent =
+          container.read(claimReviewProvider).draft!.markdownContent;
       expect(draftBContent, isNot(draftAContent));
       await _tapSave(tester);
       expect(repo.insertedNotes, hasLength(2));
@@ -706,7 +722,8 @@ void main() {
       notifier.toggle('n1');
       await tester.pumpAndSettle();
       await _generateDraft(tester);
-      expect(container.read(claimReviewProvider).draft!.markdownContent, draftAContent);
+      expect(container.read(claimReviewProvider).draft!.markdownContent,
+          draftAContent);
       expect(container.read(claimReviewProvider).isDraftAlreadySaved, isTrue);
 
       // A direct save attempt must be blocked — content already in savedDraftContents.
@@ -794,7 +811,8 @@ void main() {
         provider: provider,
         claims: [_claim('n1', 'A brand new claim.')],
         results: [
-          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+          _result(
+              'n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
         ],
       );
 
@@ -822,7 +840,8 @@ void main() {
 
       // The failure must be surfaced as backgroundSaveError, not as an error
       // on the current (cleared) draft.
-      expect(container.read(claimReviewProvider).backgroundSaveError, isNotNull);
+      expect(
+          container.read(claimReviewProvider).backgroundSaveError, isNotNull);
       expect(
         container.read(claimReviewProvider).saveStatus,
         ClaimDraftSaveStatus.idle,
@@ -857,7 +876,8 @@ void main() {
         provider: provider,
         claims: [_claim('n1', 'A brand new claim.')],
         results: [
-          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+          _result(
+              'n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
         ],
       );
 
@@ -883,7 +903,8 @@ void main() {
       // draft's savedDraftContents entry.
       expect(repo.insertedNotes, hasLength(1));
       expect(container.read(claimReviewProvider).savedDraftContents, isEmpty);
-      expect(container.read(claimReviewProvider).saveStatus, ClaimDraftSaveStatus.idle);
+      expect(container.read(claimReviewProvider).saveStatus,
+          ClaimDraftSaveStatus.idle);
       expect(container.read(claimReviewProvider).pendingDraftContents, isEmpty);
     });
 
@@ -907,7 +928,8 @@ void main() {
         provider: provider,
         claims: [_claim('n1', 'A brand new claim.')],
         results: [
-          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+          _result(
+              'n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
         ],
       );
 
@@ -933,7 +955,8 @@ void main() {
       // backgroundSaveError from the old session's failure.
       expect(repo.insertedNotes, isEmpty);
       expect(container.read(claimReviewProvider).backgroundSaveError, isNull);
-      expect(container.read(claimReviewProvider).saveStatus, ClaimDraftSaveStatus.idle);
+      expect(container.read(claimReviewProvider).saveStatus,
+          ClaimDraftSaveStatus.idle);
       expect(container.read(claimReviewProvider).pendingDraftContents, isEmpty);
     });
 
@@ -955,7 +978,8 @@ void main() {
         provider: provider,
         claims: [_claim('n1', 'A brand new claim.')],
         results: [
-          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+          _result(
+              'n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
         ],
       );
 
@@ -969,7 +993,9 @@ void main() {
           groundedAnswerIngestionServiceProvider.overrideWithValue(service),
           allNotesProvider.overrideWithValue(const <Note>[]),
           recentNotesProvider.overrideWithValue(const <Note>[]),
-          refreshNotesProvider.overrideWithValue(() async { refreshCalled = true; }),
+          refreshNotesProvider.overrideWithValue(() async {
+            refreshCalled = true;
+          }),
         ],
       );
       addTearDown(container.dispose);
@@ -1024,7 +1050,8 @@ void main() {
         provider: provider,
         claims: [_claim('n1', 'A brand new claim.')],
         results: [
-          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+          _result(
+              'n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
         ],
       );
 
@@ -1042,7 +1069,8 @@ void main() {
         container.read(claimReviewProvider).saveStatus,
         ClaimDraftSaveStatus.error,
       );
-      expect(find.byKey(const Key('claim-draft-save-error-message')), findsOneWidget);
+      expect(find.byKey(const Key('claim-draft-save-error-message')),
+          findsOneWidget);
     });
 
     testWidgets(
@@ -1063,7 +1091,8 @@ void main() {
         provider: provider,
         claims: [_claim('n1', 'A brand new claim.')],
         results: [
-          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+          _result(
+              'n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
         ],
       );
 
@@ -1099,7 +1128,8 @@ void main() {
       );
     });
 
-    testWidgets('saved draft retains claim-level source title when URL is not in provider citations',
+    testWidgets(
+        'saved draft retains claim-level source title when URL is not in provider citations',
         (tester) async {
       const url = 'https://claim-source.example.com';
       const claimTitle = 'Claim Level Source';
@@ -1136,7 +1166,8 @@ void main() {
         ],
       );
 
-      await _pumpSearchScreen(tester, ingestionService: service, repository: repo);
+      await _pumpSearchScreen(tester,
+          ingestionService: service, repository: repo);
       await _askQuestion(tester, 'question');
       await _generateDraft(tester);
       await _tapSave(tester);

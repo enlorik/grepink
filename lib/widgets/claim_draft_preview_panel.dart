@@ -41,9 +41,10 @@ class ClaimDraftPreviewPanel extends StatelessWidget {
   // note was deleted). Used as both the key fragment and initialValue so the
   // DropdownButtonFormField remounts — and its FormFieldState resets — when the
   // selected note disappears from the list.
-  String? get _effectiveTarget => availableNotes.any((n) => n.id == selectedTargetNoteId)
-      ? selectedTargetNoteId
-      : null;
+  String? get _effectiveTarget =>
+      availableNotes.any((n) => n.id == selectedTargetNoteId)
+          ? selectedTargetNoteId
+          : null;
 
   @override
   Widget build(BuildContext context) {
@@ -58,7 +59,7 @@ class ClaimDraftPreviewPanel extends StatelessWidget {
           border: Border.all(color: AppColors.dividerBorder),
         ),
         child: Text(
-          'Select at least one new claim or better source to generate a draft.',
+          'No saveable claims are selected for this draft.',
           style: AppTextStyles.bodyMedium,
         ),
       );
@@ -120,7 +121,8 @@ class ClaimDraftPreviewPanel extends StatelessWidget {
           if (saveStatus == ClaimDraftSaveStatus.error) ...[
             const SizedBox(height: 8),
             Text(
-              saveErrorMessage ?? 'Could not save this draft as a note. Please try again.',
+              saveErrorMessage ??
+                  'Could not save this draft as a note. Please try again.',
               key: const Key('claim-draft-save-error-message'),
               style: AppTextStyles.bodySmall,
             ),
@@ -147,7 +149,8 @@ class ClaimDraftPreviewPanel extends StatelessWidget {
             isExpanded: true,
             decoration: const InputDecoration(
               border: OutlineInputBorder(),
-              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              contentPadding:
+                  EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             ),
             hint: const Text('Select a target note'),
             items: availableNotes
@@ -183,7 +186,8 @@ class ClaimDraftPreviewPanel extends StatelessWidget {
           if (appendStatus == ClaimDraftAppendStatus.error) ...[
             const SizedBox(height: 8),
             Text(
-              appendErrorMessage ?? 'Could not append this draft to the note. Please try again.',
+              appendErrorMessage ??
+                  'Could not append this draft to the note. Please try again.',
               key: const Key('claim-draft-append-error-message'),
               style: AppTextStyles.bodySmall,
             ),

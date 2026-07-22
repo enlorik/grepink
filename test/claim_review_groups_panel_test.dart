@@ -385,6 +385,22 @@ void main() {
       expect(find.byKey(const Key('better-source-helper-text')), findsNothing);
     });
 
+    testWidgets('helper text does not appear for contradiction groups',
+        (tester) async {
+      await _pumpPanel(tester, groups: [
+        ClaimReviewGroup(
+          label: 'Contradictions',
+          classification: ClaimNoveltyClassification.contradiction,
+          items: [
+            _item('c1',
+                classification: ClaimNoveltyClassification.contradiction)
+          ],
+        ),
+      ]);
+
+      expect(find.byKey(const Key('better-source-helper-text')), findsNothing);
+    });
+
     testWidgets('better-source claims remain selected and interactive',
         (tester) async {
       await _pumpPanel(
@@ -496,6 +512,97 @@ void main() {
 
       expect(find.text('New claims (0)'), findsNothing);
       expect(find.textContaining('Better sources'), findsOneWidget);
+    });
+  });
+
+  group('ClaimReviewGroupsPanel group helper texts', () {
+    testWidgets('new-claim group shows helper text', (tester) async {
+      await _pumpPanel(tester, groups: [
+        ClaimReviewGroup(
+          label: 'New claims',
+          classification: ClaimNoveltyClassification.newClaim,
+          items: [_item('n1')],
+        ),
+      ]);
+
+      expect(find.byKey(const Key('new-claim-helper-text')), findsOneWidget);
+    });
+
+    testWidgets('contradiction group shows helper text', (tester) async {
+      await _pumpPanel(tester, groups: [
+        ClaimReviewGroup(
+          label: 'Contradictions',
+          classification: ClaimNoveltyClassification.contradiction,
+          items: [
+            _item('c1',
+                classification: ClaimNoveltyClassification.contradiction),
+          ],
+        ),
+      ]);
+
+      expect(
+          find.byKey(const Key('contradiction-helper-text')), findsOneWidget);
+    });
+
+    testWidgets('uncertain group shows helper text', (tester) async {
+      await _pumpPanel(tester, groups: [
+        ClaimReviewGroup(
+          label: 'Uncertain',
+          classification: ClaimNoveltyClassification.uncertain,
+          items: [
+            _item('u1',
+                classification: ClaimNoveltyClassification.uncertain,
+                canBeSaved: false),
+          ],
+        ),
+      ]);
+
+      expect(
+          find.byKey(const Key('uncertain-claim-helper-text')), findsOneWidget);
+    });
+
+    testWidgets('new-claim helper text does not appear for other groups',
+        (tester) async {
+      await _pumpPanel(tester, groups: [
+        ClaimReviewGroup(
+          label: 'Better sources',
+          classification: ClaimNoveltyClassification.betterSource,
+          items: [
+            _item('b1',
+                classification: ClaimNoveltyClassification.betterSource),
+          ],
+        ),
+      ]);
+
+      expect(find.byKey(const Key('new-claim-helper-text')), findsNothing);
+    });
+
+    testWidgets(
+        'contradiction helper text does not appear for new-claim groups',
+        (tester) async {
+      await _pumpPanel(tester, groups: [
+        ClaimReviewGroup(
+          label: 'New claims',
+          classification: ClaimNoveltyClassification.newClaim,
+          items: [_item('n1')],
+        ),
+      ]);
+
+      expect(find.byKey(const Key('contradiction-helper-text')), findsNothing);
+    });
+
+    testWidgets('uncertain helper text does not appear for new-claim groups',
+        (tester) async {
+      await _pumpPanel(tester, groups: [
+        ClaimReviewGroup(
+          label: 'New claims',
+          classification: ClaimNoveltyClassification.newClaim,
+          items: [_item('n1')],
+        ),
+      ]);
+
+      expect(
+          find.byKey(const Key('uncertain-claim-helper-text')), findsNothing);
     });
   });
 }

@@ -492,12 +492,35 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 safeProviderDisplayName(claimReviewState.providerName),
           ),
           const SizedBox(height: 12),
-          FilledButton.icon(
-            key: const Key('generate-claim-draft-button'),
-            onPressed: _generateClaimDraft,
-            icon: const Icon(Icons.description_outlined),
-            label: const Text('Generate draft'),
-          ),
+          Builder(builder: (context) {
+            final selection = claimReviewState.selection!;
+            final hasSaveableClaims =
+                selection.allItems.any((i) => i.canBeSaved);
+            final hasSelectedSaveableClaims =
+                selection.selectedSaveableItems.isNotEmpty;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                FilledButton.icon(
+                  key: const Key('generate-claim-draft-button'),
+                  onPressed:
+                      hasSelectedSaveableClaims ? _generateClaimDraft : null,
+                  icon: const Icon(Icons.description_outlined),
+                  label: const Text('Generate draft'),
+                ),
+                if (!hasSelectedSaveableClaims) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    key: const Key('generate-draft-disabled-helper'),
+                    hasSaveableClaims
+                        ? 'Select at least one claim to generate a draft. Contradictions are not selected by default.'
+                        : 'No claims in this review can be added to a draft.',
+                    style: AppTextStyles.bodySmall,
+                  ),
+                ],
+              ],
+            );
+          }),
         ],
         if (claimReviewState.draftGenerationErrorMessage != null) ...[
           const SizedBox(height: 12),
