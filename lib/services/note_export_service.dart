@@ -111,10 +111,10 @@ class NoteExportService {
     for (final note in incoming) {
       final current = merged[note.id];
       if (current == null) {
-        merged[note.id] = note;
+        merged[note.id] = note.copyWith(embeddingPending: true, clearEmbedding: true);
         added++;
       } else if (note.updatedAt.isAfter(current.updatedAt)) {
-        merged[note.id] = note;
+        merged[note.id] = note.copyWith(embeddingPending: true, clearEmbedding: true);
         updated++;
       } else {
         skipped++;

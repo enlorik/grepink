@@ -570,11 +570,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       );
       return;
     }
-    final raw = utf8.decode(bytes);
-
     List<Note> incoming;
+    List<Note> existing;
+    ImportPreview preview;
     try {
+      final raw = utf8.decode(bytes);
       incoming = NoteExportService.instance.decode(raw);
+      existing = await DatabaseService.instance.getAllNotes();
+      preview = NoteExportService.instance.preview(existing, incoming);
     } catch (e) {
       if (!mounted) return;
       messenger.showSnackBar(
@@ -582,9 +585,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       );
       return;
     }
-
-    final existing = await DatabaseService.instance.getAllNotes();
-    final preview = NoteExportService.instance.preview(existing, incoming);
 
     if (!mounted) return;
     final choice = await showDialog<_ImportChoice>(
@@ -601,45 +601,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ).toList();
         await DatabaseService.instance.replaceAll(pendingNotes);
         await ref.read(notesProvider.notifier).loadNotes();
+        // Start re-embedding before the mounted check so unmounting during
+        // navigation does not silently abandon notes with embeddingPending=true.
+        ref.read(notesProvider.notifier).reindexPendingNotes();
         if (!mounted) return;
         messenger.showSnackBar(
           SnackBar(content: Text('Replaced all notes with ${incoming.length} from backup')),
         );
       } else {
-        // Only touch notes from incoming that are new or strictly newer.
-        // Skipped notes (existing is same or newer) are left untouched so
-        // their embeddings are not destroyed.
-        final existingById = {for (final n in existing) n.id: n};
-        int added = 0, updated = 0, skipped = 0;
-        for (final note in incoming) {
-          final current = existingById[note.id];
-          if (current == null) {
-            await DatabaseService.instance.insertNote(
-              note.copyWith(embeddingPending: true, clearEmbedding: true),
-            );
-            added++;
-          } else if (note.updatedAt.isAfter(current.updatedAt)) {
-            await DatabaseService.instance.updateNote(
-              note.copyWith(embeddingPending: true, clearEmbedding: true),
-            );
-            updated++;
-          } else {
-            skipped++;
-          }
-        }
+        // Atomic: either all changes land or none do (unlike individual inserts).
+        final result = await DatabaseService.instance.mergeNotes(existing, incoming);
         await ref.read(notesProvider.notifier).loadNotes();
+        ref.read(notesProvider.notifier).reindexPendingNotes();
         if (!mounted) return;
         messenger.showSnackBar(
           SnackBar(
             content: Text(
-              'Import complete — added $added, updated $updated, skipped $skipped',
+              'Import complete — added ${result.added}, updated ${result.updated}, skipped ${result.skipped}',
             ),
           ),
         );
       }
-      // Background: embed any notes that were written with embeddingPending=true
-      // so they appear in semantic search without requiring a manual reindex.
-      ref.read(notesProvider.notifier).reindexPendingNotes();
     } catch (e) {
       if (!mounted) return;
       messenger.showSnackBar(SnackBar(content: Text('Import failed: $e')));
