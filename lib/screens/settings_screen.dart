@@ -605,12 +605,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     try {
       if (choice == _ImportChoice.replaceAll) {
-        await DatabaseService.instance.clearAll();
-        for (final note in incoming) {
-          await DatabaseService.instance.insertNote(
-            note.copyWith(embeddingPending: true, clearEmbedding: true),
-          );
-        }
+        final pendingNotes = incoming.map(
+          (n) => n.copyWith(embeddingPending: true, clearEmbedding: true),
+        ).toList();
+        await DatabaseService.instance.replaceAll(pendingNotes);
         await ref.read(notesProvider.notifier).loadNotes();
         if (!mounted) return;
         messenger.showSnackBar(
@@ -648,6 +646,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         );
       }
+      // Background: embed any notes that were written with embeddingPending=true
+      // so they appear in semantic search without requiring a manual reindex.
+      ref.read(notesProvider.notifier).reindexPendingNotes();
     } catch (e) {
       if (!mounted) return;
       messenger.showSnackBar(SnackBar(content: Text('Import failed: $e')));

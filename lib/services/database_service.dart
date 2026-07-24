@@ -193,6 +193,19 @@ class DatabaseService {
     await db.execute('DELETE FROM notes_fts');
   }
 
+  /// Atomically replaces all notes. Either every note from [notes] is written
+  /// or the existing data is left completely intact (no partial import).
+  Future<void> replaceAll(List<Note> notes) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      await txn.delete('notes');
+      await txn.execute('DELETE FROM notes_fts');
+      for (final note in notes) {
+        await txn.insert('notes', note.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+      }
+    });
+  }
+
   Future<void> reindexFts() async {
     final db = await database;
     await db.execute('INSERT INTO notes_fts(notes_fts) VALUES(\'rebuild\')');
