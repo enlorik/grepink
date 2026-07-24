@@ -87,11 +87,13 @@ jobs:
       - name: Upload to Firebase App Distribution
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+          RELEASE_NOTES: ${{ github.event.inputs.release_notes }}
         run: |
           firebase appdistribution:distribute \
             build/app/outputs/flutter-apk/app-release.apk \
-            --app "${{ secrets.FIREBASE_APP_ID }}" \
-            --release-notes "${{ github.event.inputs.release_notes }}" \
+            --app "$FIREBASE_APP_ID" \
+            --release-notes "$RELEASE_NOTES" \
             --token "$FIREBASE_TOKEN"
 
       - name: Clean up keystore
