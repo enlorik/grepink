@@ -7,5 +7,7 @@
 -->
 <full-backup-content>
     <include domain="database" path="grepink.db" />
+    <include domain="database" path="grepink.db-wal" />
+    <include domain="database" path="grepink.db-shm" />
     <exclude domain="sharedpref" path="FlutterSecureStorage" />
 </full-backup-content>

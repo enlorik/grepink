@@ -10,6 +10,10 @@ name: Firebase App Distribution
 #   FIREBASE_APP_ID                  — Firebase Android app ID (e.g. 1:123:android:abc)
 #   FIREBASE_TOKEN                   — Firebase CI token (firebase login:ci)
 #
+# Optional secret:
+#   FIREBASE_TESTER_GROUPS           — comma-separated Firebase tester group aliases
+#                                      (leave unset to skip group assignment)
+#
 # See docs/android_signing.md for keystore creation and docs/firebase_setup.md
 # for Firebase project registration.
 
@@ -89,12 +93,19 @@ jobs:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
           FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
           RELEASE_NOTES: ${{ github.event.inputs.release_notes }}
+          FIREBASE_TESTER_GROUPS: ${{ secrets.FIREBASE_TESTER_GROUPS }}
         run: |
+          GROUPS_ARG=""
+          if [ -n "$FIREBASE_TESTER_GROUPS" ]; then
+            GROUPS_ARG="--groups $FIREBASE_TESTER_GROUPS"
+          fi
+          # shellcheck disable=SC2086
           firebase appdistribution:distribute \
             build/app/outputs/flutter-apk/app-release.apk \
             --app "$FIREBASE_APP_ID" \
             --release-notes "$RELEASE_NOTES" \
-            --token "$FIREBASE_TOKEN"
+            --token "$FIREBASE_TOKEN" \
+            $GROUPS_ARG
 
       - name: Clean up keystore
         if: always()

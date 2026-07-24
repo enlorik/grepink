@@ -17,8 +17,9 @@ Distribution. It is triggered manually from the GitHub Actions UI.
 
 | Secret name        | Where to find it                                           |
 |--------------------|-------------------------------------------------------------|
-| `FIREBASE_TOKEN`   | Output of `firebase login:ci`                              |
-| `FIREBASE_APP_ID`  | Firebase console → Project settings → Your apps → App ID  |
+| `FIREBASE_TOKEN`          | Output of `firebase login:ci`                                  |
+| `FIREBASE_APP_ID`         | Firebase console → Project settings → Your apps → App ID      |
+| `FIREBASE_TESTER_GROUPS`  | Comma-separated group aliases (optional; omit to skip groups)  |
 
   Also ensure the four signing secrets from `docs/android_signing.md` are set.
 

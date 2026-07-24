@@ -56,6 +56,24 @@ keyPassword=<KEY_PASSWORD>
 Without this file, local release builds will fail with a clear error.
 Debug builds and `flutter test` are not affected.
 
+## First build from a previously debug-signed install
+
+Before this PR, release builds were signed with Gradle's built-in debug
+certificate. Android does not allow installing an APK signed by a different
+certificate over an existing one.
+
+**If you already have a debug-signed Grepink installed on a device:**
+
+1. Open Grepink and go to **Settings → Export notes**. Save the backup
+   somewhere safe (Google Drive, Downloads, etc.).
+2. Uninstall the existing Grepink.
+3. Install the first preview-signed APK from Firebase App Distribution.
+4. Open Grepink and go to **Settings → Import notes**. Select your backup.
+
+After this one-time migration every subsequent CI build will install over the
+previous one without clearing data, because all future builds share the same
+preview keystore.
+
 ## Recovery
 
 If the keystore is lost, existing installs cannot be updated over-the-air.
