@@ -1,0 +1,97 @@
+name: Firebase App Distribution
+
+# Triggered manually from the GitHub Actions UI.
+# Required secrets (set in repo Settings → Secrets and variables → Actions):
+#
+#   ANDROID_PREVIEW_KEYSTORE_BASE64  — base64-encoded .jks keystore file
+#   ANDROID_PREVIEW_KEY_ALIAS        — key alias inside the keystore
+#   ANDROID_PREVIEW_KEY_PASSWORD     — key password
+#   ANDROID_PREVIEW_STORE_PASSWORD   — keystore store password
+#   FIREBASE_APP_ID                  — Firebase Android app ID (e.g. 1:123:android:abc)
+#   FIREBASE_TOKEN                   — Firebase CI token (firebase login:ci)
+#
+# See docs/android_signing.md for keystore creation and docs/firebase_setup.md
+# for Firebase project registration.
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_notes:
+        description: 'Release notes for testers'
+        required: false
+        default: 'Preview build'
+
+jobs:
+  distribute:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter (stable)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Static analysis
+        run: flutter analyze
+
+      - name: Run tests
+        run: flutter test
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Decode keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_PREVIEW_KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 --decode > android/preview.jks
+
+      - name: Compute versionCode from run number
+        id: version
+        run: |
+          # Base versionCode is 1; each CI run increments it.
+          echo "version_code=${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
+      - name: Build signed release APK
+        env:
+          ANDROID_PREVIEW_STORE_FILE: preview.jks
+          ANDROID_PREVIEW_STORE_PASSWORD: ${{ secrets.ANDROID_PREVIEW_STORE_PASSWORD }}
+          ANDROID_PREVIEW_KEY_ALIAS: ${{ secrets.ANDROID_PREVIEW_KEY_ALIAS }}
+          ANDROID_PREVIEW_KEY_PASSWORD: ${{ secrets.ANDROID_PREVIEW_KEY_PASSWORD }}
+        run: |
+          flutter build apk --release \
+            --build-number=${{ steps.version.outputs.version_code }}
+
+      - name: Upload APK as GitHub artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: grepink-preview-${{ github.run_number }}
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
+      - name: Upload to Firebase App Distribution
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        run: |
+          firebase appdistribution:distribute \
+            build/app/outputs/flutter-apk/app-release.apk \
+            --app "${{ secrets.FIREBASE_APP_ID }}" \
+            --release-notes "${{ github.event.inputs.release_notes }}" \
+            --token "$FIREBASE_TOKEN"
+
+      - name: Clean up keystore
+        if: always()
+        run: rm -f android/preview.jks

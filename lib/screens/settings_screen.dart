@@ -1,13 +1,19 @@
 import 'dart:convert';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'dart:io';
 import '../models/brave_settings.dart';
+import '../models/note.dart';
 import '../providers/brave_settings_provider.dart';
 import '../providers/notes_provider.dart';
 import '../providers/settings_provider.dart';
 import '../services/database_service.dart';
 import '../services/brave_evidence_provider.dart';
+import '../services/note_export_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/grepink_bottom_nav.dart';
@@ -427,12 +433,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _buildSettingRow(
             title: 'Export Notes',
             trailing: const Icon(Icons.upload_outlined, color: AppColors.primaryAction),
-            onTap: () => _exportNotes(context),
+            onTap: _exportNotes,
           ),
           _buildSettingRow(
             title: 'Import Notes',
             trailing: const Icon(Icons.download_outlined, color: AppColors.primaryAction),
-            onTap: () => _importNotes(context),
+            onTap: _importNotes,
           ),
           _buildSettingRow(
             title: 'Clear All Notes',
@@ -522,24 +528,118 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  Future<void> _exportNotes(BuildContext context) async {
+  Future<void> _exportNotes() async {
+    final messenger = ScaffoldMessenger.of(context);
     try {
       final notes = ref.read(notesProvider).valueOrNull ?? [];
-      final json = jsonEncode(notes.map((n) => n.toJson()).toList());
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Exported ${notes.length} notes (${json.length} chars)')),
+      final jsonText = NoteExportService.instance.encode(notes);
+      final dir = await getTemporaryDirectory();
+      final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').substring(0, 19);
+      final file = File('${dir.path}/grepink-notes-$timestamp.json');
+      await file.writeAsString(jsonText);
+      await Share.shareXFiles(
+        [XFile(file.path, mimeType: 'application/json')],
+        subject: 'Grepink notes backup',
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Export failed: $e')),
-      );
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(content: Text('Export failed: $e')));
     }
   }
 
-  Future<void> _importNotes(BuildContext context) async {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Import: paste JSON data in a future update')),
+  Future<void> _importNotes() async {
+    final messenger = ScaffoldMessenger.of(context);
+    FilePickerResult? result;
+    try {
+      result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+        withData: true,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text('Could not open file picker: $e')),
+      );
+      return;
+    }
+    if (result == null || result.files.isEmpty) return;
+
+    final bytes = result.files.first.bytes;
+    final String raw;
+    if (bytes != null) {
+      raw = utf8.decode(bytes);
+    } else {
+      final path = result.files.first.path;
+      if (path == null) {
+        if (!mounted) return;
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Could not read the selected file')),
+        );
+        return;
+      }
+      raw = await File(path).readAsString();
+    }
+
+    List<Note> incoming;
+    try {
+      incoming = NoteExportService.instance.decode(raw);
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text('Invalid backup file: $e')),
+      );
+      return;
+    }
+
+    final existing = ref.read(notesProvider).valueOrNull ?? [];
+    final preview = NoteExportService.instance.preview(existing, incoming);
+
+    if (!mounted) return;
+    final choice = await showDialog<_ImportChoice>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => _ImportConfirmDialog(preview: preview),
     );
+    if (choice == null || !mounted) return;
+
+    try {
+      if (choice == _ImportChoice.replaceAll) {
+        await DatabaseService.instance.clearAll();
+        for (final note in incoming) {
+          await DatabaseService.instance.insertNote(note);
+        }
+        await ref.read(notesProvider.notifier).loadNotes();
+        if (!mounted) return;
+        messenger.showSnackBar(
+          SnackBar(content: Text('Replaced all notes with ${incoming.length} from backup')),
+        );
+      } else {
+        final output = NoteExportService.instance.merge(existing, incoming);
+        final all = await DatabaseService.instance.getAllNotes();
+        final existingIds = {for (final n in all) n.id};
+        for (final note in output.notes) {
+          if (existingIds.contains(note.id)) {
+            await DatabaseService.instance.updateNote(note);
+          } else {
+            await DatabaseService.instance.insertNote(note);
+          }
+        }
+        await ref.read(notesProvider.notifier).loadNotes();
+        if (!mounted) return;
+        final r = output.result;
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              'Import complete — added ${r.added}, updated ${r.updated}, skipped ${r.skipped}',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(content: Text('Import failed: $e')));
+    }
   }
 
   Future<void> _confirmClearAll() async {
@@ -576,5 +676,86 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('All notes cleared')),
     );
+  }
+}
+
+enum _ImportChoice { merge, replaceAll }
+
+class _ImportConfirmDialog extends StatelessWidget {
+  final ImportPreview preview;
+
+  const _ImportConfirmDialog({required this.preview});
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('Import ${preview.total} notes?', style: AppTextStyles.titleMedium),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Merge (recommended): keeps your newer version when IDs collide.',
+            style: AppTextStyles.bodyMedium,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Will add ${preview.willAdd} new note(s), '
+            'update ${preview.willUpdate} older note(s), '
+            'skip ${preview.willSkip} already up-to-date note(s).',
+            style: AppTextStyles.bodySmall,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Replace all: erases every existing note first. Cannot be undone.',
+            style: AppTextStyles.bodyMedium.copyWith(color: AppColors.error),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        OutlinedButton(
+          onPressed: () => _confirmReplace(context),
+          style: OutlinedButton.styleFrom(foregroundColor: AppColors.error),
+          child: const Text('Replace all'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, _ImportChoice.merge),
+          child: const Text('Merge'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _confirmReplace(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Replace all notes?', style: AppTextStyles.titleMedium),
+        content: Text(
+          'This will permanently delete all your current notes and replace them '
+          'with the ${preview.total} note(s) from the backup. This cannot be undone.',
+          style: AppTextStyles.bodyMedium,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Yes, replace all'),
+          ),
+        ],
+      ),
+    );
+    if (!context.mounted) return;
+    if (ok == true) {
+      Navigator.pop(context, _ImportChoice.replaceAll);
+    }
   }
 }

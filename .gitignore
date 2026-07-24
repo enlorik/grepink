@@ -45,3 +45,9 @@ app.*.map.json
 # Generated files
 *.g.dart
 *.freezed.dart
+.session/
+
+# Android signing — never commit these
+android/key.properties
+*.jks
+*.keystore
