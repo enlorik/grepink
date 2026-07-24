@@ -99,7 +99,7 @@ For manual verification steps, see
 
 **Why chunk notes before comparing** — A two-page note about Rome would dilute similarity against any single incoming claim about the Colosseum. Chunking at the paragraph level makes both sides of the comparison claim-shaped, so scores reflect actual topical overlap rather than document-level noise.
 
-**Why two similarity thresholds** — Three outcome categories need two fences. 0.88+ means "same statement, possibly better-sourced" → duplicate or better-source. 0.72–0.88 means "same topic, genuinely new angle" → related-but-new. Below 0.72 → new claim. The space between the fences is where fresh perspective lives; collapsing to a single threshold would lose that distinction.
+**Why the deduplication uses a similarity threshold** — The claim-review step compares each incoming claim against local notes and uses a similarity threshold (currently 0.65) to separate near-duplicates from new claims. A two-threshold ladder (producing new / related-but-new / duplicate outcomes) lives in the delta detector component of the pipeline; the claim-review UI reflects those classifications but applies its own single-threshold gate at the deduplication step.
 
 **Why the default build has no grounded provider** — If no provider is configured, the pipeline is explicitly off and the UI says so. Generating a synthetic answer or silently skipping grounding would mean you can't tell whether a claim was actually grounded. The whole point of claim review is that claims trace back to a real source; an ungrounded answer would make the classification meaningless.
 
