@@ -97,7 +97,7 @@ For manual verification steps, see
 
 ## Design notes
 
-**Why chunk notes before comparing** — A two-page note about Rome would dilute similarity against any single incoming claim about the Colosseum. Chunking at the paragraph level makes both sides of the comparison claim-shaped, so scores reflect actual topical overlap rather than document-level noise.
+**Why chunk notes before comparing** — A two-page note about Rome would dilute similarity against any single incoming claim about the Colosseum. Notes are split at sentence boundaries and newlines (Markdown list markers stripped), making both sides of the comparison claim-shaped so scores reflect actual topical overlap rather than document-level noise.
 
 **Why the deduplication uses a similarity threshold** — The claim-review deduplication step compares each incoming claim against local notes using a similarity threshold (currently 0.65). Claims above that threshold are classified as already-known, better-source, contradiction, or uncertain depending on context; claims below it are treated as new. The threshold is a single gate, not a multi-level ladder.
 
