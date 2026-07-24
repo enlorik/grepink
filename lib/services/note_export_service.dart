@@ -70,7 +70,16 @@ class NoteExportService {
         throw FormatException('Note at index $i is not an object');
       }
       try {
-        notes.add(Note.fromJson(entry));
+        final imported = Note.fromJson(entry);
+        // Export JSON intentionally omits the embedding vector, so every
+        // imported note must be queued for reindexing regardless of the source
+        // device's previous embeddingPending flag.
+        notes.add(
+          imported.copyWith(
+            embeddingPending: true,
+            clearEmbedding: true,
+          ),
+        );
       } catch (e) {
         throw FormatException('Note at index $i is malformed: $e');
       }
