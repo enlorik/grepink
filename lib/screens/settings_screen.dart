@@ -531,7 +531,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _exportNotes() async {
     final messenger = ScaffoldMessenger.of(context);
     try {
-      final notes = ref.read(notesProvider).valueOrNull ?? [];
+      final notes = await DatabaseService.instance.getAllNotes();
       final jsonText = NoteExportService.instance.encode(notes);
       final dir = await getTemporaryDirectory();
       final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').substring(0, 19);
@@ -592,7 +592,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       return;
     }
 
-    final existing = ref.read(notesProvider).valueOrNull ?? [];
+    final existing = await DatabaseService.instance.getAllNotes();
     final preview = NoteExportService.instance.preview(existing, incoming);
 
     if (!mounted) return;
