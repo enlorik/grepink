@@ -607,7 +607,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (choice == _ImportChoice.replaceAll) {
         await DatabaseService.instance.clearAll();
         for (final note in incoming) {
-          await DatabaseService.instance.insertNote(note);
+          await DatabaseService.instance.insertNote(
+            note.copyWith(embeddingPending: true, clearEmbedding: true),
+          );
         }
         await ref.read(notesProvider.notifier).loadNotes();
         if (!mounted) return;
@@ -619,10 +621,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         final all = await DatabaseService.instance.getAllNotes();
         final existingIds = {for (final n in all) n.id};
         for (final note in output.notes) {
+          final pending = note.copyWith(embeddingPending: true, clearEmbedding: true);
           if (existingIds.contains(note.id)) {
-            await DatabaseService.instance.updateNote(note);
+            await DatabaseService.instance.updateNote(pending);
           } else {
-            await DatabaseService.instance.insertNote(note);
+            await DatabaseService.instance.insertNote(pending);
           }
         }
         await ref.read(notesProvider.notifier).loadNotes();

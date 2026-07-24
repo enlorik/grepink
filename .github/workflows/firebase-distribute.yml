@@ -54,7 +54,9 @@ jobs:
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_PREVIEW_KEYSTORE_BASE64 }}
         run: |
-          echo "$KEYSTORE_BASE64" | base64 --decode > android/preview.jks
+          # Decode into android/app/ so Gradle's file() resolves it correctly
+          # relative to the :app project directory.
+          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/preview.jks
 
       - name: Compute versionCode from run number
         id: version
@@ -94,4 +96,4 @@ jobs:
 
       - name: Clean up keystore
         if: always()
-        run: rm -f android/preview.jks
+        run: rm -f android/app/preview.jks
