@@ -617,24 +617,33 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           SnackBar(content: Text('Replaced all notes with ${incoming.length} from backup')),
         );
       } else {
-        final output = NoteExportService.instance.merge(existing, incoming);
-        final all = await DatabaseService.instance.getAllNotes();
-        final existingIds = {for (final n in all) n.id};
-        for (final note in output.notes) {
-          final pending = note.copyWith(embeddingPending: true, clearEmbedding: true);
-          if (existingIds.contains(note.id)) {
-            await DatabaseService.instance.updateNote(pending);
+        // Only touch notes from incoming that are new or strictly newer.
+        // Skipped notes (existing is same or newer) are left untouched so
+        // their embeddings are not destroyed.
+        final existingById = {for (final n in existing) n.id: n};
+        int added = 0, updated = 0, skipped = 0;
+        for (final note in incoming) {
+          final current = existingById[note.id];
+          if (current == null) {
+            await DatabaseService.instance.insertNote(
+              note.copyWith(embeddingPending: true, clearEmbedding: true),
+            );
+            added++;
+          } else if (note.updatedAt.isAfter(current.updatedAt)) {
+            await DatabaseService.instance.updateNote(
+              note.copyWith(embeddingPending: true, clearEmbedding: true),
+            );
+            updated++;
           } else {
-            await DatabaseService.instance.insertNote(pending);
+            skipped++;
           }
         }
         await ref.read(notesProvider.notifier).loadNotes();
         if (!mounted) return;
-        final r = output.result;
         messenger.showSnackBar(
           SnackBar(
             content: Text(
-              'Import complete — added ${r.added}, updated ${r.updated}, skipped ${r.skipped}',
+              'Import complete — added $added, updated $updated, skipped $skipped',
             ),
           ),
         );
