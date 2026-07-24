@@ -1,11 +1,10 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'dart:io';
 import '../models/brave_settings.dart';
 import '../models/note.dart';
 import '../providers/brave_settings_provider.dart';
@@ -533,12 +532,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     try {
       final notes = await DatabaseService.instance.getAllNotes();
       final jsonText = NoteExportService.instance.encode(notes);
-      final dir = await getTemporaryDirectory();
       final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').substring(0, 19);
-      final file = File('${dir.path}/grepink-notes-$timestamp.json');
-      await file.writeAsString(jsonText);
+      final bytes = Uint8List.fromList(utf8.encode(jsonText));
       await Share.shareXFiles(
-        [XFile(file.path, mimeType: 'application/json')],
+        [XFile.fromData(bytes, name: 'grepink-notes-$timestamp.json', mimeType: 'application/json')],
         subject: 'Grepink notes backup',
       );
     } catch (e) {
@@ -566,20 +563,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (result == null || result.files.isEmpty) return;
 
     final bytes = result.files.first.bytes;
-    final String raw;
-    if (bytes != null) {
-      raw = utf8.decode(bytes);
-    } else {
-      final path = result.files.first.path;
-      if (path == null) {
-        if (!mounted) return;
-        messenger.showSnackBar(
-          const SnackBar(content: Text('Could not read the selected file')),
-        );
-        return;
-      }
-      raw = await File(path).readAsString();
+    if (bytes == null) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Could not read the selected file')),
+      );
+      return;
     }
+    final raw = utf8.decode(bytes);
 
     List<Note> incoming;
     try {
