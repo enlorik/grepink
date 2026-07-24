@@ -571,17 +571,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       return;
     }
     List<Note> incoming;
-    List<Note> existing;
-    ImportPreview preview;
     try {
       final raw = utf8.decode(bytes);
       incoming = NoteExportService.instance.decode(raw);
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text('Invalid backup file: $e')),
+      );
+      return;
+    }
+
+    List<Note> existing;
+    ImportPreview preview;
+    try {
       existing = await DatabaseService.instance.getAllNotes();
       preview = NoteExportService.instance.preview(existing, incoming);
     } catch (e) {
       if (!mounted) return;
       messenger.showSnackBar(
-        SnackBar(content: Text('Invalid backup file: $e')),
+        SnackBar(content: Text('Could not read notes: $e')),
       );
       return;
     }
@@ -594,38 +603,33 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
     if (choice == null || !mounted) return;
 
+    String? successMessage;
     try {
       if (choice == _ImportChoice.replaceAll) {
         final pendingNotes = incoming.map(
           (n) => n.copyWith(embeddingPending: true, clearEmbedding: true),
         ).toList();
         await DatabaseService.instance.replaceAll(pendingNotes);
-        await ref.read(notesProvider.notifier).loadNotes();
-        // Start re-embedding before the mounted check so unmounting during
-        // navigation does not silently abandon notes with embeddingPending=true.
-        ref.read(notesProvider.notifier).reindexPendingNotes();
-        if (!mounted) return;
-        messenger.showSnackBar(
-          SnackBar(content: Text('Replaced all notes with ${incoming.length} from backup')),
-        );
+        successMessage = 'Replaced all notes with ${incoming.length} from backup';
       } else {
-        // Atomic: either all changes land or none do (unlike individual inserts).
+        // Atomic: either all changes land or none do.
         final result = await DatabaseService.instance.mergeNotes(existing, incoming);
-        await ref.read(notesProvider.notifier).loadNotes();
-        ref.read(notesProvider.notifier).reindexPendingNotes();
-        if (!mounted) return;
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text(
-              'Import complete — added ${result.added}, updated ${result.updated}, skipped ${result.skipped}',
-            ),
-          ),
-        );
+        successMessage = 'Import complete — added ${result.added}, updated ${result.updated}, skipped ${result.skipped}';
       }
     } catch (e) {
       if (!mounted) return;
       messenger.showSnackBar(SnackBar(content: Text('Import failed: $e')));
+      return;
     }
+
+    // UI refresh and re-embedding run after the write succeeds. loadNotes() is
+    // outside the write try/catch so a transient read error does not incorrectly
+    // report the import as failed when the data was already written.
+    await ref.read(notesProvider.notifier).loadNotes();
+    // Fire-and-forget: wraps its own exceptions so no unhandled futures escape.
+    ref.read(notesProvider.notifier).reindexPendingNotes();
+    if (!mounted) return;
+    messenger.showSnackBar(SnackBar(content: Text(successMessage)));
   }
 
   Future<void> _confirmClearAll() async {
