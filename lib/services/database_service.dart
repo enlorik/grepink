@@ -21,6 +21,11 @@ class DatabaseService {
     return openDatabase(
       path,
       version: 1,
+      onConfigure: (db) async {
+        // WAL mode keeps the main DB file clean between checkpoints, so
+        // Android Auto Backup always captures a consistent snapshot.
+        await db.execute('PRAGMA journal_mode=WAL');
+      },
       onCreate: _onCreate,
     );
   }
@@ -191,6 +196,47 @@ class DatabaseService {
     final db = await database;
     await db.delete('notes');
     await db.execute('DELETE FROM notes_fts');
+  }
+
+  /// Atomically merges [incoming] notes into the database.
+  /// Incoming wins only when its updatedAt is strictly newer.
+  /// Returns the counts of added, updated, and skipped notes.
+  Future<({int added, int updated, int skipped})> mergeNotes(
+    List<Note> existing,
+    List<Note> incoming,
+  ) async {
+    final db = await database;
+    final existingById = {for (final n in existing) n.id: n};
+    int added = 0, updated = 0, skipped = 0;
+    await db.transaction((txn) async {
+      for (final note in incoming) {
+        final current = existingById[note.id];
+        final toWrite = note.copyWith(embeddingPending: true, clearEmbedding: true);
+        if (current == null) {
+          await txn.insert('notes', toWrite.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+          added++;
+        } else if (note.updatedAt.isAfter(current.updatedAt)) {
+          await txn.update('notes', toWrite.toMap(), where: 'id = ?', whereArgs: [note.id]);
+          updated++;
+        } else {
+          skipped++;
+        }
+      }
+    });
+    return (added: added, updated: updated, skipped: skipped);
+  }
+
+  /// Atomically replaces all notes. Either every note from [notes] is written
+  /// or the existing data is left completely intact (no partial import).
+  Future<void> replaceAll(List<Note> notes) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      await txn.delete('notes');
+      await txn.execute('DELETE FROM notes_fts');
+      for (final note in notes) {
+        await txn.insert('notes', note.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+      }
+    });
   }
 
   Future<void> reindexFts() async {

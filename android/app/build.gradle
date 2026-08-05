@@ -4,6 +4,18 @@ plugins {
     id "dev.flutter.flutter-gradle-plugin"
 }
 
+// Prefer key.properties (local dev); CI supplies ANDROID_PREVIEW_* env vars.
+def keystorePropertiesFile = rootProject.file("key.properties")
+def kp = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withInputStream { kp.load(it) }
+}
+
+def ksFile     = kp['storeFile']     ?: System.getenv('ANDROID_PREVIEW_STORE_FILE')
+def ksPassword = kp['storePassword'] ?: System.getenv('ANDROID_PREVIEW_STORE_PASSWORD')
+def ksAlias    = kp['keyAlias']      ?: System.getenv('ANDROID_PREVIEW_KEY_ALIAS')
+def ksKeyPass  = kp['keyPassword']   ?: System.getenv('ANDROID_PREVIEW_KEY_PASSWORD')
+
 android {
     namespace "com.enlorik.grepink"
     compileSdk flutter.compileSdkVersion
@@ -18,6 +30,16 @@ android {
         jvmTarget = '1.8'
     }
 
+    signingConfigs {
+        release {
+            // Resolved at task-execution time so debug/analyze/test tasks are not blocked.
+            storeFile     ksFile     != null ? file(ksFile) : null
+            storePassword ksPassword ?: ''
+            keyAlias      ksAlias    ?: ''
+            keyPassword   ksKeyPass  ?: ''
+        }
+    }
+
     defaultConfig {
         applicationId "com.enlorik.grepink"
         minSdkVersion flutter.minSdkVersion
@@ -28,7 +50,25 @@ android {
 
     buildTypes {
         release {
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
+            minifyEnabled false
+            shrinkResources false
+        }
+    }
+}
+
+// Fail the release build early if keystore config is missing, rather than
+// producing an APK signed with the wrong key.
+tasks.whenTaskAdded { task ->
+    if (task.name == 'packageRelease' || task.name == 'assembleRelease' || task.name == 'bundleRelease') {
+        task.doFirst {
+            if (ksFile == null || ksPassword == null || ksAlias == null || ksKeyPass == null) {
+                throw new GradleException(
+                    "Release signing is not configured.\n" +
+                    "Create android/key.properties or set ANDROID_PREVIEW_* environment variables.\n" +
+                    "See docs/android_signing.md for setup instructions."
+                )
+            }
         }
     }
 }

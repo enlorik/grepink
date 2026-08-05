@@ -86,6 +86,25 @@ class NotesNotifier extends StateNotifier<AsyncValue<List<Note>>> {
     await loadNotes();
   }
 
+  /// Embeds only notes that have embeddingPending=true. Called after import so
+  /// restored notes appear in semantic search without a full manual reindex.
+  Future<void> reindexPendingNotes() async {
+    try {
+      final settings = await _ref.read(settingsProvider.future);
+      final apiKey = settings.apiKey;
+      if (apiKey.isEmpty) return;
+
+      final pending = await DatabaseService.instance.getNotesWithPendingEmbeddings();
+      for (final note in pending) {
+        try {
+          final embedding = await EmbeddingService.instance.embedNote(note, apiKey);
+          await DatabaseService.instance.updateEmbedding(note.id, embedding);
+        } catch (_) {}
+      }
+      await loadNotes();
+    } catch (_) {}
+  }
+
   Future<void> _triggerEmbedding(Note note) async {
     try {
       final settings = await _ref.read(settingsProvider.future);
