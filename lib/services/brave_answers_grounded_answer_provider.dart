@@ -5,17 +5,21 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 import '../models/grounded_answer.dart';
+import 'brave_evidence_provider.dart';
 import '../models/grounded_answer_provider_outcome.dart';
 import 'grounded_answer_provider.dart';
 
 class BraveAnswersGroundedAnswerProvider implements GroundedAnswerProvider {
   final String _apiKey;
+  final BraveSafeSearch _safeSearch;
   final http.Client _client;
 
   BraveAnswersGroundedAnswerProvider({
     required String apiKey,
+    BraveSafeSearch safeSearch = BraveSafeSearch.moderate,
     http.Client? client,
   })  : _apiKey = apiKey,
+        _safeSearch = safeSearch,
         _client = client ?? http.Client();
 
   static final _citationTag =
@@ -39,6 +43,7 @@ class BraveAnswersGroundedAnswerProvider implements GroundedAnswerProvider {
         'model': 'brave',
         'stream': true,
         'enable_citations': true,
+        'web_search_options': {'safesearch': _safeSearch.name},
         'messages': [
           {'role': 'user', 'content': question}
         ],

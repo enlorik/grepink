@@ -26,7 +26,10 @@ final groundedAnswerProviderProvider =
   if (apiKey == null || apiKey.trim().isEmpty) {
     return const NullGroundedAnswerProvider();
   }
-  return BraveAnswersGroundedAnswerProvider(apiKey: apiKey);
+  return BraveAnswersGroundedAnswerProvider(
+    apiKey: apiKey,
+    safeSearch: braveSettings.safeSearch,
+  );
 });
 
 final claimExtractionServiceProvider = Provider<ClaimExtractionService>(
