@@ -19,9 +19,13 @@ import 'package:grepink/screens/search_screen.dart';
 import 'package:grepink/services/claim_deduplication_service.dart';
 import 'package:grepink/services/claim_extraction_service.dart';
 import 'package:grepink/services/grounded_answer_ingestion_service.dart';
+import 'package:grepink/models/grounded_answer_provider_outcome.dart';
 import 'package:grepink/services/grounded_answer_provider.dart';
 import 'package:grepink/services/knowledge_ingestion_service.dart';
 import 'package:grepink/services/local_evidence_retriever.dart';
+
+import 'helpers/fake_brave_settings.dart';
+import 'helpers/fake_llm_settings.dart';
 
 // ─── Test doubles ────────────────────────────────────────────────────────────
 
@@ -73,12 +77,9 @@ class _FixedGroundedAnswerProvider implements GroundedAnswerProvider {
   final GroundedAnswer answer;
 
   _FixedGroundedAnswerProvider(this.answer);
-
   @override
-  bool get isConfigured => true;
-
-  @override
-  Future<GroundedAnswer?> fetchGroundedAnswer(String question) async => answer;
+  Future<GroundedAnswerProviderOutcome> fetchGroundedAnswer(String question) async =>
+      GroundedAnswerSuccess(answer);
 }
 
 class _FixedClaimExtractionService implements ClaimExtractionService {
@@ -215,7 +216,9 @@ Future<ProviderContainer> _pumpSearchScreen(
       ),
       noteDraftReviewRepositoryProvider.overrideWithValue(repository),
       groundedAnswerIngestionServiceProvider
-          .overrideWithValue(ingestionService),
+          .overrideWith((_) async => ingestionService),
+      braveSettingsOverride(const BraveSettings(answersKeyConfigured: true)),
+      llmSettingsOverride(LlmProviderConfig.defaults),
       allNotesProvider.overrideWithValue(availableNotes),
       recentNotesProvider.overrideWithValue(const <Note>[]),
       refreshNotesProvider.overrideWithValue(() async {}),
@@ -936,7 +939,9 @@ void main() {
           (ref) async => _FakeKnowledgeIngestionService(),
         ),
         noteDraftReviewRepositoryProvider.overrideWithValue(repo),
-        groundedAnswerIngestionServiceProvider.overrideWithValue(service),
+        groundedAnswerIngestionServiceProvider.overrideWith((_) async => service),
+        braveSettingsOverride(const BraveSettings(answersKeyConfigured: true)),
+      llmSettingsOverride(LlmProviderConfig.defaults),
         allNotesProvider.overrideWithValue([existingB]),
         recentNotesProvider.overrideWithValue(const <Note>[]),
         refreshNotesProvider.overrideWithValue(() async {}),
@@ -1621,6 +1626,20 @@ void main() {
       await _askQuestion(tester, 'question');
       await _generateDraft(tester);
 
+      // Inject a note-draft review so the note-draft panel is visible alongside
+      // the claim review panel (simulating a scenario where both are active).
+      container.read(noteDraftReviewProvider.notifier).startReview(
+            const NoteDraft(
+              question: 'question',
+              markdownContent: '# Test\n- Content',
+              action: NoteDraftAction.appendToExistingNote,
+              deltas: [],
+              localEvidence: [],
+              webEvidence: [],
+            ),
+          );
+      await tester.pump();
+
       final claimNotifier = container.read(claimReviewProvider.notifier);
 
       // Select a target note on both panels so both append buttons are enabled.
@@ -1691,6 +1710,20 @@ void main() {
       );
       await _askQuestion(tester, 'question');
       await _generateDraft(tester);
+
+      // Inject a note-draft review so the note-draft panel is visible alongside
+      // the claim review panel.
+      container.read(noteDraftReviewProvider.notifier).startReview(
+            const NoteDraft(
+              question: 'question',
+              markdownContent: '# Test\n- Content',
+              action: NoteDraftAction.appendToExistingNote,
+              deltas: [],
+              localEvidence: [],
+              webEvidence: [],
+            ),
+          );
+      await tester.pump();
 
       final claimNotifier = container.read(claimReviewProvider.notifier);
       claimNotifier.selectTargetNote(existing.id);

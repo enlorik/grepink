@@ -46,7 +46,7 @@ void main() {
       expect(settings.enabled, isFalse);
       expect(settings.resultCount, 5);
       expect(settings.safeSearch, BraveSafeSearch.moderate);
-      expect(settings.apiKeyConfigured, isFalse);
+      expect(settings.searchKeyConfigured, isFalse);
     });
 
     test('setEnabled persists config safely', () async {
@@ -81,13 +81,13 @@ void main() {
       await container.read(braveSettingsProvider.future);
       await container.read(braveSettingsProvider.notifier).saveApiKey('brave-key');
 
-      expect(secureStorage.data['brave_api_key'], 'brave-key');
+      expect(secureStorage.data['brave_search_api_key'], 'brave-key');
       for (final key in prefs.getKeys()) {
         final value = prefs.get(key)?.toString() ?? '';
         expect(value.contains('brave-key'), isFalse);
       }
       expect(
-        container.read(braveSettingsProvider).valueOrNull!.apiKeyConfigured,
+        container.read(braveSettingsProvider).valueOrNull!.searchKeyConfigured,
         isTrue,
       );
     });
@@ -98,9 +98,9 @@ void main() {
 
       await container.read(braveSettingsProvider.notifier).clearApiKey();
 
-      expect(secureStorage.data.containsKey('brave_api_key'), isFalse);
+      expect(secureStorage.data.containsKey('brave_search_api_key'), isFalse);
       expect(
-        container.read(braveSettingsProvider).valueOrNull!.apiKeyConfigured,
+        container.read(braveSettingsProvider).valueOrNull!.searchKeyConfigured,
         isFalse,
       );
     });

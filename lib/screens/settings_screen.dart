@@ -27,21 +27,25 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   late TextEditingController _apiKeyController;
-  late TextEditingController _braveApiKeyController;
+  late TextEditingController _braveSearchApiKeyController;
+  late TextEditingController _braveAnswersApiKeyController;
   bool _apiKeyVisible = false;
-  bool _braveApiKeyVisible = false;
+  bool _braveSearchApiKeyVisible = false;
+  bool _braveAnswersApiKeyVisible = false;
 
   @override
   void initState() {
     super.initState();
     _apiKeyController = TextEditingController();
-    _braveApiKeyController = TextEditingController();
+    _braveSearchApiKeyController = TextEditingController();
+    _braveAnswersApiKeyController = TextEditingController();
   }
 
   @override
   void dispose() {
     _apiKeyController.dispose();
-    _braveApiKeyController.dispose();
+    _braveSearchApiKeyController.dispose();
+    _braveAnswersApiKeyController.dispose();
     super.dispose();
   }
 
@@ -226,8 +230,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         _buildSection('WEB EVIDENCE', [
           _buildSettingRow(
             title: 'Brave Search evidence',
-            subtitle: braveSettings.apiKeyConfigured
-                ? 'API key stored securely'
+            subtitle: braveSettings.searchKeyConfigured
+                ? 'Search API key stored securely'
                 : 'Add a Brave Search API key to enable this later',
             trailing: Switch(
               value: braveSettings.enabled,
@@ -238,21 +242,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ),
           _buildSettingRow(
-            title: 'Brave API Key',
+            title: 'Brave Search API Key',
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 TextField(
-                  controller: _braveApiKeyController,
-                  obscureText: !_braveApiKeyVisible,
+                  controller: _braveSearchApiKeyController,
+                  obscureText: !_braveSearchApiKeyVisible,
                   style: AppTextStyles.bodyMedium.copyWith(
                     color: AppColors.bodyText,
                     fontFamily: 'monospace',
                   ),
                   decoration: InputDecoration(
-                    hintText: braveSettings.apiKeyConfigured
+                    hintText: braveSettings.searchKeyConfigured
                         ? 'Enter a new key to replace the saved one'
-                        : 'brave-key...',
+                        : 'BSA...',
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 10,
@@ -260,7 +264,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     isDense: true,
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _braveApiKeyVisible
+                        _braveSearchApiKeyVisible
                             ? Icons.visibility_off
                             : Icons.visibility,
                         size: 18,
@@ -268,7 +272,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                       onPressed: () {
                         setState(() {
-                          _braveApiKeyVisible = !_braveApiKeyVisible;
+                          _braveSearchApiKeyVisible =
+                              !_braveSearchApiKeyVisible;
                         });
                       },
                     ),
@@ -281,35 +286,119 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   children: [
                     FilledButton(
                       onPressed: () async {
-                        final apiKey = _braveApiKeyController.text.trim();
+                        final apiKey =
+                            _braveSearchApiKeyController.text.trim();
                         if (apiKey.isEmpty) return;
-
                         await ref
                             .read(braveSettingsProvider.notifier)
-                            .saveApiKey(apiKey);
+                            .saveSearchApiKey(apiKey);
                         if (!mounted) return;
-
-                        _braveApiKeyController.clear();
+                        _braveSearchApiKeyController.clear();
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Brave API key saved securely.'),
+                            content:
+                                Text('Brave Search API key saved securely.'),
                           ),
                         );
                       },
                       child: const Text('Save key'),
                     ),
                     OutlinedButton(
-                      onPressed: braveSettings.apiKeyConfigured
+                      onPressed: braveSettings.searchKeyConfigured
                           ? () async {
                               await ref
                                   .read(braveSettingsProvider.notifier)
-                                  .clearApiKey();
+                                  .clearSearchApiKey();
                               if (!mounted) return;
-
-                              _braveApiKeyController.clear();
+                              _braveSearchApiKeyController.clear();
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text('Brave API key cleared.'),
+                                  content: Text('Brave Search API key cleared.'),
+                                ),
+                              );
+                            }
+                          : null,
+                      child: const Text('Clear key'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          _buildSettingRow(
+            title: 'Brave Answers API Key',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: _braveAnswersApiKeyController,
+                  obscureText: !_braveAnswersApiKeyVisible,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.bodyText,
+                    fontFamily: 'monospace',
+                  ),
+                  decoration: InputDecoration(
+                    hintText: braveSettings.answersKeyConfigured
+                        ? 'Enter a new key to replace the saved one'
+                        : 'BAA...',
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    isDense: true,
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _braveAnswersApiKeyVisible
+                            ? Icons.visibility_off
+                            : Icons.visibility,
+                        size: 18,
+                        color: AppColors.secondaryText,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _braveAnswersApiKeyVisible =
+                              !_braveAnswersApiKeyVisible;
+                        });
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    FilledButton(
+                      onPressed: () async {
+                        final apiKey =
+                            _braveAnswersApiKeyController.text.trim();
+                        if (apiKey.isEmpty) return;
+                        await ref
+                            .read(braveSettingsProvider.notifier)
+                            .saveAnswersApiKey(apiKey);
+                        if (!mounted) return;
+                        _braveAnswersApiKeyController.clear();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content:
+                                Text('Brave Answers API key saved securely.'),
+                          ),
+                        );
+                      },
+                      child: const Text('Save key'),
+                    ),
+                    OutlinedButton(
+                      onPressed: braveSettings.answersKeyConfigured
+                          ? () async {
+                              await ref
+                                  .read(braveSettingsProvider.notifier)
+                                  .clearAnswersApiKey();
+                              if (!mounted) return;
+                              _braveAnswersApiKeyController.clear();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content:
+                                      Text('Brave Answers API key cleared.'),
                                 ),
                               );
                             }

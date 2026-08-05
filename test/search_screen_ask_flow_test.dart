@@ -13,6 +13,9 @@ import 'package:grepink/providers/notes_provider.dart';
 import 'package:grepink/screens/search_screen.dart';
 import 'package:grepink/services/knowledge_ingestion_service.dart';
 
+import 'helpers/fake_brave_settings.dart';
+import 'helpers/fake_llm_settings.dart';
+
 class _FakeKnowledgeIngestionService implements KnowledgeIngestionService {
   final Future<NoteDraft> Function(String question) _onIngest;
 
@@ -129,6 +132,9 @@ Future<ProviderContainer> _pumpSearchScreen(
         (ref) async => ingestionService,
       ),
       noteDraftReviewRepositoryProvider.overrideWithValue(repository),
+      braveSettingsOverride(const BraveSettings(searchKeyConfigured: true)),
+      llmSettingsOverride(LlmProviderConfig.defaults
+          .copyWith(providerKind: LlmProviderKind.openAICompatible)),
       allNotesProvider.overrideWithValue(notes),
       recentNotesProvider.overrideWithValue(recentNotes),
       refreshNotesProvider.overrideWithValue(() async {

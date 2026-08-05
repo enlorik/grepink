@@ -16,9 +16,13 @@ import 'package:grepink/screens/search_screen.dart';
 import 'package:grepink/services/claim_deduplication_service.dart';
 import 'package:grepink/services/claim_extraction_service.dart';
 import 'package:grepink/services/grounded_answer_ingestion_service.dart';
+import 'package:grepink/models/grounded_answer_provider_outcome.dart';
 import 'package:grepink/services/grounded_answer_provider.dart';
 import 'package:grepink/services/knowledge_ingestion_service.dart';
 import 'package:grepink/services/local_evidence_retriever.dart';
+
+import 'helpers/fake_brave_settings.dart';
+import 'helpers/fake_llm_settings.dart';
 
 // ─── Test doubles ────────────────────────────────────────────────────────────
 
@@ -52,14 +56,11 @@ class _CountingGroundedAnswerProvider implements GroundedAnswerProvider {
   final GroundedAnswer answer;
 
   _CountingGroundedAnswerProvider(this.answer);
-
   @override
-  bool get isConfigured => true;
-
-  @override
-  Future<GroundedAnswer?> fetchGroundedAnswer(String question) async {
+  Future<GroundedAnswerProviderOutcome> fetchGroundedAnswer(
+      String question) async {
     calls++;
-    return answer;
+    return GroundedAnswerSuccess(answer);
   }
 }
 
@@ -148,7 +149,9 @@ Future<ProviderContainer> _pumpSearchScreen(
       noteDraftReviewRepositoryProvider.overrideWithValue(
         _FakeNoteDraftReviewRepository(),
       ),
-      groundedAnswerIngestionServiceProvider.overrideWithValue(ingestionService),
+      groundedAnswerIngestionServiceProvider.overrideWith((_) async => ingestionService),
+      braveSettingsOverride(const BraveSettings(answersKeyConfigured: true)),
+      llmSettingsOverride(LlmProviderConfig.defaults),
       allNotesProvider.overrideWithValue(const <Note>[]),
       recentNotesProvider.overrideWithValue(const <Note>[]),
       refreshNotesProvider.overrideWithValue(() async {}),
@@ -177,54 +180,6 @@ Future<void> _askQuestion(WidgetTester tester, String question) async {
   await tester.pump();
   await tester.tap(find.byKey(const Key('ask-question-button')));
   await tester.pumpAndSettle();
-}
-
-class _CreateNoteKnowledgeIngestionService implements KnowledgeIngestionService {
-  @override
-  Future<NoteDraft> ingest(String question) async => NoteDraft(
-        question: question,
-        markdownContent: '# Note\n- Content',
-        action: NoteDraftAction.createNewNote,
-        deltas: const [],
-        localEvidence: const [],
-        webEvidence: const [],
-      );
-}
-
-Future<ProviderContainer> _pumpSearchScreenWithDraftReview(
-  WidgetTester tester, {
-  required GroundedAnswerIngestionService ingestionService,
-}) async {
-  final container = ProviderContainer(
-    overrides: [
-      knowledgeIngestionServiceProvider.overrideWith(
-        (ref) async => _CreateNoteKnowledgeIngestionService(),
-      ),
-      noteDraftReviewRepositoryProvider.overrideWithValue(
-        _FakeNoteDraftReviewRepository(),
-      ),
-      groundedAnswerIngestionServiceProvider.overrideWithValue(ingestionService),
-      allNotesProvider.overrideWithValue(const <Note>[]),
-      recentNotesProvider.overrideWithValue(const <Note>[]),
-      refreshNotesProvider.overrideWithValue(() async {}),
-    ],
-  );
-  await tester.pumpWidget(
-    UncontrolledProviderScope(
-      container: container,
-      child: const MaterialApp(
-        home: Scaffold(
-          body: MediaQuery(
-            data: MediaQueryData(disableAnimations: true),
-            child: SearchScreen(),
-          ),
-        ),
-      ),
-    ),
-  );
-  await tester.pump();
-  addTearDown(container.dispose);
-  return container;
 }
 
 void main() {
@@ -469,7 +424,7 @@ void main() {
         ],
       );
 
-      final container = await _pumpSearchScreenWithDraftReview(
+      final container = await _pumpSearchScreen(
         tester,
         ingestionService: service,
       );
@@ -479,9 +434,10 @@ void main() {
       expect(find.byKey(const Key('claim-review-groups-panel')), findsOneWidget);
       expect(container.read(claimReviewProvider).hasReviewItems, isTrue);
 
-      // Tap Discard on the note draft review widget.
-      await tester.ensureVisible(find.text('Discard'));
-      await tester.tap(find.text('Discard'));
+      // Tap "Discard review" on the claim review panel.
+      final discardBtn = find.byKey(const Key('discard-claim-review-button'));
+      await tester.ensureVisible(discardBtn);
+      await tester.tap(discardBtn);
       await tester.pumpAndSettle();
 
       // Discard must reset claimReviewProvider so no stale groups remain.

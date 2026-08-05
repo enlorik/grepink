@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:grepink/models/grounded_answer.dart';
+import 'package:grepink/models/grounded_answer_provider_outcome.dart';
 import 'package:grepink/services/grounded_answer_provider.dart';
 
 class FakeGroundedAnswerProvider implements GroundedAnswerProvider {
@@ -7,12 +8,12 @@ class FakeGroundedAnswerProvider implements GroundedAnswerProvider {
   FakeGroundedAnswerProvider(this._result);
 
   @override
-  bool get isConfigured => true;
-
-  @override
-  Future<GroundedAnswer?> fetchGroundedAnswer(String question) async {
-    if (question.trim().isEmpty) return null;
-    return _result;
+  Future<GroundedAnswerProviderOutcome> fetchGroundedAnswer(
+      String question) async {
+    if (question.trim().isEmpty) return const GroundedAnswerNotConfigured();
+    final r = _result;
+    if (r == null) return const GroundedAnswerNotConfigured();
+    return GroundedAnswerSuccess(r);
   }
 }
 
@@ -237,33 +238,52 @@ void main() {
   });
 
   group('GroundedAnswerProvider interface', () {
-    test('empty question returns null without calling into result', () async {
+    test('empty question returns GroundedAnswerNotConfigured', () async {
       final provider = FakeGroundedAnswerProvider(_answer());
-      expect(await provider.fetchGroundedAnswer(''), isNull);
+      expect(
+        await provider.fetchGroundedAnswer(''),
+        isA<GroundedAnswerNotConfigured>(),
+      );
     });
 
-    test('whitespace-only question returns null', () async {
+    test('whitespace-only question returns GroundedAnswerNotConfigured', () async {
       final provider = FakeGroundedAnswerProvider(_answer());
-      expect(await provider.fetchGroundedAnswer('   '), isNull);
+      expect(
+        await provider.fetchGroundedAnswer('   '),
+        isA<GroundedAnswerNotConfigured>(),
+      );
     });
 
-    test('valid question returns the injected answer', () async {
+    test('valid question returns GroundedAnswerSuccess with the injected answer', () async {
       final injected = _answer(question: 'What is Dart?');
       final provider = FakeGroundedAnswerProvider(injected);
       final result = await provider.fetchGroundedAnswer('What is Dart?');
-      expect(result, same(injected));
+      expect(result, isA<GroundedAnswerSuccess>());
+      expect((result as GroundedAnswerSuccess).answer, same(injected));
     });
 
-    test('provider configured to return null does so for a non-empty question', () async {
+    test('provider configured to return null gives GroundedAnswerNotConfigured', () async {
       final provider = FakeGroundedAnswerProvider(null);
-      expect(await provider.fetchGroundedAnswer('some question'), isNull);
+      expect(
+        await provider.fetchGroundedAnswer('some question'),
+        isA<GroundedAnswerNotConfigured>(),
+      );
     });
 
-    test('NullGroundedAnswerProvider always returns null regardless of question', () async {
+    test('NullGroundedAnswerProvider always returns GroundedAnswerNotConfigured', () async {
       const provider = NullGroundedAnswerProvider();
-      expect(await provider.fetchGroundedAnswer('anything'), isNull);
-      expect(await provider.fetchGroundedAnswer(''), isNull);
-      expect(await provider.fetchGroundedAnswer('   '), isNull);
+      expect(
+        await provider.fetchGroundedAnswer('anything'),
+        isA<GroundedAnswerNotConfigured>(),
+      );
+      expect(
+        await provider.fetchGroundedAnswer(''),
+        isA<GroundedAnswerNotConfigured>(),
+      );
+      expect(
+        await provider.fetchGroundedAnswer('   '),
+        isA<GroundedAnswerNotConfigured>(),
+      );
     });
   });
 }

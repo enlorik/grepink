@@ -21,11 +21,15 @@ import 'package:grepink/services/claim_deduplication_service.dart';
 import 'package:grepink/services/claim_extraction_service.dart';
 import 'package:grepink/services/claim_review_mapper.dart';
 import 'package:grepink/services/grounded_answer_ingestion_service.dart';
+import 'package:grepink/models/grounded_answer_provider_outcome.dart';
 import 'package:grepink/services/grounded_answer_provider.dart';
 import 'package:grepink/services/knowledge_ingestion_service.dart';
 import 'package:grepink/services/local_evidence_retriever.dart';
 import 'package:grepink/services/provider_name_formatter.dart';
 import 'package:grepink/services/selected_claims_draft_builder.dart';
+
+import 'helpers/fake_brave_settings.dart';
+import 'helpers/fake_llm_settings.dart';
 
 // ─── Test doubles ─────────────────────────────────────────────────────────────
 
@@ -67,41 +71,32 @@ class _SimpleNoteDraftReviewRepository implements NoteDraftReviewRepository {
 class _FixedGroundedAnswerProvider implements GroundedAnswerProvider {
   final GroundedAnswer answer;
   _FixedGroundedAnswerProvider(this.answer);
-
   @override
-  bool get isConfigured => true;
-
-  @override
-  Future<GroundedAnswer?> fetchGroundedAnswer(String question) async => answer;
+  Future<GroundedAnswerProviderOutcome> fetchGroundedAnswer(String question) async =>
+      GroundedAnswerSuccess(answer);
 }
 
-/// Blocks until [gate] completes, then returns [answer]. isConfigured = true.
+/// Blocks until [gate] completes, then returns [answer].
 class _GatedGroundedAnswerProvider implements GroundedAnswerProvider {
   final GroundedAnswer answer;
   final Completer<void> gate;
   _GatedGroundedAnswerProvider(this.answer, this.gate);
-
   @override
-  bool get isConfigured => true;
-
-  @override
-  Future<GroundedAnswer?> fetchGroundedAnswer(String question) async {
+  Future<GroundedAnswerProviderOutcome> fetchGroundedAnswer(
+      String question) async {
     await gate.future;
-    return answer;
+    return GroundedAnswerSuccess(answer);
   }
 }
 
-/// Throws from fetchGroundedAnswer. isConfigured = true so runReview() enters
-/// the pipeline and the exception is caught by GroundedAnswerIngestionService.
+/// Throws from fetchGroundedAnswer so runReview() enters the pipeline and
+/// the exception is caught by GroundedAnswerIngestionService.
 class _ThrowingGroundedAnswerProvider implements GroundedAnswerProvider {
   final Object error;
   _ThrowingGroundedAnswerProvider(this.error);
-
   @override
-  bool get isConfigured => true;
-
-  @override
-  Future<GroundedAnswer?> fetchGroundedAnswer(String question) async =>
+  Future<GroundedAnswerProviderOutcome> fetchGroundedAnswer(
+      String question) async =>
       throw error;
 }
 
@@ -218,7 +213,9 @@ Future<ProviderContainer> _pumpSearchScreen(
         _SimpleNoteDraftReviewRepository(),
       ),
       groundedAnswerIngestionServiceProvider
-          .overrideWithValue(ingestionService),
+          .overrideWith((_) async => ingestionService),
+      braveSettingsOverride(const BraveSettings(answersKeyConfigured: true)),
+      llmSettingsOverride(LlmProviderConfig.defaults),
       if (mapper != null) claimReviewMapperProvider.overrideWithValue(mapper),
       allNotesProvider.overrideWithValue(const <Note>[]),
       recentNotesProvider.overrideWithValue(const <Note>[]),

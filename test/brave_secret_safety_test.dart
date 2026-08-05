@@ -43,7 +43,7 @@ void main() {
         enabled: true,
         resultCount: 7,
         safeSearch: BraveSafeSearch.strict,
-        apiKeyConfigured: true,
+        searchKeyConfigured: true,
       );
 
       final json = settings.toJson();
@@ -51,8 +51,10 @@ void main() {
       expect(json.containsKey('enabled'), isTrue);
       expect(json.containsKey('resultCount'), isTrue);
       expect(json.containsKey('safeSearch'), isTrue);
-      expect(json.containsKey('apiKeyConfigured'), isFalse,
-          reason: 'apiKeyConfigured must not be serialised to JSON');
+      expect(json.containsKey('searchKeyConfigured'), isFalse,
+          reason: 'searchKeyConfigured must not be serialised to JSON');
+      expect(json.containsKey('answersKeyConfigured'), isFalse,
+          reason: 'answersKeyConfigured must not be serialised to JSON');
       expect(json.containsKey('apiKey'), isFalse);
       expect(json.containsKey('api_key'), isFalse);
     });
@@ -61,7 +63,7 @@ void main() {
       const settings = BraveSettings(
         enabled: true,
         resultCount: 3,
-        apiKeyConfigured: true,
+        searchKeyConfigured: true,
       );
 
       final jsonString = settings.toJsonString();
@@ -69,21 +71,21 @@ void main() {
       expect(jsonString.toLowerCase().contains('apikey'), isFalse);
       expect(jsonString.toLowerCase().contains('api_key'), isFalse);
       expect(jsonString.toLowerCase().contains('configured'), isFalse,
-          reason: 'apiKeyConfigured flag must not leak into stored JSON');
+          reason: 'key-configured flags must not leak into stored JSON');
     });
 
-    test('round-trip through toJsonString/fromJsonString never restores apiKeyConfigured', () {
+    test('round-trip through toJsonString/fromJsonString never restores searchKeyConfigured', () {
       const original = BraveSettings(
         enabled: true,
         resultCount: 10,
         safeSearch: BraveSafeSearch.strict,
-        apiKeyConfigured: true,
+        searchKeyConfigured: true,
       );
 
       final restored = BraveSettings.fromJsonString(original.toJsonString());
 
-      expect(restored.apiKeyConfigured, isFalse,
-          reason: 'apiKeyConfigured is not stored so it cannot be restored from JSON');
+      expect(restored.searchKeyConfigured, isFalse,
+          reason: 'searchKeyConfigured is not stored so it cannot be restored from JSON');
     });
 
     test('fromJsonString ignores an injected apiKey field without throwing', () {
@@ -94,7 +96,7 @@ void main() {
 
       expect(settings.enabled, isTrue);
       expect(settings.resultCount, 5);
-      expect(settings.apiKeyConfigured, isFalse);
+      expect(settings.searchKeyConfigured, isFalse);
     });
   });
 
@@ -102,11 +104,11 @@ void main() {
     test('saveApiKey with empty string deletes the key from secure storage', () async {
       final (service, secure) = await _makeService();
       await service.saveApiKey('real-key');
-      expect(secure.data.containsKey('brave_api_key'), isTrue);
+      expect(secure.data.containsKey('brave_search_api_key'), isTrue);
 
       await service.saveApiKey('');
 
-      expect(secure.data.containsKey('brave_api_key'), isFalse);
+      expect(secure.data.containsKey('brave_search_api_key'), isFalse);
       expect(await service.hasApiKey, isFalse);
     });
 
@@ -114,7 +116,7 @@ void main() {
       final (service, secure) = await _makeService();
       await service.saveApiKey('   ');
 
-      expect(secure.data.containsKey('brave_api_key'), isFalse);
+      expect(secure.data.containsKey('brave_search_api_key'), isFalse);
       expect(await service.hasApiKey, isFalse);
     });
 
@@ -145,21 +147,21 @@ void main() {
   });
 
   group('BraveSettingsNotifier — key safety', () {
-    test('clearing API key updates apiKeyConfigured to false', () async {
+    test('clearing API key updates searchKeyConfigured to false', () async {
       final (container, _, _, _) = await _makeContainer();
       addTearDown(container.dispose);
 
       await container.read(braveSettingsProvider.future);
       await container.read(braveSettingsProvider.notifier).saveApiKey('brave-key');
       expect(
-        container.read(braveSettingsProvider).valueOrNull!.apiKeyConfigured,
+        container.read(braveSettingsProvider).valueOrNull!.searchKeyConfigured,
         isTrue,
       );
 
       await container.read(braveSettingsProvider.notifier).clearApiKey();
 
       expect(
-        container.read(braveSettingsProvider).valueOrNull!.apiKeyConfigured,
+        container.read(braveSettingsProvider).valueOrNull!.searchKeyConfigured,
         isFalse,
       );
     });
@@ -171,9 +173,9 @@ void main() {
       await container.read(braveSettingsProvider.future);
       await container.read(braveSettingsProvider.notifier).saveApiKey('');
 
-      expect(secure.data.containsKey('brave_api_key'), isFalse);
+      expect(secure.data.containsKey('brave_search_api_key'), isFalse);
       expect(
-        container.read(braveSettingsProvider).valueOrNull!.apiKeyConfigured,
+        container.read(braveSettingsProvider).valueOrNull!.searchKeyConfigured,
         isFalse,
       );
     });

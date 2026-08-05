@@ -4,6 +4,8 @@ class GroundedAnswerCitation {
   final String url;
   final String? snippet;
   final int? position;
+  final int? startIndex;
+  final int? endIndex;
 
   const GroundedAnswerCitation({
     required this.id,
@@ -11,7 +13,29 @@ class GroundedAnswerCitation {
     required this.url,
     this.snippet,
     this.position,
+    this.startIndex,
+    this.endIndex,
   });
+
+  GroundedAnswerCitation copyWith({
+    String? id,
+    String? title,
+    String? url,
+    String? snippet,
+    int? position,
+    int? startIndex,
+    int? endIndex,
+  }) {
+    return GroundedAnswerCitation(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      url: url ?? this.url,
+      snippet: snippet ?? this.snippet,
+      position: position ?? this.position,
+      startIndex: startIndex ?? this.startIndex,
+      endIndex: endIndex ?? this.endIndex,
+    );
+  }
 
   @override
   bool operator ==(Object other) =>
@@ -19,10 +43,12 @@ class GroundedAnswerCitation {
       other is GroundedAnswerCitation &&
           runtimeType == other.runtimeType &&
           id == other.id &&
-          url == other.url;
+          url == other.url &&
+          startIndex == other.startIndex &&
+          endIndex == other.endIndex;
 
   @override
-  int get hashCode => Object.hash(id, url);
+  int get hashCode => Object.hash(id, url, startIndex, endIndex);
 }
 
 class GroundedAnswer {

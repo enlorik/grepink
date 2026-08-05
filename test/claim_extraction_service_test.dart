@@ -20,6 +20,11 @@ GroundedAnswer _answer({
 GroundedAnswerCitation _citation(String id, String url, String title) =>
     GroundedAnswerCitation(id: id, title: title, url: url);
 
+GroundedAnswerCitation _citationWithOffsets(
+        String id, String url, String title, int start, int end) =>
+    GroundedAnswerCitation(
+        id: id, title: title, url: url, startIndex: start, endIndex: end);
+
 void main() {
   const service = RuleBasedClaimExtractionService();
 
@@ -221,6 +226,90 @@ void main() {
         () => claims.first.citationUrls.add('https://evil.com'),
         throwsUnsupportedError,
       );
+    });
+
+    group('position-aware citation attribution', () {
+      // Text: "Claim one. Claim two."
+      //        0         9 (end=10)  11           20 (end=21)
+      // The sentence splitter finds:
+      //   sentence 1: start=0, end=10, text="Claim one."
+      //   sentence 2: start=11, end=21, text="Claim two."
+
+      test('sentence within citation range gets only that citation, citationUncertain false',
+          () {
+        final answer = _answer(
+          answerText: 'Claim one. Claim two.',
+          citations: [
+            _citationWithOffsets('c1', 'https://one.example', 'One', 0, 10),
+            _citationWithOffsets('c2', 'https://two.example', 'Two', 11, 21),
+          ],
+        );
+
+        final claims = service.extract(answer);
+
+        expect(claims[0].text, 'Claim one.');
+        expect(claims[0].citationUrls, ['https://one.example']);
+        expect(claims[0].citationUncertain, isFalse);
+
+        expect(claims[1].text, 'Claim two.');
+        expect(claims[1].citationUrls, ['https://two.example']);
+        expect(claims[1].citationUncertain, isFalse);
+      });
+
+      test('sentence with no overlapping citation has empty citations and citationUncertain true',
+          () {
+        // Citation covers only sentence 1 (chars 0–10); sentence 2 (11–21) has no citation.
+        final answer = _answer(
+          answerText: 'Claim one. Claim two.',
+          citations: [
+            _citationWithOffsets('c1', 'https://one.example', 'One', 0, 10),
+          ],
+        );
+
+        final claims = service.extract(answer);
+
+        expect(claims[1].text, 'Claim two.');
+        expect(claims[1].citationUrls, isEmpty);
+        expect(claims[1].citationUncertain, isTrue);
+      });
+
+      test('citation spanning two sentences is attached to both', () {
+        // Citation spans chars 5–15, which overlaps both sentences.
+        final answer = _answer(
+          answerText: 'Claim one. Claim two.',
+          citations: [
+            _citationWithOffsets('c1', 'https://both.example', 'Both', 5, 15),
+          ],
+        );
+
+        final claims = service.extract(answer);
+
+        expect(claims[0].text, 'Claim one.');
+        expect(claims[0].citationUrls, contains('https://both.example'));
+        expect(claims[0].citationUncertain, isFalse);
+
+        expect(claims[1].text, 'Claim two.');
+        expect(claims[1].citationUrls, contains('https://both.example'));
+        expect(claims[1].citationUncertain, isFalse);
+      });
+
+      test('citations without offsets mark all sentences as citationUncertain',
+          () {
+        final answer = _answer(
+          answerText: 'Claim one. Claim two.',
+          citations: [
+            _citation('c1', 'https://example.com', 'Source'),
+          ],
+        );
+
+        final claims = service.extract(answer);
+
+        for (final claim in claims) {
+          expect(claim.citationUncertain, isTrue,
+              reason:
+                  'claims should be uncertain when citations lack offset fields');
+        }
+      });
     });
 
     test('ExtractedClaim equality is id-based', () {

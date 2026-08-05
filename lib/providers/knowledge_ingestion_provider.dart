@@ -24,7 +24,7 @@ final knowledgeWebEvidenceProvider = Provider<WebEvidenceProvider>(
 final configuredKnowledgeWebEvidenceProvider =
     FutureProvider<WebEvidenceProvider>((ref) async {
   final braveSettings = await ref.watch(braveSettingsProvider.future);
-  if (!braveSettings.enabled || !braveSettings.apiKeyConfigured) {
+  if (!braveSettings.enabled || !braveSettings.searchKeyConfigured) {
     return ref.watch(knowledgeWebEvidenceProvider);
   }
 

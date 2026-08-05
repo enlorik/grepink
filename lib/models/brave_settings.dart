@@ -9,13 +9,15 @@ class BraveSettings {
   final bool enabled;
   final int resultCount;
   final BraveSafeSearch safeSearch;
-  final bool apiKeyConfigured;
+  final bool searchKeyConfigured;
+  final bool answersKeyConfigured;
 
   const BraveSettings({
     this.enabled = false,
     this.resultCount = 5,
     this.safeSearch = BraveSafeSearch.moderate,
-    this.apiKeyConfigured = false,
+    this.searchKeyConfigured = false,
+    this.answersKeyConfigured = false,
   });
 
   static const defaults = BraveSettings();
@@ -24,13 +26,15 @@ class BraveSettings {
     bool? enabled,
     int? resultCount,
     BraveSafeSearch? safeSearch,
-    bool? apiKeyConfigured,
+    bool? searchKeyConfigured,
+    bool? answersKeyConfigured,
   }) {
     return BraveSettings(
       enabled: enabled ?? this.enabled,
       resultCount: resultCount ?? this.resultCount,
       safeSearch: safeSearch ?? this.safeSearch,
-      apiKeyConfigured: apiKeyConfigured ?? this.apiKeyConfigured,
+      searchKeyConfigured: searchKeyConfigured ?? this.searchKeyConfigured,
+      answersKeyConfigured: answersKeyConfigured ?? this.answersKeyConfigured,
     );
   }
 

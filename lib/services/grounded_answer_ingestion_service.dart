@@ -1,4 +1,5 @@
 import '../models/claim_deduplication_result.dart';
+import '../models/grounded_answer_provider_outcome.dart';
 import '../models/grounded_claim_ingestion_result.dart';
 import 'claim_deduplication_service.dart';
 import 'claim_extraction_service.dart';
@@ -21,24 +22,32 @@ class GroundedAnswerIngestionService {
         _deduplicator = deduplicator,
         _localEvidence = localEvidence;
 
-  bool get isConfigured => _provider.isConfigured;
-
   /// Fetches a grounded answer, extracts claims, and classifies them against
   /// local evidence.
   ///
-  /// Returns [GroundedClaimIngestionResult.empty] if the provider returns null
-  /// or if an exception occurs. Never throws. Never auto-saves.
+  /// Returns [GroundedClaimIngestionResult.failure] for non-success outcomes.
+  /// Returns [GroundedClaimIngestionResult.empty] for unexpected exceptions.
+  /// Never throws. Never auto-saves.
   Future<GroundedClaimIngestionResult> ingest(String question) async {
     if (question.trim().isEmpty) {
       return GroundedClaimIngestionResult.empty(question);
     }
 
+    GroundedAnswerProviderOutcome outcome;
     try {
       final localEvidence = await _localEvidence.retrieve(question);
-      final answer = await _provider.fetchGroundedAnswer(question);
-      if (answer == null || answer.isEmpty) {
-        return GroundedClaimIngestionResult.empty(question);
+      outcome = await _provider.fetchGroundedAnswer(question);
+
+      if (outcome is! GroundedAnswerSuccess) {
+        return GroundedClaimIngestionResult.failure(question, outcome);
       }
+
+      final answer = outcome.answer;
+      if (answer.isEmpty) {
+        return GroundedClaimIngestionResult.failure(
+            question, const GroundedAnswerEmpty());
+      }
+
       final claims = _extractor.extract(answer);
 
       if (claims.isEmpty) {
@@ -52,6 +61,7 @@ class GroundedAnswerIngestionService {
           contradictionClaims: const [],
           uncertainClaims: const [],
           citations: List.unmodifiable(answer.citations),
+          providerOutcome: outcome,
         );
       }
 
@@ -88,6 +98,7 @@ class GroundedAnswerIngestionService {
         contradictionClaims: List.unmodifiable(contradiction),
         uncertainClaims: List.unmodifiable(uncertain),
         citations: List.unmodifiable(answer.citations),
+        providerOutcome: outcome,
       );
     } catch (_) {
       return GroundedClaimIngestionResult.empty(question);

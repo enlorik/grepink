@@ -1,5 +1,6 @@
 import 'claim_deduplication_result.dart';
 import 'grounded_answer.dart';
+import 'grounded_answer_provider_outcome.dart';
 
 class GroundedClaimIngestionResult {
   final String question;
@@ -11,6 +12,7 @@ class GroundedClaimIngestionResult {
   final List<ClaimDeduplicationResult> contradictionClaims;
   final List<ClaimDeduplicationResult> uncertainClaims;
   final List<GroundedAnswerCitation> citations;
+  final GroundedAnswerProviderOutcome? providerOutcome;
 
   const GroundedClaimIngestionResult({
     required this.question,
@@ -22,6 +24,7 @@ class GroundedClaimIngestionResult {
     required this.contradictionClaims,
     required this.uncertainClaims,
     required this.citations,
+    this.providerOutcome,
   });
 
   bool get hasNewKnowledge =>
@@ -49,5 +52,22 @@ class GroundedClaimIngestionResult {
         contradictionClaims: const [],
         uncertainClaims: const [],
         citations: const [],
+      );
+
+  factory GroundedClaimIngestionResult.failure(
+    String question,
+    GroundedAnswerProviderOutcome outcome,
+  ) =>
+      GroundedClaimIngestionResult(
+        question: question,
+        answerText: '',
+        providerName: '',
+        knownClaims: const [],
+        newClaims: const [],
+        betterSourceClaims: const [],
+        contradictionClaims: const [],
+        uncertainClaims: const [],
+        citations: const [],
+        providerOutcome: outcome,
       );
 }

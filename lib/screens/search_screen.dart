@@ -7,11 +7,14 @@ import '../models/knowledge_ingestion_state.dart';
 import '../models/note.dart';
 import '../models/note_draft_review_state.dart';
 import '../models/search_state.dart';
+import '../models/llm_provider_config.dart';
 import '../providers/claim_review_provider.dart';
 import '../providers/knowledge_ingestion_provider.dart';
+import '../providers/llm_settings_provider.dart';
 import '../providers/note_draft_review_provider.dart';
 import '../providers/notes_provider.dart';
 import '../providers/search_provider.dart';
+import '../providers/brave_settings_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/grepink_search_bar.dart';
@@ -79,19 +82,44 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     }
 
     final askId = ++_askSequence;
-    ref.read(claimReviewProvider.notifier).reset();
 
-    await ref.read(knowledgeIngestionProvider.notifier).ingest(question);
+    final braveSettings = await ref.read(braveSettingsProvider.future);
     if (!mounted || askId != _askSequence) return;
+    final llmSettings = await ref.read(llmSettingsProvider.future);
+    if (!mounted || askId != _askSequence) return;
+    final hasRealWriter =
+        llmSettings.providerKind == LlmProviderKind.openAICompatible;
 
-    final knowledgeState = ref.read(knowledgeIngestionProvider);
-    if (knowledgeState.isSuccess && knowledgeState.noteDraft != null) {
-      ref.read(noteDraftReviewProvider.notifier).startReview(
-            knowledgeState.noteDraft!,
-          );
+    if (braveSettings.answersKeyConfigured) {
+      ref.read(knowledgeIngestionProvider.notifier).reset();
+      ref.read(noteDraftReviewProvider.notifier).clear();
+      ref.read(claimReviewProvider.notifier).reset();
+      await ref.read(claimReviewProvider.notifier).runReview(question);
+      if (!mounted || askId != _askSequence) return;
+      final claimSt = ref.read(claimReviewProvider);
+      final needsFallback = claimSt.status == ClaimReviewSessionStatus.error ||
+          claimSt.status == ClaimReviewSessionStatus.providerNotConfigured;
+      if (needsFallback && braveSettings.searchKeyConfigured && hasRealWriter) {
+        await ref.read(knowledgeIngestionProvider.notifier).ingest(question);
+        if (!mounted || askId != _askSequence) return;
+        final ks = ref.read(knowledgeIngestionProvider);
+        if (ks.isSuccess && ks.noteDraft != null) {
+          ref.read(noteDraftReviewProvider.notifier).startReview(ks.noteDraft!);
+        }
+      }
+    } else if (braveSettings.searchKeyConfigured && hasRealWriter) {
+      ref.read(claimReviewProvider.notifier).reset();
+      await ref.read(knowledgeIngestionProvider.notifier).ingest(question);
+      if (!mounted || askId != _askSequence) return;
+      final ks = ref.read(knowledgeIngestionProvider);
+      if (ks.isSuccess && ks.noteDraft != null) {
+        ref.read(noteDraftReviewProvider.notifier).startReview(ks.noteDraft!);
+      }
+    } else {
+      ref.read(claimReviewProvider.notifier).reset();
+      ref.read(knowledgeIngestionProvider.notifier).reset();
+      ref.read(noteDraftReviewProvider.notifier).clear();
     }
-
-    await ref.read(claimReviewProvider.notifier).runReview(question);
   }
 
   Future<void> _retryClaimReview() async {

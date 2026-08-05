@@ -8,7 +8,8 @@ import '../services/brave_settings_service.dart';
 final braveSettingsServiceProvider =
     FutureProvider<BraveSettingsService>((ref) async {
   final prefs = await SharedPreferences.getInstance();
-  return BraveSettingsService(prefs: prefs);
+  final service = BraveSettingsService(prefs: prefs);
+  return service;
 });
 
 class BraveSettingsNotifier extends AsyncNotifier<BraveSettings> {
@@ -27,7 +28,10 @@ class BraveSettingsNotifier extends AsyncNotifier<BraveSettings> {
     final service = await _service;
     final clamped = updated.clamped();
     await service.saveSettings(clamped);
-    state = AsyncData(clamped.copyWith(apiKeyConfigured: _current.apiKeyConfigured));
+    state = AsyncData(clamped.copyWith(
+      searchKeyConfigured: _current.searchKeyConfigured,
+      answersKeyConfigured: _current.answersKeyConfigured,
+    ));
   }
 
   Future<void> setEnabled(bool enabled) =>
@@ -39,18 +43,36 @@ class BraveSettingsNotifier extends AsyncNotifier<BraveSettings> {
   Future<void> setSafeSearch(BraveSafeSearch safeSearch) =>
       _persist(_current.copyWith(safeSearch: safeSearch));
 
-  Future<void> saveApiKey(String apiKey) async {
+  Future<void> saveSearchApiKey(String apiKey) async {
     final service = await _service;
-    await service.saveApiKey(apiKey);
-    final hasKey = await service.hasApiKey;
-    state = AsyncData(_current.copyWith(apiKeyConfigured: hasKey));
+    await service.saveSearchApiKey(apiKey);
+    final hasKey = await service.hasSearchApiKey;
+    state = AsyncData(_current.copyWith(searchKeyConfigured: hasKey));
   }
 
-  Future<void> clearApiKey() async {
+  Future<void> clearSearchApiKey() async {
     final service = await _service;
-    await service.clearApiKey();
-    state = AsyncData(_current.copyWith(apiKeyConfigured: false));
+    await service.clearSearchApiKey();
+    state = AsyncData(_current.copyWith(searchKeyConfigured: false));
   }
+
+  Future<void> saveAnswersApiKey(String apiKey) async {
+    final service = await _service;
+    await service.saveAnswersApiKey(apiKey);
+    final hasKey = await service.hasAnswersApiKey;
+    state = AsyncData(_current.copyWith(answersKeyConfigured: hasKey));
+  }
+
+  Future<void> clearAnswersApiKey() async {
+    final service = await _service;
+    await service.clearAnswersApiKey();
+    state = AsyncData(_current.copyWith(answersKeyConfigured: false));
+  }
+
+  // Legacy forwarding methods for callers that haven't migrated yet
+  Future<void> saveApiKey(String apiKey) => saveSearchApiKey(apiKey);
+
+  Future<void> clearApiKey() => clearSearchApiKey();
 }
 
 final braveSettingsProvider =
