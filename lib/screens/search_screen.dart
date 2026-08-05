@@ -117,9 +117,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         ref.read(noteDraftReviewProvider.notifier).startReview(ks.noteDraft!);
       }
     } else {
-      ref.read(claimReviewProvider.notifier).reset();
       ref.read(knowledgeIngestionProvider.notifier).reset();
       ref.read(noteDraftReviewProvider.notifier).clear();
+      // Route through runReview so the UI shows providerNotConfigured feedback
+      // rather than silently resetting with no visible result for the user.
+      await ref.read(claimReviewProvider.notifier).runReview(question);
     }
   }
 
