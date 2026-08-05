@@ -68,12 +68,15 @@ class RuleBasedClaimExtractionService implements ClaimExtractionService {
       final bool uncertain;
 
       if (!hasOffsets) {
-        // No citations have offsets — attach all citations but mark uncertain.
+        // No citation offset data — attach all citations and mark uncertain.
+        // When citations are present, uncertainty prevents saving without a
+        // verifiable source. When there are no citations at all, marking uncertain
+        // ensures claims from unannotated answers are not saved as sourced facts.
         citationUrls =
             List.unmodifiable(allCitations.map((c) => c.url).toList());
         citationTitles =
             List.unmodifiable(allCitations.map((c) => c.title).toList());
-        uncertain = allCitations.isNotEmpty;
+        uncertain = true;
       } else {
         final overlapping = allCitations.where((c) {
           if (c.startIndex == null || c.endIndex == null) return false;

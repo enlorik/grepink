@@ -102,6 +102,8 @@ void main() {
       expect(claims.length, 1);
       expect(claims.first.citationUrls, isEmpty);
       expect(claims.first.citationTitles, isEmpty);
+      expect(claims.first.citationUncertain, isTrue,
+          reason: 'claims without any source URL must be uncertain');
     });
 
     test('returns empty list for empty answer text', () {
