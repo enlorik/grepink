@@ -49,7 +49,9 @@ class BraveAnswersGroundedAnswerProvider implements GroundedAnswerProvider {
         ],
       });
 
-      final response = await _client.send(request);
+      final response = await _client
+          .send(request)
+          .timeout(const Duration(seconds: 30));
 
       switch (response.statusCode) {
         case 402:
@@ -71,8 +73,9 @@ class BraveAnswersGroundedAnswerProvider implements GroundedAnswerProvider {
       final buffer = StringBuffer();
       var remainder = '';
 
-      await for (final chunk
-          in response.stream.transform(utf8.decoder)) {
+      await for (final chunk in response.stream
+          .transform(utf8.decoder)
+          .timeout(const Duration(seconds: 30))) {
         remainder += chunk;
         final frames = remainder.split('\n\n');
         remainder = frames.removeLast();
