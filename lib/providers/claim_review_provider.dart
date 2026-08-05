@@ -104,6 +104,10 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
           errorMessage: status == ClaimReviewSessionStatus.error
               ? 'Could not review claims for this question. Please try again.'
               : null,
+          // Reset provider metadata so hasNoAnswer / hasNoClaimsExtracted
+          // reflect this response, not a stale previous review.
+          providerName: '',
+          citations: const [],
           clearDraft: true,
           saveStatus: ClaimDraftSaveStatus.idle,
           clearSaveError: true,
