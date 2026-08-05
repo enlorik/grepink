@@ -1,0 +1,47 @@
+language: en-US
+reviews:
+  profile: assertive
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  auto_review:
+    enabled: true
+    drafts: true
+  path_instructions:
+    - path: "lib/providers/**"
+      instructions: |
+        This app uses Riverpod. Providers should be either synchronous Provider/StateNotifierProvider
+        or FutureProvider — never mix them. FutureProviders must be awaited with stale-request checks
+        (requestId != _requestSequence) after every await. Watch for valueOrNull used as a synchronous
+        truth check on async state — that is a race condition here.
+    - path: "lib/services/brave_answers_grounded_answer_provider.dart"
+      instructions: |
+        This file implements SSE streaming from the Brave Answers API. Key invariants:
+        citation tags must be parsed from the fully assembled string, never from individual chunks.
+        Both _client.send() and the stream transform must have timeouts so a stalled server
+        does not block the UI indefinitely. HTTP status checks must happen before reading the stream.
+    - path: "lib/services/**"
+      instructions: |
+        Services must never throw — they return typed outcomes (GroundedAnswerProviderOutcome
+        sealed class). Exceptions must be caught and mapped to the appropriate outcome type.
+        API keys must never appear in logs, state, returned models, or error messages.
+    - path: "lib/screens/search_screen.dart"
+      instructions: |
+        _onAsk() implements a routing table: Answers key configured → claim review pipeline;
+        Answers fails + real writer → fallback to knowledge ingestion; no Brave keys + real writer
+        → knowledge ingestion; no writer → runReview() to surface providerNotConfigured state.
+        Every await must be followed by a stale-request check (!mounted || askId != _askSequence).
+        Never use valueOrNull as a synchronous read on a FutureProvider.
+    - path: "lib/models/grounded_answer_provider_outcome.dart"
+      instructions: |
+        Sealed class for typed provider outcomes. Every new failure mode must be a new subclass,
+        never collapse distinct failures into a single generic error. The ingestion service and
+        _onAsk() routing both switch on this type.
+    - path: "test/**"
+      instructions: |
+        Tests for BraveAnswersGroundedAnswerProvider must use a mock http.Client.
+        SSE stream tests must verify citation tags split across chunk boundaries are still
+        parsed correctly from the assembled string. API keys must not appear in any test fixture.
+chat:
+  auto_reply: true
