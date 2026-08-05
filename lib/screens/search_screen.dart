@@ -100,7 +100,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       final needsFallback = claimSt.status == ClaimReviewSessionStatus.error ||
           claimSt.status == ClaimReviewSessionStatus.providerNotConfigured ||
           claimSt.hasNoAnswer;
-      if (needsFallback && braveSettings.searchKeyConfigured && hasRealWriter) {
+      if (needsFallback && braveSettings.searchKeyConfigured && braveSettings.enabled && hasRealWriter) {
         await ref.read(knowledgeIngestionProvider.notifier).ingest(question);
         if (!mounted || askId != _askSequence) return;
         final ks = ref.read(knowledgeIngestionProvider);

@@ -115,11 +115,15 @@ class BraveAnswersGroundedAnswerProvider implements GroundedAnswerProvider {
         try {
           final json =
               jsonDecode(match.group(1)!) as Map<String, dynamic>;
+          final url = json['url'] as String? ?? '';
+          // Skip citations without a valid URL — an empty URL would produce
+          // a broken [Source]() link in saved notes.
+          if (url.trim().isEmpty) continue;
           citations.add(GroundedAnswerCitation(
             id: (json['number'] ?? json['id'] ?? citations.length + 1)
                 .toString(),
-            title: (json['url'] as String? ?? ''),
-            url: json['url'] as String? ?? '',
+            title: url,
+            url: url,
             snippet: json['snippet'] as String?,
             startIndex: json['start_index'] as int?,
             endIndex: json['end_index'] as int?,
