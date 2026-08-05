@@ -55,6 +55,8 @@ class BraveSettingsService {
 
   Future<void> clearSearchApiKey() async {
     await _secureStorage.delete(key: _searchApiKey);
+    // Also remove the legacy key so the migration does not re-populate it.
+    await _secureStorage.delete(key: _legacyApiKey);
   }
 
   Future<bool> get hasSearchApiKey async {

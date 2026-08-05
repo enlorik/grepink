@@ -79,11 +79,21 @@ class RuleBasedClaimExtractionService implements ClaimExtractionService {
           if (c.startIndex == null || c.endIndex == null) return false;
           return c.startIndex! < sentenceEnd && c.endIndex! > sentenceStart;
         }).toList();
-        citationUrls =
-            List.unmodifiable(overlapping.map((c) => c.url).toList());
-        citationTitles =
-            List.unmodifiable(overlapping.map((c) => c.title).toList());
-        uncertain = overlapping.isEmpty;
+        if (overlapping.isNotEmpty) {
+          citationUrls =
+              List.unmodifiable(overlapping.map((c) => c.url).toList());
+          citationTitles =
+              List.unmodifiable(overlapping.map((c) => c.title).toList());
+          uncertain = false;
+        } else {
+          // No citation range covers this sentence; attach all citations
+          // conservatively so saved claims still carry a source URL.
+          citationUrls =
+              List.unmodifiable(allCitations.map((c) => c.url).toList());
+          citationTitles =
+              List.unmodifiable(allCitations.map((c) => c.title).toList());
+          uncertain = true;
+        }
       }
 
       final id = _claimId(

@@ -256,9 +256,12 @@ void main() {
         expect(claims[1].citationUncertain, isFalse);
       });
 
-      test('sentence with no overlapping citation has empty citations and citationUncertain true',
+      test(
+          'sentence with no overlapping citation falls back to all citations with citationUncertain true',
           () {
-        // Citation covers only sentence 1 (chars 0–10); sentence 2 (11–21) has no citation.
+        // Citation covers only sentence 1 (chars 0–10); sentence 2 (11–21) has no
+        // overlapping citation. All citations are attached conservatively to preserve
+        // source URLs on saved claims.
         final answer = _answer(
           answerText: 'Claim one. Claim two.',
           citations: [
@@ -269,7 +272,7 @@ void main() {
         final claims = service.extract(answer);
 
         expect(claims[1].text, 'Claim two.');
-        expect(claims[1].citationUrls, isEmpty);
+        expect(claims[1].citationUrls, equals(['https://one.example']));
         expect(claims[1].citationUncertain, isTrue);
       });
 
