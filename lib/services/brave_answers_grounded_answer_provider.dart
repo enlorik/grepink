@@ -29,6 +29,7 @@ class BraveAnswersGroundedAnswerProvider implements GroundedAnswerProvider {
   @override
   Future<GroundedAnswerProviderOutcome> fetchGroundedAnswer(
       String question) async {
+    if (_apiKey.trim().isEmpty) return const GroundedAnswerNotConfigured();
     try {
       final request = http.Request(
         'POST',
@@ -49,6 +50,7 @@ class BraveAnswersGroundedAnswerProvider implements GroundedAnswerProvider {
         ],
       });
 
+      request.followRedirects = false;
       final response = await _client
           .send(request)
           .timeout(const Duration(seconds: 30));

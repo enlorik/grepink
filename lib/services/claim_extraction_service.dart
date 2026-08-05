@@ -27,8 +27,10 @@ class RuleBasedClaimExtractionService implements ClaimExtractionService {
 
   @override
   List<ExtractedClaim> extract(GroundedAnswer answer) {
-    final text = answer.answerText.trim();
-    if (text.isEmpty) return const [];
+    // Use answerText without trimming so citation startIndex/endIndex offsets
+    // remain aligned with sentence ranges. Individual claim texts are trimmed below.
+    final text = answer.answerText;
+    if (text.trim().isEmpty) return const [];
 
     final allCitations = answer.citations;
     final hasOffsets = allCitations.any(

@@ -130,6 +130,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       // Route through runReview so the UI shows providerNotConfigured feedback
       // rather than silently resetting with no visible result for the user.
       await ref.read(claimReviewProvider.notifier).runReview(question);
+      if (!mounted || askId != _askSequence) return;
     }
   }
 

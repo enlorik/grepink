@@ -249,6 +249,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 TextField(
                   controller: _braveSearchApiKeyController,
                   obscureText: !_braveSearchApiKeyVisible,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  enableIMEPersonalizedLearning: false,
                   style: AppTextStyles.bodyMedium.copyWith(
                     color: AppColors.bodyText,
                     fontFamily: 'monospace',
@@ -333,6 +336,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 TextField(
                   controller: _braveAnswersApiKeyController,
                   obscureText: !_braveAnswersApiKeyVisible,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  enableIMEPersonalizedLearning: false,
                   style: AppTextStyles.bodyMedium.copyWith(
                     color: AppColors.bodyText,
                     fontFamily: 'monospace',

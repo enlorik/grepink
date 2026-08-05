@@ -44,8 +44,14 @@ List<int> _buildSseBody(List<String> contents) {
   return utf8.encode(buffer.toString());
 }
 
-http.StreamedResponse _sseResponse(List<int> bytes) =>
-    http.StreamedResponse(Stream.value(bytes), 200);
+http.StreamedResponse _sseResponse(List<int> bytes,
+        {bool splitBytes = false}) =>
+    http.StreamedResponse(
+      splitBytes
+          ? Stream<List<int>>.fromIterable(bytes.map((b) => [b]))
+          : Stream.value(bytes),
+      200,
+    );
 
 http.StreamedResponse _statusResponse(int statusCode) =>
     http.StreamedResponse(
@@ -105,7 +111,8 @@ void main() {
           '${citationJson.substring(mid)}</citation>',
         ]);
 
-        final result = await _provider((_) async => _sseResponse(body))
+        final result = await _provider(
+                (_) async => _sseResponse(body, splitBytes: true))
             .fetchGroundedAnswer('test?');
 
         expect(result, isA<GroundedAnswerSuccess>());
