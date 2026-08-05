@@ -47,7 +47,7 @@ class BraveSettingsService {
   Future<void> saveSearchApiKey(String apiKey) async {
     final trimmed = apiKey.trim();
     if (trimmed.isEmpty) {
-      await _secureStorage.delete(key: _searchApiKey);
+      await clearSearchApiKey();
       return;
     }
     await _secureStorage.write(key: _searchApiKey, value: trimmed);
