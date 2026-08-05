@@ -116,6 +116,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       if (ks.isSuccess && ks.noteDraft != null) {
         ref.read(noteDraftReviewProvider.notifier).startReview(ks.noteDraft!);
       }
+    } else if (hasRealWriter) {
+      ref.read(claimReviewProvider.notifier).reset();
+      await ref.read(knowledgeIngestionProvider.notifier).ingest(question);
+      if (!mounted || askId != _askSequence) return;
+      final ks = ref.read(knowledgeIngestionProvider);
+      if (ks.isSuccess && ks.noteDraft != null) {
+        ref.read(noteDraftReviewProvider.notifier).startReview(ks.noteDraft!);
+      }
     } else {
       ref.read(knowledgeIngestionProvider.notifier).reset();
       ref.read(noteDraftReviewProvider.notifier).clear();
