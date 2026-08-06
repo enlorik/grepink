@@ -197,7 +197,11 @@ class SyncNotifier extends StateNotifier<SyncState> {
       await service.upload(encoded);
 
       // Skip persisting if a sign-out happened while the upload was in flight.
-      if (_syncGeneration != capturedGeneration) return;
+      // Reset status to idle so the UI doesn't stay stuck on "syncing".
+      if (_syncGeneration != capturedGeneration) {
+        if (mounted) state = state.copyWith(status: SyncStatus.idle);
+        return;
+      }
       final now = DateTime.now();
       await prefs.setInt(_lastSyncKey, now.millisecondsSinceEpoch);
       await prefs.setStringList(_knownIdsKey, allNotes.map((n) => n.id).toList());

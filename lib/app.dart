@@ -50,6 +50,9 @@ class _GrepinkAppState extends ConsumerState<GrepinkApp>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // Eagerly construct the notifier so _init() (silent sign-in + first sync)
+    // fires even when the lifecycle is already resumed at observer registration.
+    ref.read(syncProvider.notifier);
   }
 
   @override
