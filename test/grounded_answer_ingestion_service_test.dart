@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:grepink/models/evidence_item.dart';
 import 'package:grepink/models/grounded_answer.dart';
+import 'package:grepink/models/grounded_answer_provider_outcome.dart';
 import 'package:grepink/services/claim_deduplication_service.dart';
 import 'package:grepink/services/claim_extraction_service.dart';
 import 'package:grepink/services/grounded_answer_ingestion_service.dart';
@@ -19,12 +20,13 @@ class _FakeProvider implements GroundedAnswerProvider {
       : _shouldThrow = shouldThrow;
 
   @override
-  bool get isConfigured => true;
-
-  @override
-  Future<GroundedAnswer?> fetchGroundedAnswer(String question) async {
+  Future<GroundedAnswerProviderOutcome> fetchGroundedAnswer(
+      String question) async {
     if (_shouldThrow) throw Exception('provider failed');
-    return _answer;
+    final a = _answer;
+    if (a == null) return const GroundedAnswerNotConfigured();
+    if (a.isEmpty) return const GroundedAnswerEmpty();
+    return GroundedAnswerSuccess(a);
   }
 }
 
@@ -52,12 +54,10 @@ class _OrderTrackingProvider implements GroundedAnswerProvider {
   _OrderTrackingProvider(this._order);
 
   @override
-  bool get isConfigured => true;
-
-  @override
-  Future<GroundedAnswer?> fetchGroundedAnswer(String question) async {
+  Future<GroundedAnswerProviderOutcome> fetchGroundedAnswer(
+      String question) async {
     _order.events.add('provider');
-    return _answer();
+    return GroundedAnswerSuccess(_answer());
   }
 }
 

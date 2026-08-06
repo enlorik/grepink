@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/claim_review_session_state.dart';
+import '../models/grounded_answer_provider_outcome.dart';
+import '../services/brave_answers_grounded_answer_provider.dart';
 import '../services/claim_deduplication_service.dart';
 import '../services/claim_extraction_service.dart';
 import '../services/claim_review_mapper.dart';
@@ -9,15 +11,26 @@ import '../services/grounded_answer_provider.dart';
 import '../services/selected_claims_draft_builder.dart';
 import '../services/text_similarity_provider.dart';
 import '../models/note_draft_review_state.dart';
+import 'brave_settings_provider.dart';
 import 'knowledge_ingestion_provider.dart';
 import 'note_draft_review_provider.dart';
 
-/// No real grounded-answer provider is wired up yet. Using the null
-/// implementation keeps this pipeline inert (no network calls, no fake
-/// Brave AI Answers) until a real provider is configured in a later PR.
-final groundedAnswerProviderProvider = Provider<GroundedAnswerProvider>(
-  (ref) => const NullGroundedAnswerProvider(),
-);
+final groundedAnswerProviderProvider =
+    FutureProvider<GroundedAnswerProvider>((ref) async {
+  final braveSettings = await ref.watch(braveSettingsProvider.future);
+  if (!braveSettings.answersKeyConfigured) {
+    return const NullGroundedAnswerProvider();
+  }
+  final service = await ref.watch(braveSettingsServiceProvider.future);
+  final apiKey = await service.loadAnswersApiKey();
+  if (apiKey == null || apiKey.trim().isEmpty) {
+    return const NullGroundedAnswerProvider();
+  }
+  return BraveAnswersGroundedAnswerProvider(
+    apiKey: apiKey,
+    safeSearch: braveSettings.safeSearch,
+  );
+});
 
 final claimExtractionServiceProvider = Provider<ClaimExtractionService>(
   (ref) => const RuleBasedClaimExtractionService(),
@@ -42,14 +55,15 @@ final selectedClaimsDraftBuilderProvider = Provider<SelectedClaimsDraftBuilder>(
 );
 
 final groundedAnswerIngestionServiceProvider =
-    Provider<GroundedAnswerIngestionService>(
-  (ref) => GroundedAnswerIngestionService(
-    provider: ref.watch(groundedAnswerProviderProvider),
+    FutureProvider<GroundedAnswerIngestionService>((ref) async {
+  final provider = await ref.watch(groundedAnswerProviderProvider.future);
+  return GroundedAnswerIngestionService(
+    provider: provider,
     extractor: ref.watch(claimExtractionServiceProvider),
     deduplicator: ref.watch(claimDeduplicationServiceProvider),
     localEvidence: ref.watch(localEvidenceRetrieverProvider),
-  ),
-);
+  );
+});
 
 class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
   final Ref _ref;
@@ -64,17 +78,6 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
       return;
     }
 
-    // When no real provider is wired up, show a distinct not-configured state
-    // instead of silently doing nothing. No loading indicator, no pipeline call.
-    if (!_ref.read(groundedAnswerIngestionServiceProvider).isConfigured) {
-      _requestSequence++;
-      state = ClaimReviewSessionState(
-        status: ClaimReviewSessionStatus.providerNotConfigured,
-        question: trimmedQuestion,
-      );
-      return;
-    }
-
     final requestId = ++_requestSequence;
 
     state = state.copyWith(
@@ -85,10 +88,40 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
     );
 
     try {
-      final service = _ref.read(groundedAnswerIngestionServiceProvider);
+      final service =
+          await _ref.read(groundedAnswerIngestionServiceProvider.future);
+      if (requestId != _requestSequence) return;
+
       final mapper = _ref.read(claimReviewMapperProvider);
       final ingestion = await service.ingest(trimmedQuestion);
       if (requestId != _requestSequence) return;
+
+      final outcome = ingestion.providerOutcome;
+      if (outcome != null && outcome is! GroundedAnswerSuccess) {
+        final status = _statusForOutcome(outcome);
+        state = state.copyWith(
+          status: status,
+          question: trimmedQuestion,
+          groups: const [],
+          clearSelection: true,
+          errorMessage: status == ClaimReviewSessionStatus.error
+              ? 'Could not review claims for this question. Please try again.'
+              : null,
+          // Reset provider metadata so hasNoAnswer / hasNoClaimsExtracted
+          // reflect this response, not a stale previous review.
+          providerName: '',
+          citations: const [],
+          clearDraft: true,
+          saveStatus: ClaimDraftSaveStatus.idle,
+          clearSaveError: true,
+          appendStatus: ClaimDraftAppendStatus.idle,
+          clearAppendError: true,
+          clearBackgroundAppendError: true,
+          clearDraftGenerationError: true,
+          clearTargetNoteId: true,
+        );
+        return;
+      }
 
       final groups = mapper.toGroups(ingestion);
       final selection = mapper.toSelectionState(ingestion);
@@ -129,6 +162,18 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
         clearTargetNoteId: true,
       );
     }
+  }
+
+  ClaimReviewSessionStatus _statusForOutcome(
+      GroundedAnswerProviderOutcome outcome) {
+    return switch (outcome) {
+      GroundedAnswerNotConfigured() =>
+        ClaimReviewSessionStatus.providerNotConfigured,
+      GroundedAnswerSuccess() => ClaimReviewSessionStatus.success,
+      // Empty answer is displayed via hasNoAnswer, not as an error.
+      GroundedAnswerEmpty() => ClaimReviewSessionStatus.success,
+      _ => ClaimReviewSessionStatus.error,
+    };
   }
 
   void toggle(String claimId) {

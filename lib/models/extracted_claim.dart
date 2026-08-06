@@ -7,6 +7,7 @@ class ExtractedClaim {
   final String sourceQuestion;
   final double? confidence;
   final int order;
+  final bool citationUncertain;
 
   const ExtractedClaim({
     required this.id,
@@ -17,7 +18,32 @@ class ExtractedClaim {
     required this.sourceQuestion,
     this.confidence,
     required this.order,
+    this.citationUncertain = false,
   });
+
+  ExtractedClaim copyWith({
+    String? id,
+    String? text,
+    List<String>? citationUrls,
+    List<String>? citationTitles,
+    String? sourceAnswerProvider,
+    String? sourceQuestion,
+    double? confidence,
+    int? order,
+    bool? citationUncertain,
+  }) {
+    return ExtractedClaim(
+      id: id ?? this.id,
+      text: text ?? this.text,
+      citationUrls: citationUrls ?? this.citationUrls,
+      citationTitles: citationTitles ?? this.citationTitles,
+      sourceAnswerProvider: sourceAnswerProvider ?? this.sourceAnswerProvider,
+      sourceQuestion: sourceQuestion ?? this.sourceQuestion,
+      confidence: confidence ?? this.confidence,
+      order: order ?? this.order,
+      citationUncertain: citationUncertain ?? this.citationUncertain,
+    );
+  }
 
   @override
   bool operator ==(Object other) =>

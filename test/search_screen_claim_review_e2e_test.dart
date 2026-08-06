@@ -16,9 +16,13 @@ import 'package:grepink/screens/search_screen.dart';
 import 'package:grepink/services/claim_deduplication_service.dart';
 import 'package:grepink/services/claim_extraction_service.dart';
 import 'package:grepink/services/grounded_answer_ingestion_service.dart';
+import 'package:grepink/models/grounded_answer_provider_outcome.dart';
 import 'package:grepink/services/grounded_answer_provider.dart';
 import 'package:grepink/services/knowledge_ingestion_service.dart';
 import 'package:grepink/services/local_evidence_retriever.dart';
+
+import 'helpers/fake_brave_settings.dart';
+import 'helpers/fake_llm_settings.dart';
 
 // ─── Test doubles ────────────────────────────────────────────────────────────
 
@@ -79,14 +83,11 @@ class _RecordingGroundedAnswerProvider implements GroundedAnswerProvider {
   int callCount = 0;
 
   _RecordingGroundedAnswerProvider(this._answer);
-
   @override
-  bool get isConfigured => true;
-
-  @override
-  Future<GroundedAnswer?> fetchGroundedAnswer(String question) async {
+  Future<GroundedAnswerProviderOutcome> fetchGroundedAnswer(
+      String question) async {
     callCount++;
-    return _answer;
+    return GroundedAnswerSuccess(_answer);
   }
 }
 
@@ -184,7 +185,9 @@ Future<ProviderContainer> _pump(
       ),
       noteDraftReviewRepositoryProvider.overrideWithValue(repository),
       groundedAnswerIngestionServiceProvider
-          .overrideWithValue(ingestionService),
+          .overrideWith((_) async => ingestionService),
+      braveSettingsOverride(const BraveSettings(answersKeyConfigured: true)),
+      llmSettingsOverride(LlmProviderConfig.defaults),
       allNotesProvider.overrideWithValue(notes),
       recentNotesProvider.overrideWithValue(const <Note>[]),
       refreshNotesProvider.overrideWithValue(() async {}),
