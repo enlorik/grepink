@@ -205,6 +205,12 @@ class SyncNotifier extends StateNotifier<SyncState> {
             return;
           }
           await mergeNotes(localNotes, toMerge);
+          // Persist the newly merged IDs immediately so that if the subsequent
+          // upload fails, a later sync still treats those notes as "known" and
+          // respects any local deletion the user makes before the next upload.
+          final updatedKnownIds =
+              knownIds.union({for (final n in toMerge) n.id});
+          await prefs.setStringList(_knownIdsKey, updatedKnownIds.toList());
           await reloadNotes();
           await reindexEmbeddings();
         }
