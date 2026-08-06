@@ -288,6 +288,37 @@ void main() {
       expect(service.uploadCalls, greaterThan(uploadsBeforeSecondSync));
     });
 
+    test('signIn() triggers an immediate sync', () async {
+      final service = _FakeDriveSyncService(signedIn: false);
+      final container = _makeContainer(service: service);
+      addTearDown(container.dispose);
+
+      await container.read(syncProvider.notifier).signIn();
+
+      expect(service.uploadCalls, 1,
+          reason: 'signIn should immediately sync so Drive notes are downloaded');
+    });
+
+    test('sync() sets status=error when connectivity check throws', () async {
+      final service = _FakeDriveSyncService();
+      final container = ProviderContainer(
+        overrides: [
+          syncServiceProvider.overrideWithValue(service),
+          connectivityCheckerProvider
+              .overrideWithValue(() async => throw Exception('platform error')),
+          notesGetterProvider.overrideWithValue(() async => []),
+          notesMergerProvider.overrideWithValue((e, i) async {}),
+        ],
+      );
+      addTearDown(container.dispose);
+      SharedPreferences.setMockInitialValues({});
+
+      await container.read(syncProvider.notifier).sync();
+
+      expect(container.read(syncProvider).status, SyncStatus.error);
+      expect(service.uploadCalls, 0);
+    });
+
     test('silent sign-in on startup restores session state', () async {
       final service = _FakeDriveSyncService(
         signedIn: false,

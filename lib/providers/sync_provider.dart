@@ -108,6 +108,11 @@ class SyncNotifier extends StateNotifier<SyncState> {
       clearAccountEmail: !ok,
       clearErrorMessage: true,
     );
+    if (ok) {
+      // Immediately download and merge so notes are available without waiting
+      // for the next lifecycle resume or manual tap.
+      await sync();
+    }
   }
 
   Future<void> signOut() async {
@@ -154,15 +159,18 @@ class SyncNotifier extends StateNotifier<SyncState> {
     final service = _ref.read(syncServiceProvider);
     if (!service.isSignedIn) return;
 
-    final checkConnectivity = _ref.read(connectivityCheckerProvider);
-    final connectivity = await checkConnectivity();
-    if (connectivity.contains(ConnectivityResult.none) &&
-        connectivity.length == 1) {
-      return;
-    }
-
     state = state.copyWith(status: SyncStatus.syncing, clearErrorMessage: true);
     try {
+      // Connectivity check is inside try so a platform-channel failure is caught
+      // and surfaces as a sync error rather than an unhandled future exception.
+      final checkConnectivity = _ref.read(connectivityCheckerProvider);
+      final connectivity = await checkConnectivity();
+      if (connectivity.contains(ConnectivityResult.none) &&
+          connectivity.length == 1) {
+        if (mounted) state = state.copyWith(status: SyncStatus.idle);
+        return;
+      }
+
       final getNotes = _ref.read(notesGetterProvider);
       final mergeNotes = _ref.read(notesMergerProvider);
       final reloadNotes = _ref.read(notesReloaderProvider);
@@ -186,12 +194,22 @@ class SyncNotifier extends StateNotifier<SyncState> {
           return localIds.contains(n.id);
         }).toList();
         if (toMerge.isNotEmpty) {
+          // Guard against a sign-out that occurred while the download was in flight.
+          if (_syncGeneration != capturedGeneration) {
+            if (mounted) state = state.copyWith(status: SyncStatus.idle);
+            return;
+          }
           await mergeNotes(localNotes, toMerge);
           await reloadNotes();
           await reindexEmbeddings();
         }
       }
 
+      // Guard before upload so we don't write through another account's DriveApi.
+      if (_syncGeneration != capturedGeneration) {
+        if (mounted) state = state.copyWith(status: SyncStatus.idle);
+        return;
+      }
       final allNotes = await getNotes();
       final encoded = NoteExportService.instance.encode(allNotes);
       await service.upload(encoded);

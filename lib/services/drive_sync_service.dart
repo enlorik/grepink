@@ -52,6 +52,7 @@ class _AuthenticatedClient extends http.BaseClient {
 class _GoogleDriveSyncService implements DriveSyncService {
   final GoogleSignIn _googleSignIn;
   drive.DriveApi? _driveApi;
+  _AuthenticatedClient? _httpClient;
 
   _GoogleDriveSyncService()
       : _googleSignIn = GoogleSignIn(
@@ -93,6 +94,8 @@ class _GoogleDriveSyncService implements DriveSyncService {
     try {
       await _googleSignIn.signOut();
     } catch (_) {}
+    _httpClient?.close();
+    _httpClient = null;
     _driveApi = null;
   }
 
@@ -105,7 +108,9 @@ class _GoogleDriveSyncService implements DriveSyncService {
   }
 
   drive.DriveApi _buildDriveApi(GoogleSignInAccount account) {
-    return drive.DriveApi(_AuthenticatedClient(account));
+    _httpClient?.close();
+    _httpClient = _AuthenticatedClient(account);
+    return drive.DriveApi(_httpClient!);
   }
 
   @override
