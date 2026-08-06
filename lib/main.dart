@@ -1,15 +1,12 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'database_initializer_stub.dart'
+    if (dart.library.io) 'database_initializer_io.dart';
 import 'app.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  if (Platform.isWindows || Platform.isLinux) {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  }
+  await initializeDatabase();
   runApp(
     const ProviderScope(
       child: GrepinkApp(),
