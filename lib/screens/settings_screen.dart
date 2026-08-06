@@ -7,9 +7,11 @@ import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 import '../models/brave_settings.dart';
 import '../models/note.dart';
+import '../models/sync_state.dart';
 import '../providers/brave_settings_provider.dart';
 import '../providers/notes_provider.dart';
 import '../providers/settings_provider.dart';
+import '../providers/sync_provider.dart';
 import '../services/database_service.dart';
 import '../services/brave_evidence_provider.dart';
 import '../services/note_export_service.dart';
@@ -463,6 +465,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
         const SizedBox(height: 8),
 
+        // SYNC
+        _buildSyncSection(),
+
+        const SizedBox(height: 8),
+
         // MEMORY ENGINE
         _buildSection('MEMORY ENGINE', [
           _buildSettingRow(
@@ -560,6 +567,67 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ]),
       ],
     );
+  }
+
+  String _formatLastSynced(DateTime? dt) {
+    if (dt == null) return 'Never synced';
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return '${dt.month}/${dt.day}/${dt.year}';
+  }
+
+  Widget _buildSyncSection() {
+    final syncState = ref.watch(syncProvider);
+    final isSyncing = syncState.status == SyncStatus.syncing;
+
+    return _buildSection('SYNC', [
+      if (!syncState.isSignedIn)
+        _buildSettingRow(
+          title: 'Google account',
+          subtitle: 'Not signed in',
+          trailing: FilledButton(
+            onPressed: () => ref.read(syncProvider.notifier).signIn(),
+            child: const Text('Sign in with Google'),
+          ),
+        )
+      else ...[
+        _buildSettingRow(
+          title: 'Google account',
+          subtitle: syncState.accountEmail ?? '',
+          trailing: OutlinedButton(
+            onPressed: () => ref.read(syncProvider.notifier).signOut(),
+            child: const Text('Sign out'),
+          ),
+        ),
+        _buildSettingRow(
+          title: 'Sync now',
+          subtitle: _formatLastSynced(syncState.lastSyncedAt),
+          trailing: FilledButton(
+            onPressed: isSyncing
+                ? null
+                : () => ref.read(syncProvider.notifier).sync(),
+            child: isSyncing
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Sync now'),
+          ),
+        ),
+      ],
+      if (syncState.status == SyncStatus.error &&
+          syncState.errorMessage != null)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          child: Text(
+            syncState.errorMessage!,
+            style: AppTextStyles.bodySmall.copyWith(color: AppColors.error),
+          ),
+        ),
+    ]);
   }
 
   Widget _buildSection(String title, List<Widget> children) {
