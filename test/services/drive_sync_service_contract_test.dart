@@ -43,10 +43,6 @@ class _FakeDriveSyncService implements DriveSyncService {
   @override
   Future<String?> download() async => _storedContent;
 
-  @override
-  Future<DateTime?> getRemoteModifiedAt() async =>
-      _storedContent == null ? null : DateTime.utc(2026, 1, 1);
-
   int get uploadCount => _uploadCount;
 }
 
@@ -80,15 +76,6 @@ void main() {
       const content = '{"version":1,"notes":[]}';
       await service.upload(content);
       expect(await service.download(), content);
-    });
-
-    test('getRemoteModifiedAt() returns null when no backup exists', () async {
-      expect(await service.getRemoteModifiedAt(), isNull);
-    });
-
-    test('getRemoteModifiedAt() returns a date when backup exists', () async {
-      await service.upload('{"version":1,"notes":[]}');
-      expect(await service.getRemoteModifiedAt(), isNotNull);
     });
 
     test('signOut() clears internal state', () async {

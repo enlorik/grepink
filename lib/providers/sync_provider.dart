@@ -59,6 +59,7 @@ class SyncNotifier extends StateNotifier<SyncState> {
   Future<void> signIn() async {
     final service = _ref.read(syncServiceProvider);
     final ok = await service.signIn();
+    if (!mounted) return;
     state = state.copyWith(
       isSignedIn: ok,
       accountEmail: ok ? service.accountEmail : null,
@@ -70,6 +71,7 @@ class SyncNotifier extends StateNotifier<SyncState> {
   Future<void> signOut() async {
     final service = _ref.read(syncServiceProvider);
     await service.signOut();
+    if (!mounted) return;
     state = state.copyWith(
       isSignedIn: false,
       clearAccountEmail: true,

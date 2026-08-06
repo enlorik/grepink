@@ -60,9 +60,6 @@ class _FakeDriveSyncService implements DriveSyncService {
     if (throwOnDownload) throw Exception('download error');
     return _remote;
   }
-
-  @override
-  Future<DateTime?> getRemoteModifiedAt() async => null;
 }
 
 // ---------- helpers ----------

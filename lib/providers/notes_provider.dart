@@ -71,6 +71,7 @@ class NotesNotifier extends StateNotifier<AsyncValue<List<Note>>> {
     final updated = note.copyWith(isPinned: !note.isPinned, updatedAt: DateTime.now());
     await DatabaseService.instance.updateNote(updated);
     await loadNotes();
+    _ref.read(syncProvider.notifier).scheduleSync();
   }
 
   Future<void> reindexEmbeddings() async {

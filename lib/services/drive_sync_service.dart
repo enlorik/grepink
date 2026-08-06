@@ -21,7 +21,6 @@ abstract class DriveSyncService {
   Future<void> signOut();
   Future<void> upload(String encodedJson);
   Future<String?> download();
-  Future<DateTime?> getRemoteModifiedAt();
 
   factory DriveSyncService() = _GoogleDriveSyncService;
 }
@@ -149,24 +148,6 @@ class _GoogleDriveSyncService implements DriveSyncService {
       rethrow;
     } catch (_) {
       throw const DriveSyncException('Download failed');
-    }
-  }
-
-  @override
-  Future<DateTime?> getRemoteModifiedAt() async {
-    try {
-      final api = await _getApi();
-      final id = await _findFileId(api);
-      if (id == null) return null;
-      final file = await api.files.get(
-        id,
-        $fields: 'modifiedTime',
-      ) as drive.File;
-      return file.modifiedTime;
-    } on DriveSyncException {
-      rethrow;
-    } catch (_) {
-      return null;
     }
   }
 
