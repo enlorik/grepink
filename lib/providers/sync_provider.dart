@@ -117,9 +117,14 @@ class SyncNotifier extends StateNotifier<SyncState> {
 
   Future<void> signOut() async {
     final service = _ref.read(syncServiceProvider);
-    await service.signOut();
-    if (!mounted) return;
+    // Increment before awaiting sign-out so any in-flight sync that completes
+    // its download while we await will see the changed generation and abort
+    // before merging or uploading.
     _syncGeneration++;
+    try {
+      await service.signOut();
+    } catch (_) {}
+    if (!mounted) return;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_lastSyncKey);
     await prefs.remove(_knownIdsKey);

@@ -53,6 +53,9 @@ class _GoogleDriveSyncService implements DriveSyncService {
   final GoogleSignIn _googleSignIn;
   drive.DriveApi? _driveApi;
   _AuthenticatedClient? _httpClient;
+  // Track our own sign-in flag so that a failed platform sign-out cannot leave
+  // isSignedIn true and allow _getApi() to rebuild the Drive client.
+  bool _signedIn = false;
 
   _GoogleDriveSyncService()
       : _googleSignIn = GoogleSignIn(
@@ -60,7 +63,7 @@ class _GoogleDriveSyncService implements DriveSyncService {
         );
 
   @override
-  bool get isSignedIn => _googleSignIn.currentUser != null;
+  bool get isSignedIn => _signedIn;
 
   @override
   String? get accountEmail => _googleSignIn.currentUser?.email;
@@ -71,6 +74,7 @@ class _GoogleDriveSyncService implements DriveSyncService {
       final account = await _googleSignIn.signIn();
       if (account == null) return false;
       _driveApi = _buildDriveApi(account);
+      _signedIn = true;
       return true;
     } catch (_) {
       return false;
@@ -83,6 +87,7 @@ class _GoogleDriveSyncService implements DriveSyncService {
       final account = await _googleSignIn.signInSilently();
       if (account == null) return false;
       _driveApi = _buildDriveApi(account);
+      _signedIn = true;
       return true;
     } catch (_) {
       return false;
@@ -91,16 +96,20 @@ class _GoogleDriveSyncService implements DriveSyncService {
 
   @override
   Future<void> signOut() async {
-    try {
-      await _googleSignIn.signOut();
-    } catch (_) {}
+    // Clear local state first so no further Drive requests can be made,
+    // even if the provider-level sign-out call throws.
+    _signedIn = false;
     _httpClient?.close();
     _httpClient = null;
     _driveApi = null;
+    try {
+      await _googleSignIn.signOut();
+    } catch (_) {}
   }
 
   Future<drive.DriveApi> _getApi() async {
     if (_driveApi != null) return _driveApi!;
+    if (!_signedIn) throw const DriveSyncException('Not signed in');
     final account = _googleSignIn.currentUser;
     if (account == null) throw const DriveSyncException('Not signed in');
     _driveApi = _buildDriveApi(account);
