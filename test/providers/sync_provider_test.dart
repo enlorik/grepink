@@ -248,6 +248,43 @@ void main() {
       expect(msg.contains('Step 1'), isFalse);
     });
 
+    test('sync() does not resurrect notes deleted before lastSyncedAt', () async {
+      // A note that existed in a prior backup but was deleted locally should
+      // not come back just because the remote still has it, as long as the
+      // remote copy predates our last successful sync.
+      final beforeLastSync = DateTime.utc(2026, 1, 1);
+      final deletedNote =
+          _note(id: 'deleted', title: 'Deleted note', updatedAt: beforeLastSync);
+      final remoteJson = NoteExportService.instance.encode([deletedNote]);
+
+      final service = _FakeDriveSyncService(remote: remoteJson);
+      final container = _makeContainer(service: service, localNotes: []);
+      addTearDown(container.dispose);
+
+      // Simulate a prior sync by patching lastSyncedAt into the notifier state.
+      // We do this by running a sync first (so lastSyncedAt = now), then faking
+      // the remote to have the old note.
+      //
+      // Simpler: directly drive the notifier after an initial successful sync
+      // that sets lastSyncedAt to a time after deletedNote.updatedAt.
+      container.read(syncProvider.notifier);
+      // Manually set the lastSyncedAt by running a clean sync first.
+      await container.read(syncProvider.notifier).sync();
+      // Now lastSyncedAt is around DateTime.now(). deletedNote.updatedAt =
+      // 2026-01-01, which is before lastSyncedAt, so it must NOT be merged.
+      final uploadsBefore = service.uploadCalls;
+      _mergeCalls.clear();
+      await container.read(syncProvider.notifier).sync();
+
+      // mergeNotes must NOT have been called with the deleted note.
+      final resurrected = _mergeCalls.any(
+        (c) => c.incoming.any((n) => n.id == 'deleted'),
+      );
+      expect(resurrected, isFalse,
+          reason: 'Deleted note should not be resurrected from stale remote backup');
+      expect(service.uploadCalls, greaterThan(uploadsBefore));
+    });
+
     test('silent sign-in on startup restores session state', () async {
       final service = _FakeDriveSyncService(
         signedIn: false,

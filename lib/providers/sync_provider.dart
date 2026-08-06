@@ -10,6 +10,8 @@ import '../services/note_export_service.dart';
 typedef ConnectivityChecker = Future<List<ConnectivityResult>> Function();
 typedef NotesGetter = Future<List<Note>> Function();
 typedef NotesMerger = Future<void> Function(List<Note> existing, List<Note> incoming);
+typedef NotesReloader = Future<void> Function();
+typedef EmbeddingReindexer = Future<void> Function();
 
 final connectivityCheckerProvider = Provider<ConnectivityChecker>(
   (ref) => () => Connectivity().checkConnectivity(),
@@ -22,6 +24,18 @@ final notesGetterProvider = Provider<NotesGetter>(
 final notesMergerProvider = Provider<NotesMerger>(
   (ref) => (existing, incoming) =>
       DatabaseService.instance.mergeNotes(existing, incoming).then((_) {}),
+);
+
+// Reloads the in-memory notes list after a remote merge. Overridden in main()
+// to call notesProvider.notifier.loadNotes() without creating a circular import.
+final notesReloaderProvider = Provider<NotesReloader>(
+  (ref) => () async {},
+);
+
+// Triggers embedding generation for notes whose embeddingPending flag is set
+// after a remote merge. Overridden in main() to call reindexPendingNotes().
+final embeddingReindexerProvider = Provider<EmbeddingReindexer>(
+  (ref) => () async {},
 );
 
 final syncServiceProvider = Provider<DriveSyncService>(
@@ -109,12 +123,25 @@ class SyncNotifier extends StateNotifier<SyncState> {
     try {
       final getNotes = _ref.read(notesGetterProvider);
       final mergeNotes = _ref.read(notesMergerProvider);
+      final reloadNotes = _ref.read(notesReloaderProvider);
+      final reindexEmbeddings = _ref.read(embeddingReindexerProvider);
 
       final remote = await service.download();
       if (remote != null) {
         final incoming = NoteExportService.instance.decode(remote);
-        final existing = await getNotes();
-        await mergeNotes(existing, incoming);
+        // Only merge notes whose updatedAt is strictly after our last sync.
+        // Notes older than lastSyncedAt that are absent locally were deleted
+        // locally and should not be resurrected from the remote backup.
+        final lastSynced = state.lastSyncedAt;
+        final toMerge = lastSynced == null
+            ? incoming
+            : incoming.where((n) => n.updatedAt.isAfter(lastSynced)).toList();
+        if (toMerge.isNotEmpty) {
+          final existing = await getNotes();
+          await mergeNotes(existing, toMerge);
+          await reloadNotes();
+          await reindexEmbeddings();
+        }
       }
 
       final allNotes = await getNotes();
