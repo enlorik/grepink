@@ -33,12 +33,27 @@ class SyncNotifier extends StateNotifier<SyncState> {
   Timer? _debounce;
   bool _syncInProgress = false;
 
-  SyncNotifier(this._ref) : super(const SyncState());
+  SyncNotifier(this._ref) : super(const SyncState()) {
+    _silentSignIn();
+  }
 
   @override
   void dispose() {
     _debounce?.cancel();
     super.dispose();
+  }
+
+  Future<void> _silentSignIn() async {
+    final service = _ref.read(syncServiceProvider);
+    final ok = await service.signInSilently();
+    if (!mounted) return;
+    if (ok) {
+      state = state.copyWith(
+        isSignedIn: true,
+        accountEmail: service.accountEmail,
+        clearErrorMessage: true,
+      );
+    }
   }
 
   Future<void> signIn() async {

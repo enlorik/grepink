@@ -17,6 +17,7 @@ abstract class DriveSyncService {
   bool get isSignedIn;
   String? get accountEmail;
   Future<bool> signIn();
+  Future<bool> signInSilently();
   Future<void> signOut();
   Future<void> upload(String encodedJson);
   Future<String?> download();
@@ -25,15 +26,20 @@ abstract class DriveSyncService {
   factory DriveSyncService() = _GoogleDriveSyncService;
 }
 
+// Fetches a fresh access token on every request so tokens never expire mid-session.
 class _AuthenticatedClient extends http.BaseClient {
-  final Map<String, String> _headers;
+  final GoogleSignInAccount _account;
   final http.Client _inner;
 
-  _AuthenticatedClient(this._headers) : _inner = http.Client();
+  _AuthenticatedClient(this._account) : _inner = http.Client();
 
   @override
-  Future<http.StreamedResponse> send(http.BaseRequest request) {
-    request.headers.addAll(_headers);
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    final auth = await _account.authentication;
+    final token = auth.accessToken;
+    if (token != null) {
+      request.headers['Authorization'] = 'Bearer $token';
+    }
     return _inner.send(request);
   }
 
@@ -64,7 +70,19 @@ class _GoogleDriveSyncService implements DriveSyncService {
     try {
       final account = await _googleSignIn.signIn();
       if (account == null) return false;
-      _driveApi = await _buildDriveApi(account);
+      _driveApi = _buildDriveApi(account);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> signInSilently() async {
+    try {
+      final account = await _googleSignIn.signInSilently();
+      if (account == null) return false;
+      _driveApi = _buildDriveApi(account);
       return true;
     } catch (_) {
       return false;
@@ -83,16 +101,12 @@ class _GoogleDriveSyncService implements DriveSyncService {
     if (_driveApi != null) return _driveApi!;
     final account = _googleSignIn.currentUser;
     if (account == null) throw const DriveSyncException('Not signed in');
-    _driveApi = await _buildDriveApi(account);
+    _driveApi = _buildDriveApi(account);
     return _driveApi!;
   }
 
-  Future<drive.DriveApi> _buildDriveApi(GoogleSignInAccount account) async {
-    final auth = await account.authentication;
-    final token = auth.accessToken;
-    if (token == null) throw const DriveSyncException('No access token');
-    final client = _AuthenticatedClient({'Authorization': 'Bearer $token'});
-    return drive.DriveApi(client);
+  drive.DriveApi _buildDriveApi(GoogleSignInAccount account) {
+    return drive.DriveApi(_AuthenticatedClient(account));
   }
 
   @override

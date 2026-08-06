@@ -14,6 +14,7 @@ class _FakeDriveSyncService implements DriveSyncService {
   final String? _remote;
   bool throwOnUpload;
   bool throwOnDownload;
+  bool silentSignInResult;
   int uploadCalls = 0;
   String? lastUploaded;
 
@@ -22,6 +23,7 @@ class _FakeDriveSyncService implements DriveSyncService {
     String? remote,
     this.throwOnUpload = false,
     this.throwOnDownload = false,
+    this.silentSignInResult = false,
   })  : _signedIn = signedIn,
         _remote = remote;
 
@@ -35,6 +37,12 @@ class _FakeDriveSyncService implements DriveSyncService {
   Future<bool> signIn() async {
     _signedIn = true;
     return true;
+  }
+
+  @override
+  Future<bool> signInSilently() async {
+    if (silentSignInResult) _signedIn = true;
+    return silentSignInResult;
   }
 
   @override
@@ -149,9 +157,7 @@ void main() {
       final container = _makeContainer(service: service);
       addTearDown(container.dispose);
 
-      // Force syncing state
       final notifier = container.read(syncProvider.notifier);
-      // Run two concurrent syncs; second should be a no-op
       final f1 = notifier.sync();
       final f2 = notifier.sync();
       await Future.wait([f1, f2]);
@@ -160,10 +166,9 @@ void main() {
     });
 
     test('sync() merges remote notes into local when remote exists', () async {
-      final older = DateTime.utc(2025, 1, 1);
       final newer = DateTime.utc(2026, 6, 1);
       final remoteNote = _note(id: 'r1', title: 'Remote', updatedAt: newer);
-      final localNote = _note(id: 'l1', title: 'Local', updatedAt: older);
+      final localNote = _note(id: 'l1', title: 'Local');
       final remoteJson = NoteExportService.instance.encode([remoteNote]);
 
       final service = _FakeDriveSyncService(remote: remoteJson);
@@ -244,6 +249,24 @@ void main() {
       expect(msg.contains('secret'), isFalse);
       expect(msg.contains('rule the world'), isFalse);
       expect(msg.contains('Step 1'), isFalse);
+    });
+
+    test('silent sign-in on startup restores session state', () async {
+      final service = _FakeDriveSyncService(
+        signedIn: false,
+        silentSignInResult: true,
+      );
+      final container = _makeContainer(service: service);
+      addTearDown(container.dispose);
+
+      // Reading the notifier triggers its creation, which fires _silentSignIn().
+      container.read(syncProvider.notifier);
+      // Allow the async signInSilently() call to complete before checking state.
+      await Future<void>.delayed(Duration.zero);
+
+      final syncState = container.read(syncProvider);
+      expect(syncState.isSignedIn, isTrue);
+      expect(syncState.accountEmail, isNotNull);
     });
   });
 }

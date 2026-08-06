@@ -22,6 +22,12 @@ class _FakeDriveSyncService implements DriveSyncService {
   }
 
   @override
+  Future<bool> signInSilently() async {
+    if (_signedIn) return true;
+    return false;
+  }
+
+  @override
   Future<void> signOut() async {
     _signedIn = false;
     _email = null;
