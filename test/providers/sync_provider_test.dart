@@ -6,6 +6,7 @@ import 'package:grepink/models/sync_state.dart';
 import 'package:grepink/providers/sync_provider.dart';
 import 'package:grepink/services/drive_sync_service.dart';
 import 'package:grepink/services/note_export_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // ---------- fakes ----------
 
@@ -118,7 +119,13 @@ ProviderContainer _makeContainer({
 // ---------- tests ----------
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('SyncNotifier', () {
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+    });
+
     tearDown(() {
       _localNotes = [];
       _mergeCalls.clear();
@@ -149,7 +156,10 @@ void main() {
       expect(service.uploadCalls, 0);
     });
 
-    test('sync() skips when already syncing', () async {
+    test('sync() queues one follow-up when already syncing', () async {
+      // When a second sync() call arrives while one is in-flight, it should
+      // mark a pending flag so a single follow-up run happens after the first
+      // finishes — not unlimited queuing, but no silent discard either.
       final service = _FakeDriveSyncService();
       final container = _makeContainer(service: service);
       addTearDown(container.dispose);
@@ -159,7 +169,8 @@ void main() {
       final f2 = notifier.sync();
       await Future.wait([f1, f2]);
 
-      expect(service.uploadCalls, 1);
+      // First sync uploads once; the queued sync uploads once more.
+      expect(service.uploadCalls, 2);
     });
 
     test('sync() merges remote notes into local when remote exists', () async {
@@ -293,10 +304,10 @@ void main() {
       final container = _makeContainer(service: service);
       addTearDown(container.dispose);
 
-      // Reading the notifier triggers its creation, which fires _silentSignIn().
+      // Reading the notifier triggers _init() → _silentSignIn() → sync().
       container.read(syncProvider.notifier);
-      // Allow the async signInSilently() call to complete before checking state.
-      await Future<void>.delayed(Duration.zero);
+      // Drain the full async chain (sign-in + sync + prefs write).
+      await pumpEventQueue(times: 20);
 
       final syncState = container.read(syncProvider);
       expect(syncState.isSignedIn, isTrue);

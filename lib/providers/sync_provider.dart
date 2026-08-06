@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/note.dart';
 import '../models/sync_state.dart';
 import '../services/database_service.dart';
@@ -42,19 +43,37 @@ final syncServiceProvider = Provider<DriveSyncService>(
   (ref) => DriveSyncService(),
 );
 
+const _lastSyncKey = 'sync.lastSyncedAt';
+
 class SyncNotifier extends StateNotifier<SyncState> {
   final Ref _ref;
   Timer? _debounce;
   bool _syncInProgress = false;
+  bool _syncPending = false;
 
   SyncNotifier(this._ref) : super(const SyncState()) {
-    _silentSignIn();
+    _init();
   }
 
   @override
   void dispose() {
     _debounce?.cancel();
     super.dispose();
+  }
+
+  Future<void> _init() async {
+    await _loadPersistedState();
+    await _silentSignIn();
+  }
+
+  Future<void> _loadPersistedState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final millis = prefs.getInt(_lastSyncKey);
+    if (millis != null && mounted) {
+      state = state.copyWith(
+        lastSyncedAt: DateTime.fromMillisecondsSinceEpoch(millis),
+      );
+    }
   }
 
   Future<void> _silentSignIn() async {
@@ -67,6 +86,8 @@ class SyncNotifier extends StateNotifier<SyncState> {
         accountEmail: service.accountEmail,
         clearErrorMessage: true,
       );
+      // Chain the first sync so notes are up to date immediately after startup.
+      await sync();
     }
   }
 
@@ -86,9 +107,12 @@ class SyncNotifier extends StateNotifier<SyncState> {
     final service = _ref.read(syncServiceProvider);
     await service.signOut();
     if (!mounted) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_lastSyncKey);
     state = state.copyWith(
       isSignedIn: false,
       clearAccountEmail: true,
+      clearLastSyncedAt: true,
       clearErrorMessage: true,
     );
   }
@@ -99,12 +123,20 @@ class SyncNotifier extends StateNotifier<SyncState> {
   }
 
   Future<void> sync() async {
-    if (_syncInProgress) return;
+    if (_syncInProgress) {
+      _syncPending = true;
+      return;
+    }
     _syncInProgress = true;
     try {
       await _doSync();
+      if (_syncPending) {
+        _syncPending = false;
+        await _doSync();
+      }
     } finally {
       _syncInProgress = false;
+      _syncPending = false;
     }
   }
 
@@ -148,9 +180,13 @@ class SyncNotifier extends StateNotifier<SyncState> {
       final encoded = NoteExportService.instance.encode(allNotes);
       await service.upload(encoded);
 
+      final now = DateTime.now();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_lastSyncKey, now.millisecondsSinceEpoch);
+      if (!mounted) return;
       state = state.copyWith(
         status: SyncStatus.idle,
-        lastSyncedAt: DateTime.now(),
+        lastSyncedAt: now,
         clearErrorMessage: true,
       );
     } catch (_) {

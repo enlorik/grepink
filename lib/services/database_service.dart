@@ -199,27 +199,36 @@ class DatabaseService {
   }
 
   /// Atomically merges [incoming] notes into the database.
-  /// Incoming wins only when its updatedAt is strictly newer.
+  /// Incoming wins only when its updatedAt is strictly newer than the row
+  /// currently in the database (re-read inside the transaction to avoid TOCTOU).
   /// Returns the counts of added, updated, and skipped notes.
   Future<({int added, int updated, int skipped})> mergeNotes(
     List<Note> existing,
     List<Note> incoming,
   ) async {
     final db = await database;
-    final existingById = {for (final n in existing) n.id: n};
     int added = 0, updated = 0, skipped = 0;
     await db.transaction((txn) async {
       for (final note in incoming) {
-        final current = existingById[note.id];
+        final rows = await txn.query(
+          'notes',
+          columns: ['id', 'updated_at'],
+          where: 'id = ?',
+          whereArgs: [note.id],
+          limit: 1,
+        );
         final toWrite = note.copyWith(embeddingPending: true, clearEmbedding: true);
-        if (current == null) {
+        if (rows.isEmpty) {
           await txn.insert('notes', toWrite.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
           added++;
-        } else if (note.updatedAt.isAfter(current.updatedAt)) {
-          await txn.update('notes', toWrite.toMap(), where: 'id = ?', whereArgs: [note.id]);
-          updated++;
         } else {
-          skipped++;
+          final currentUpdatedAt = DateTime.parse(rows.first['updated_at'] as String);
+          if (note.updatedAt.isAfter(currentUpdatedAt)) {
+            await txn.update('notes', toWrite.toMap(), where: 'id = ?', whereArgs: [note.id]);
+            updated++;
+          } else {
+            skipped++;
+          }
         }
       }
     });
