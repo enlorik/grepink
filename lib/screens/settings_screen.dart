@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -628,11 +629,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final notes = await DatabaseService.instance.getAllNotes();
       final jsonText = NoteExportService.instance.encode(notes);
       final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').substring(0, 19);
+      final fileName = 'grepink-notes-$timestamp.json';
       final bytes = Uint8List.fromList(utf8.encode(jsonText));
-      await Share.shareXFiles(
-        [XFile.fromData(bytes, name: 'grepink-notes-$timestamp.json', mimeType: 'application/json')],
-        subject: 'Grepink notes backup',
-      );
+      // share_plus has no Windows or Linux desktop implementation;
+      // use the file-picker save dialog there (and on web).
+      final isDesktopOrWeb = kIsWeb ||
+          defaultTargetPlatform == TargetPlatform.windows ||
+          defaultTargetPlatform == TargetPlatform.linux ||
+          defaultTargetPlatform == TargetPlatform.macOS;
+      if (isDesktopOrWeb) {
+        await FilePicker.platform.saveFile(
+          fileName: fileName,
+          type: FileType.custom,
+          allowedExtensions: ['json'],
+          bytes: bytes,
+        );
+      } else {
+        await Share.shareXFiles(
+          [XFile.fromData(bytes, name: fileName, mimeType: 'application/json')],
+          subject: 'Grepink notes backup',
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       messenger.showSnackBar(SnackBar(content: Text('Export failed: $e')));
