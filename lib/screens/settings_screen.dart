@@ -791,6 +791,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await ref.read(notesProvider.notifier).loadNotes();
     // Fire-and-forget: wraps its own exceptions so no unhandled futures escape.
     ref.read(notesProvider.notifier).reindexPendingNotes();
+    ref.read(syncProvider.notifier).scheduleSync();
     if (!mounted) return;
     messenger.showSnackBar(SnackBar(content: Text(successMessage)));
   }
@@ -823,6 +824,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     await DatabaseService.instance.clearAll();
     await ref.read(notesProvider.notifier).loadNotes();
+    ref.read(syncProvider.notifier).scheduleSync();
     if (!mounted) {
       return;
     }

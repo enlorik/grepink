@@ -44,12 +44,19 @@ final syncServiceProvider = Provider<DriveSyncService>(
 );
 
 const _lastSyncKey = 'sync.lastSyncedAt';
+// Tracks note IDs present in the last successful upload so we can distinguish
+// "deleted locally" (ID in knownIds, absent in local) from "new from another
+// device" (ID not in knownIds) when processing the remote backup.
+const _knownIdsKey = 'sync.knownIds';
 
 class SyncNotifier extends StateNotifier<SyncState> {
   final Ref _ref;
   Timer? _debounce;
   bool _syncInProgress = false;
   bool _syncPending = false;
+  // Incremented on sign-out so in-flight syncs can detect the cancellation and
+  // avoid writing stale watermarks back to SharedPreferences.
+  int _syncGeneration = 0;
 
   SyncNotifier(this._ref) : super(const SyncState()) {
     _init();
@@ -107,8 +114,11 @@ class SyncNotifier extends StateNotifier<SyncState> {
     final service = _ref.read(syncServiceProvider);
     await service.signOut();
     if (!mounted) return;
+    _syncGeneration++;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_lastSyncKey);
+    await prefs.remove(_knownIdsKey);
+    if (!mounted) return;
     state = state.copyWith(
       isSignedIn: false,
       clearAccountEmail: true,
@@ -129,11 +139,10 @@ class SyncNotifier extends StateNotifier<SyncState> {
     }
     _syncInProgress = true;
     try {
-      await _doSync();
-      if (_syncPending) {
+      do {
         _syncPending = false;
         await _doSync();
-      }
+      } while (_syncPending);
     } finally {
       _syncInProgress = false;
       _syncPending = false;
@@ -141,6 +150,7 @@ class SyncNotifier extends StateNotifier<SyncState> {
   }
 
   Future<void> _doSync() async {
+    final capturedGeneration = _syncGeneration;
     final service = _ref.read(syncServiceProvider);
     if (!service.isSignedIn) return;
 
@@ -158,19 +168,25 @@ class SyncNotifier extends StateNotifier<SyncState> {
       final reloadNotes = _ref.read(notesReloaderProvider);
       final reindexEmbeddings = _ref.read(embeddingReindexerProvider);
 
+      final prefs = await SharedPreferences.getInstance();
+      final knownIds = Set<String>.from(prefs.getStringList(_knownIdsKey) ?? []);
+
+      final localNotes = await getNotes();
+      final localIds = {for (final n in localNotes) n.id};
+
       final remote = await service.download();
       if (remote != null) {
         final incoming = NoteExportService.instance.decode(remote);
-        // Only merge notes whose updatedAt is strictly after our last sync.
-        // Notes older than lastSyncedAt that are absent locally were deleted
-        // locally and should not be resurrected from the remote backup.
-        final lastSynced = state.lastSyncedAt;
-        final toMerge = lastSynced == null
-            ? incoming
-            : incoming.where((n) => n.updatedAt.isAfter(lastSynced)).toList();
+        // Merge rules using ID-based deletion tracking:
+        // - ID not in knownIds: note from another device never seen here → merge
+        // - ID in knownIds AND in localIds: present locally → updatedAt-wins in mergeNotes
+        // - ID in knownIds but NOT in localIds: deleted locally → skip to prevent resurrection
+        final toMerge = incoming.where((n) {
+          if (!knownIds.contains(n.id)) return true;
+          return localIds.contains(n.id);
+        }).toList();
         if (toMerge.isNotEmpty) {
-          final existing = await getNotes();
-          await mergeNotes(existing, toMerge);
+          await mergeNotes(localNotes, toMerge);
           await reloadNotes();
           await reindexEmbeddings();
         }
@@ -180,9 +196,11 @@ class SyncNotifier extends StateNotifier<SyncState> {
       final encoded = NoteExportService.instance.encode(allNotes);
       await service.upload(encoded);
 
+      // Skip persisting if a sign-out happened while the upload was in flight.
+      if (_syncGeneration != capturedGeneration) return;
       final now = DateTime.now();
-      final prefs = await SharedPreferences.getInstance();
       await prefs.setInt(_lastSyncKey, now.millisecondsSinceEpoch);
+      await prefs.setStringList(_knownIdsKey, allNotes.map((n) => n.id).toList());
       if (!mounted) return;
       state = state.copyWith(
         status: SyncStatus.idle,
@@ -190,6 +208,7 @@ class SyncNotifier extends StateNotifier<SyncState> {
         clearErrorMessage: true,
       );
     } catch (_) {
+      if (!mounted) return;
       state = state.copyWith(
         status: SyncStatus.error,
         errorMessage: 'Sync failed. Check your connection and try again.',
