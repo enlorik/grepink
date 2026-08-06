@@ -4,6 +4,7 @@ import '../models/note.dart';
 import '../services/database_service.dart';
 import '../services/embedding_service.dart';
 import 'settings_provider.dart';
+import 'sync_provider.dart';
 
 class NotesNotifier extends StateNotifier<AsyncValue<List<Note>>> {
   final Ref _ref;
@@ -42,6 +43,7 @@ class NotesNotifier extends StateNotifier<AsyncValue<List<Note>>> {
     await DatabaseService.instance.insertNote(note);
     await loadNotes();
     _triggerEmbedding(note);
+    _ref.read(syncProvider.notifier).scheduleSync();
     return note;
   }
 
@@ -54,11 +56,13 @@ class NotesNotifier extends StateNotifier<AsyncValue<List<Note>>> {
     await DatabaseService.instance.updateNote(updated);
     await loadNotes();
     _triggerEmbedding(updated);
+    _ref.read(syncProvider.notifier).scheduleSync();
   }
 
   Future<void> deleteNote(String id) async {
     await DatabaseService.instance.deleteNote(id);
     await loadNotes();
+    _ref.read(syncProvider.notifier).scheduleSync();
   }
 
   Future<void> togglePin(String id) async {

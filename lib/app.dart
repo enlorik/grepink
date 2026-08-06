@@ -6,6 +6,7 @@ import 'screens/note_editor_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/settings_screen.dart';
 import 'theme/app_theme.dart';
+import 'providers/sync_provider.dart';
 
 final _router = GoRouter(
   initialLocation: '/',
@@ -36,11 +37,36 @@ final _router = GoRouter(
   ],
 );
 
-class GrepinkApp extends ConsumerWidget {
+class GrepinkApp extends ConsumerStatefulWidget {
   const GrepinkApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<GrepinkApp> createState() => _GrepinkAppState();
+}
+
+class _GrepinkAppState extends ConsumerState<GrepinkApp>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ref.read(syncProvider.notifier).sync();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return MaterialApp.router(
       title: 'Grepink',
       theme: AppTheme.lightTheme,
