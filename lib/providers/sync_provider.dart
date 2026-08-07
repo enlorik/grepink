@@ -135,9 +135,16 @@ class SyncNotifier extends StateNotifier<SyncState> {
       clearErrorMessage: true,
     );
     if (ok) {
-      // Immediately download and merge so notes are available without waiting
-      // for the next lifecycle resume or manual tap.
-      await sync();
+      // If a replaceAll was interrupted while signed out, honor the durable
+      // flag so newer Drive versions cannot overwrite the restored backup.
+      final prefs = await SharedPreferences.getInstance();
+      if (!mounted) return;
+      final forceUpload = prefs.getBool(_forceUploadPendingKey) ?? false;
+      if (forceUpload) {
+        await syncUploadOnly();
+      } else {
+        await sync();
+      }
     }
   }
 
@@ -211,8 +218,13 @@ class SyncNotifier extends StateNotifier<SyncState> {
     }
     _syncInProgress = true;
     try {
-      await _doUploadOnly();
-      // Drain any regular sync requests that arrived while the upload was running.
+      // Drain consecutive force uploads (e.g. a second replaceAll fired while
+      // an earlier upload-only pass was still in flight).
+      do {
+        _forceUploadPending = false;
+        await _doUploadOnly();
+      } while (_forceUploadPending);
+      // Then drain any regular sync requests queued during the upload(s).
       while (_syncPending) {
         _syncPending = false;
         await _doSync();
@@ -387,8 +399,6 @@ class SyncNotifier extends StateNotifier<SyncState> {
       final now = DateTime.now();
       await prefs.setInt(_lastSyncKey, now.millisecondsSinceEpoch);
       await prefs.setStringList(_knownIdsKey, allNotes.map((n) => n.id).toList());
-      // Regular upload also satisfies any pending force-upload requirement.
-      await prefs.remove(_forceUploadPendingKey);
       if (!mounted) return;
       state = state.copyWith(
         status: SyncStatus.idle,
