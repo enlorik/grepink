@@ -58,6 +58,10 @@ const _lastSyncKey = 'sync.lastSyncedAt';
 // "deleted locally" (ID in knownIds, absent in local) from "new from another
 // device" (ID not in knownIds) when processing the remote backup.
 const _knownIdsKey = 'sync.knownIds';
+// Survives process termination so that a failed force-upload (e.g. app killed
+// mid-upload after replaceAll) is retried on the next launch rather than
+// letting a download-merge overwrite the explicitly restored backup.
+const _forceUploadPendingKey = 'sync.forceUploadPending';
 
 class SyncNotifier extends StateNotifier<SyncState> {
   final Ref _ref;
@@ -82,11 +86,13 @@ class SyncNotifier extends StateNotifier<SyncState> {
   }
 
   Future<void> _init() async {
-    await _loadPersistedState();
-    await _silentSignIn();
+    final forceUpload = await _loadPersistedState();
+    await _silentSignIn(forceUpload: forceUpload);
   }
 
-  Future<void> _loadPersistedState() async {
+  // Returns true when a durable force-upload flag is set (a replaceAll was
+  // interrupted before the backup reached Drive).
+  Future<bool> _loadPersistedState() async {
     final prefs = await SharedPreferences.getInstance();
     final millis = prefs.getInt(_lastSyncKey);
     if (millis != null && mounted) {
@@ -94,9 +100,10 @@ class SyncNotifier extends StateNotifier<SyncState> {
         lastSyncedAt: DateTime.fromMillisecondsSinceEpoch(millis),
       );
     }
+    return prefs.getBool(_forceUploadPendingKey) ?? false;
   }
 
-  Future<void> _silentSignIn() async {
+  Future<void> _silentSignIn({bool forceUpload = false}) async {
     final service = _ref.read(syncServiceProvider);
     final ok = await service.signInSilently();
     if (!mounted) return;
@@ -106,8 +113,14 @@ class SyncNotifier extends StateNotifier<SyncState> {
         accountEmail: service.accountEmail,
         clearErrorMessage: true,
       );
-      // Chain the first sync so notes are up to date immediately after startup.
-      await sync();
+      // If a replaceAll was interrupted by process termination before the
+      // upload completed, upload-only so the restored snapshot reaches Drive
+      // before any download-merge can overwrite it.
+      if (forceUpload) {
+        await syncUploadOnly();
+      } else {
+        await sync();
+      }
     }
   }
 
@@ -141,6 +154,7 @@ class SyncNotifier extends StateNotifier<SyncState> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_lastSyncKey);
     await prefs.remove(_knownIdsKey);
+    await prefs.remove(_forceUploadPendingKey);
     if (!mounted) return;
     state = state.copyWith(
       isSignedIn: false,
@@ -185,6 +199,12 @@ class SyncNotifier extends StateNotifier<SyncState> {
   // If a sync is already in progress, queues a force-upload-only pass to run
   // immediately after the active sync finishes.
   Future<void> syncUploadOnly() async {
+    // Record durably so a process kill before the upload completes triggers
+    // a retry on the next launch instead of allowing a merge to overwrite
+    // the explicitly restored backup.
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_forceUploadPendingKey, true);
+
     if (_syncInProgress) {
       _forceUploadPending = true;
       return;
@@ -192,6 +212,11 @@ class SyncNotifier extends StateNotifier<SyncState> {
     _syncInProgress = true;
     try {
       await _doUploadOnly();
+      // Drain any regular sync requests that arrived while the upload was running.
+      while (_syncPending) {
+        _syncPending = false;
+        await _doSync();
+      }
     } finally {
       _syncInProgress = false;
       _syncPending = false;
@@ -229,6 +254,8 @@ class SyncNotifier extends StateNotifier<SyncState> {
       final now = DateTime.now();
       await prefs.setInt(_lastSyncKey, now.millisecondsSinceEpoch);
       await prefs.setStringList(_knownIdsKey, allNotes.map((n) => n.id).toList());
+      // Upload succeeded: the durable force-upload flag is no longer needed.
+      await prefs.remove(_forceUploadPendingKey);
       if (!mounted) return;
       state = state.copyWith(
         status: SyncStatus.idle,
@@ -360,6 +387,8 @@ class SyncNotifier extends StateNotifier<SyncState> {
       final now = DateTime.now();
       await prefs.setInt(_lastSyncKey, now.millisecondsSinceEpoch);
       await prefs.setStringList(_knownIdsKey, allNotes.map((n) => n.id).toList());
+      // Regular upload also satisfies any pending force-upload requirement.
+      await prefs.remove(_forceUploadPendingKey);
       if (!mounted) return;
       state = state.copyWith(
         status: SyncStatus.idle,
