@@ -152,15 +152,7 @@ class SyncNotifier extends StateNotifier<SyncState> {
     _debounce = Timer(const Duration(seconds: 5), sync);
   }
 
-  // Schedules an upload-only sync after the usual debounce. Use after replaceAll
-  // so the deliberately restored snapshot is pushed to Drive before any
-  // download-merge can overwrite it with newer remote versions.
-  void scheduleForceUpload() {
-    _debounce?.cancel();
-    _debounce = Timer(const Duration(seconds: 5), syncUploadOnly);
-  }
-
-  Future<void> sync() async {
+Future<void> sync() async {
     if (_syncInProgress) {
       _syncPending = true;
       return;

@@ -791,10 +791,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await ref.read(notesProvider.notifier).loadNotes();
     // Fire-and-forget: wraps its own exceptions so no unhandled futures escape.
     ref.read(notesProvider.notifier).reindexPendingNotes();
-    // replaceAll explicitly sets the desired state; upload without merging so a
-    // subsequent download-merge cannot overwrite the just-restored notes.
     if (choice == _ImportChoice.replaceAll) {
-      ref.read(syncProvider.notifier).scheduleForceUpload();
+      // Upload immediately (no debounce) so an app-close within the debounce
+      // window cannot cancel the timer and allow Drive to overwrite the
+      // explicitly restored backup on the next launch.
+      ref.read(syncProvider.notifier).syncUploadOnly();
     } else {
       ref.read(syncProvider.notifier).scheduleSync();
     }
