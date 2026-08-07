@@ -64,6 +64,9 @@ class SyncNotifier extends StateNotifier<SyncState> {
   Timer? _debounce;
   bool _syncInProgress = false;
   bool _syncPending = false;
+  // Set when syncUploadOnly() is called while a regular sync is in progress,
+  // so the upload-only pass runs immediately after the active sync finishes.
+  bool _forceUploadPending = false;
   // Incremented on sign-out so in-flight syncs can detect the cancellation and
   // avoid writing stale watermarks back to SharedPreferences.
   int _syncGeneration = 0;
@@ -152,7 +155,7 @@ class SyncNotifier extends StateNotifier<SyncState> {
     _debounce = Timer(const Duration(seconds: 5), sync);
   }
 
-Future<void> sync() async {
+  Future<void> sync() async {
     if (_syncInProgress) {
       _syncPending = true;
       return;
@@ -163,16 +166,27 @@ Future<void> sync() async {
         _syncPending = false;
         await _doSync();
       } while (_syncPending);
+      // If syncUploadOnly() was called while the drain loop was running
+      // (e.g. replaceAll fired mid-sync), run the upload-only pass now so
+      // Drive reflects the newly restored notes.
+      if (_forceUploadPending) {
+        _forceUploadPending = false;
+        await _doUploadOnly();
+      }
     } finally {
       _syncInProgress = false;
       _syncPending = false;
+      _forceUploadPending = false;
     }
   }
 
   // Uploads current local notes to Drive without downloading or merging first.
   // Used after replaceAll to avoid a subsequent merge overwriting the restored notes.
+  // If a sync is already in progress, queues a force-upload-only pass to run
+  // immediately after the active sync finishes.
   Future<void> syncUploadOnly() async {
     if (_syncInProgress) {
+      _forceUploadPending = true;
       return;
     }
     _syncInProgress = true;
@@ -181,6 +195,7 @@ Future<void> sync() async {
     } finally {
       _syncInProgress = false;
       _syncPending = false;
+      _forceUploadPending = false;
     }
   }
 
@@ -271,9 +286,21 @@ Future<void> sync() async {
         // is empty due to an error or an intentional clear-all.
         if (incoming.isNotEmpty) {
           final incomingIds = {for (final n in incoming) n.id};
-          final remoteDeletedIds = knownIds
-              .where((id) => currentLocalIds.contains(id) && !incomingIds.contains(id))
-              .toSet();
+          final localNoteById = {for (final n in currentLocalNotes) n.id: n};
+          final sinceLastSync = state.lastSyncedAt;
+          final remoteDeletedIds = knownIds.where((id) {
+            if (!currentLocalIds.contains(id) || incomingIds.contains(id)) return false;
+            // Preserve local edits made after the last sync: we cannot tell
+            // whether the remote deletion or the local edit happened later, so
+            // we keep the edit rather than risk data loss.
+            if (sinceLastSync != null) {
+              final localNote = localNoteById[id];
+              if (localNote != null && localNote.updatedAt.isAfter(sinceLastSync)) {
+                return false;
+              }
+            }
+            return true;
+          }).toSet();
           if (remoteDeletedIds.isNotEmpty) {
             if (_syncGeneration != capturedGeneration) {
               if (mounted) state = state.copyWith(status: SyncStatus.idle);
