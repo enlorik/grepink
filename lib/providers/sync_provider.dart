@@ -13,6 +13,7 @@ typedef NotesGetter = Future<List<Note>> Function();
 typedef NotesMerger = Future<void> Function(List<Note> existing, List<Note> incoming);
 typedef NotesReloader = Future<void> Function();
 typedef EmbeddingReindexer = Future<void> Function();
+typedef NotesDeleter = Future<void> Function(Set<String> ids);
 
 final connectivityCheckerProvider = Provider<ConnectivityChecker>(
   (ref) => () => Connectivity().checkConnectivity(),
@@ -37,6 +38,15 @@ final notesReloaderProvider = Provider<NotesReloader>(
 // after a remote merge. Overridden in main() to call reindexPendingNotes().
 final embeddingReindexerProvider = Provider<EmbeddingReindexer>(
   (ref) => () async {},
+);
+
+// Deletes notes by ID from local storage. Overridden in tests to avoid real DB access.
+final notesDeleterProvider = Provider<NotesDeleter>(
+  (ref) => (ids) async {
+    for (final id in ids) {
+      await DatabaseService.instance.deleteNote(id);
+    }
+  },
 );
 
 final syncServiceProvider = Provider<DriveSyncService>(
@@ -142,6 +152,14 @@ class SyncNotifier extends StateNotifier<SyncState> {
     _debounce = Timer(const Duration(seconds: 5), sync);
   }
 
+  // Schedules an upload-only sync after the usual debounce. Use after replaceAll
+  // so the deliberately restored snapshot is pushed to Drive before any
+  // download-merge can overwrite it with newer remote versions.
+  void scheduleForceUpload() {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(seconds: 5), syncUploadOnly);
+  }
+
   Future<void> sync() async {
     if (_syncInProgress) {
       _syncPending = true;
@@ -156,6 +174,66 @@ class SyncNotifier extends StateNotifier<SyncState> {
     } finally {
       _syncInProgress = false;
       _syncPending = false;
+    }
+  }
+
+  // Uploads current local notes to Drive without downloading or merging first.
+  // Used after replaceAll to avoid a subsequent merge overwriting the restored notes.
+  Future<void> syncUploadOnly() async {
+    if (_syncInProgress) {
+      return;
+    }
+    _syncInProgress = true;
+    try {
+      await _doUploadOnly();
+    } finally {
+      _syncInProgress = false;
+      _syncPending = false;
+    }
+  }
+
+  Future<void> _doUploadOnly() async {
+    final capturedGeneration = _syncGeneration;
+    final service = _ref.read(syncServiceProvider);
+    if (!service.isSignedIn) return;
+
+    state = state.copyWith(status: SyncStatus.syncing, clearErrorMessage: true);
+    try {
+      final checkConnectivity = _ref.read(connectivityCheckerProvider);
+      final connectivity = await checkConnectivity();
+      if (connectivity.contains(ConnectivityResult.none) &&
+          connectivity.length == 1) {
+        if (mounted) state = state.copyWith(status: SyncStatus.idle);
+        return;
+      }
+      if (_syncGeneration != capturedGeneration) {
+        if (mounted) state = state.copyWith(status: SyncStatus.idle);
+        return;
+      }
+      final getNotes = _ref.read(notesGetterProvider);
+      final allNotes = await getNotes();
+      final encoded = NoteExportService.instance.encode(allNotes);
+      await service.upload(encoded);
+      if (_syncGeneration != capturedGeneration) {
+        if (mounted) state = state.copyWith(status: SyncStatus.idle);
+        return;
+      }
+      final prefs = await SharedPreferences.getInstance();
+      final now = DateTime.now();
+      await prefs.setInt(_lastSyncKey, now.millisecondsSinceEpoch);
+      await prefs.setStringList(_knownIdsKey, allNotes.map((n) => n.id).toList());
+      if (!mounted) return;
+      state = state.copyWith(
+        status: SyncStatus.idle,
+        lastSyncedAt: now,
+        clearErrorMessage: true,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      state = state.copyWith(
+        status: SyncStatus.error,
+        errorMessage: 'Sync failed. Check your connection and try again.',
+      );
     }
   }
 
@@ -180,23 +258,52 @@ class SyncNotifier extends StateNotifier<SyncState> {
       final mergeNotes = _ref.read(notesMergerProvider);
       final reloadNotes = _ref.read(notesReloaderProvider);
       final reindexEmbeddings = _ref.read(embeddingReindexerProvider);
+      final deleteNotes = _ref.read(notesDeleterProvider);
 
       final prefs = await SharedPreferences.getInstance();
       final knownIds = Set<String>.from(prefs.getStringList(_knownIdsKey) ?? []);
 
-      final localNotes = await getNotes();
-      final localIds = {for (final n in localNotes) n.id};
-
       final remote = await service.download();
       if (remote != null) {
         final incoming = NoteExportService.instance.decode(remote);
+        // Re-read local state after the download so any deletions that occurred
+        // while the network call was in flight are reflected in the filter.
+        // This minimises the staleness window to the time between this read and
+        // mergeNotes (effectively zero compared to a network round-trip).
+        var currentLocalNotes = await getNotes();
+        var currentLocalIds = {for (final n in currentLocalNotes) n.id};
+
+        // Cross-device deletions: notes in knownIds, present locally, but absent
+        // from the non-empty remote backup were deleted on another device.
+        // Guard with incoming.isNotEmpty to avoid mass deletion if the backup
+        // is empty due to an error or an intentional clear-all.
+        if (incoming.isNotEmpty) {
+          final incomingIds = {for (final n in incoming) n.id};
+          final remoteDeletedIds = knownIds
+              .where((id) => currentLocalIds.contains(id) && !incomingIds.contains(id))
+              .toSet();
+          if (remoteDeletedIds.isNotEmpty) {
+            if (_syncGeneration != capturedGeneration) {
+              if (mounted) state = state.copyWith(status: SyncStatus.idle);
+              return;
+            }
+            await deleteNotes(remoteDeletedIds);
+            currentLocalNotes = currentLocalNotes
+                .where((n) => !remoteDeletedIds.contains(n.id))
+                .toList();
+            currentLocalIds = currentLocalIds.difference(remoteDeletedIds);
+            knownIds.removeAll(remoteDeletedIds);
+            await reloadNotes();
+          }
+        }
+
         // Merge rules using ID-based deletion tracking:
         // - ID not in knownIds: note from another device never seen here → merge
-        // - ID in knownIds AND in localIds: present locally → updatedAt-wins in mergeNotes
-        // - ID in knownIds but NOT in localIds: deleted locally → skip to prevent resurrection
+        // - ID in knownIds AND in currentLocalIds: present locally → updatedAt-wins
+        // - ID in knownIds but NOT in currentLocalIds: deleted locally → skip
         final toMerge = incoming.where((n) {
           if (!knownIds.contains(n.id)) return true;
-          return localIds.contains(n.id);
+          return currentLocalIds.contains(n.id);
         }).toList();
         if (toMerge.isNotEmpty) {
           // Guard against a sign-out that occurred while the download was in flight.
@@ -204,7 +311,7 @@ class SyncNotifier extends StateNotifier<SyncState> {
             if (mounted) state = state.copyWith(status: SyncStatus.idle);
             return;
           }
-          await mergeNotes(localNotes, toMerge);
+          await mergeNotes(currentLocalNotes, toMerge);
           // Persist the newly merged IDs immediately so that if the subsequent
           // upload fails, a later sync still treats those notes as "known" and
           // respects any local deletion the user makes before the next upload.

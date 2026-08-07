@@ -12,21 +12,21 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class _FakeDriveSyncService implements DriveSyncService {
   bool _signedIn;
-  final String? _remote;
+  String? remote;
   bool throwOnUpload;
   bool throwOnDownload;
   bool silentSignInResult;
   int uploadCalls = 0;
+  int downloadCalls = 0;
   String? lastUploaded;
 
   _FakeDriveSyncService({
     bool signedIn = true,
-    String? remote,
+    this.remote,
     this.throwOnUpload = false,
     this.throwOnDownload = false,
     this.silentSignInResult = false,
-  })  : _signedIn = signedIn,
-        _remote = remote;
+  })  : _signedIn = signedIn;
 
   @override
   bool get isSignedIn => _signedIn;
@@ -59,7 +59,8 @@ class _FakeDriveSyncService implements DriveSyncService {
   @override
   Future<String?> download() async {
     if (throwOnDownload) throw Exception('download error');
-    return _remote;
+    downloadCalls++;
+    return remote;
   }
 }
 
@@ -87,6 +88,7 @@ Note _note({
 
 List<Note> _localNotes = [];
 final List<_MergeCall> _mergeCalls = [];
+final Set<String> _deletedIds = {};
 
 class _MergeCall {
   final List<Note> existing;
@@ -101,6 +103,7 @@ ProviderContainer _makeContainer({
 }) {
   _localNotes = localNotes ?? [];
   _mergeCalls.clear();
+  _deletedIds.clear();
 
   return ProviderContainer(
     overrides: [
@@ -111,6 +114,10 @@ ProviderContainer _makeContainer({
       notesGetterProvider.overrideWithValue(() async => List.of(_localNotes)),
       notesMergerProvider.overrideWithValue((existing, incoming) async {
         _mergeCalls.add(_MergeCall(existing, incoming));
+      }),
+      notesDeleterProvider.overrideWithValue((ids) async {
+        _deletedIds.addAll(ids);
+        _localNotes.removeWhere((n) => ids.contains(n.id));
       }),
     ],
   );
@@ -129,6 +136,7 @@ void main() {
     tearDown(() {
       _localNotes = [];
       _mergeCalls.clear();
+      _deletedIds.clear();
     });
 
     test('sync() skips when not signed in', () async {
@@ -288,6 +296,46 @@ void main() {
       expect(service.uploadCalls, greaterThan(uploadsBeforeSecondSync));
     });
 
+    test('sync() deletes a note that was removed on another device', () async {
+      // Scenario: note 'x' is known (synced before, so its ID is in knownIds)
+      // and present locally, but the latest remote backup no longer contains it
+      // — another device deleted it. This sync must delete 'x' locally.
+      final noteX = _note(id: 'x', title: 'Note X');
+      final noteY = _note(id: 'y', title: 'Note Y');
+      // Remote backup has 'y' but NOT 'x'.
+      final remoteJson = NoteExportService.instance.encode([noteY]);
+
+      // Pre-populate knownIds so 'x' is considered a previously synced note.
+      SharedPreferences.setMockInitialValues({'sync.knownIds': ['x']});
+
+      final service = _FakeDriveSyncService(remote: remoteJson);
+      final container = _makeContainer(service: service, localNotes: [noteX]);
+      addTearDown(container.dispose);
+
+      await container.read(syncProvider.notifier).sync();
+
+      expect(_deletedIds.contains('x'), isTrue,
+          reason: 'Note deleted on another device should be removed locally');
+      expect(_mergeCalls.any((c) => c.incoming.any((n) => n.id == 'x')), isFalse,
+          reason: 'Remotely deleted note must not be re-merged');
+    });
+
+    test('syncUploadOnly() uploads without downloading', () async {
+      final localNote = _note(id: 'l1');
+      final service = _FakeDriveSyncService();
+      final container = _makeContainer(service: service, localNotes: [localNote]);
+      addTearDown(container.dispose);
+
+      await container.read(syncProvider.notifier).syncUploadOnly();
+
+      expect(service.uploadCalls, 1,
+          reason: 'syncUploadOnly should upload current notes');
+      expect(service.downloadCalls, 0,
+          reason: 'syncUploadOnly must not download to avoid overwriting restored notes');
+      expect(_mergeCalls, isEmpty,
+          reason: 'syncUploadOnly must not merge remote notes');
+    });
+
     test('signIn() triggers an immediate sync', () async {
       final service = _FakeDriveSyncService(signedIn: false);
       final container = _makeContainer(service: service);
@@ -308,6 +356,7 @@ void main() {
               .overrideWithValue(() async => throw Exception('platform error')),
           notesGetterProvider.overrideWithValue(() async => []),
           notesMergerProvider.overrideWithValue((e, i) async {}),
+          notesDeleterProvider.overrideWithValue((ids) async {}),
         ],
       );
       addTearDown(container.dispose);

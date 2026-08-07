@@ -791,7 +791,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await ref.read(notesProvider.notifier).loadNotes();
     // Fire-and-forget: wraps its own exceptions so no unhandled futures escape.
     ref.read(notesProvider.notifier).reindexPendingNotes();
-    ref.read(syncProvider.notifier).scheduleSync();
+    // replaceAll explicitly sets the desired state; upload without merging so a
+    // subsequent download-merge cannot overwrite the just-restored notes.
+    if (choice == _ImportChoice.replaceAll) {
+      ref.read(syncProvider.notifier).scheduleForceUpload();
+    } else {
+      ref.read(syncProvider.notifier).scheduleSync();
+    }
     if (!mounted) return;
     messenger.showSnackBar(SnackBar(content: Text(successMessage)));
   }
