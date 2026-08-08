@@ -188,9 +188,9 @@ class SyncNotifier extends StateNotifier<SyncState> {
         await _doSync();
       } while (_syncPending);
       // If syncUploadOnly() was called while the drain loop was running
-      // (e.g. replaceAll fired mid-sync), run the upload-only pass now so
-      // Drive reflects the newly restored notes.
-      if (_forceUploadPending) {
+      // (e.g. replaceAll fired mid-sync), drain all queued upload-only passes
+      // so Drive reflects every replacement, even if multiple fired mid-sync.
+      while (_forceUploadPending) {
         _forceUploadPending = false;
         await _doUploadOnly();
       }
