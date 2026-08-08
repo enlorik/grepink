@@ -1,6 +1,9 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
+import '../desktop_file_writer_stub.dart'
+    if (dart.library.io) '../desktop_file_writer_io.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -628,11 +631,35 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final notes = await DatabaseService.instance.getAllNotes();
       final jsonText = NoteExportService.instance.encode(notes);
       final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').substring(0, 19);
+      final fileName = 'grepink-notes-$timestamp.json';
       final bytes = Uint8List.fromList(utf8.encode(jsonText));
-      await Share.shareXFiles(
-        [XFile.fromData(bytes, name: 'grepink-notes-$timestamp.json', mimeType: 'application/json')],
-        subject: 'Grepink notes backup',
-      );
+      // Web: passing bytes triggers a browser download.
+      // Desktop: saveFile only returns the chosen path; write bytes ourselves.
+      // Mobile: use share_plus (no desktop implementation for Windows/Linux).
+      if (kIsWeb) {
+        await FilePicker.platform.saveFile(
+          fileName: fileName,
+          type: FileType.custom,
+          allowedExtensions: ['json'],
+          bytes: bytes,
+        );
+      } else if (defaultTargetPlatform == TargetPlatform.windows ||
+          defaultTargetPlatform == TargetPlatform.linux ||
+          defaultTargetPlatform == TargetPlatform.macOS) {
+        final savePath = await FilePicker.platform.saveFile(
+          fileName: fileName,
+          type: FileType.custom,
+          allowedExtensions: ['json'],
+        );
+        if (savePath != null) {
+          await writeToDesktopPath(savePath, bytes);
+        }
+      } else {
+        await Share.shareXFiles(
+          [XFile.fromData(bytes, name: fileName, mimeType: 'application/json')],
+          subject: 'Grepink notes backup',
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       messenger.showSnackBar(SnackBar(content: Text('Export failed: $e')));
