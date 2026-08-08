@@ -1,7 +1,8 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
+import '../desktop_file_writer_stub.dart'
+    if (dart.library.io) '../desktop_file_writer_io.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -651,7 +652,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           allowedExtensions: ['json'],
         );
         if (savePath != null) {
-          await File(savePath).writeAsBytes(bytes);
+          await writeToDesktopPath(savePath, bytes);
         }
       } else {
         await Share.shareXFiles(
