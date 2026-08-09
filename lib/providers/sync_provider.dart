@@ -266,8 +266,13 @@ class SyncNotifier extends StateNotifier<SyncState> {
       final now = DateTime.now();
       await prefs.setInt(_lastSyncKey, now.millisecondsSinceEpoch);
       await prefs.setStringList(_knownIdsKey, allNotes.map((n) => n.id).toList());
-      // Upload succeeded: the durable force-upload flag is no longer needed.
-      await prefs.remove(_forceUploadPendingKey);
+      // Only clear the durable flag when no further force-upload is queued.
+      // If _forceUploadPending was set by a concurrent syncUploadOnly() while
+      // this upload was in flight, the drain loop will call us again — keep
+      // the flag so a crash before that second upload still triggers recovery.
+      if (!_forceUploadPending) {
+        await prefs.remove(_forceUploadPendingKey);
+      }
       if (!mounted) return;
       state = state.copyWith(
         status: SyncStatus.idle,
@@ -320,39 +325,36 @@ class SyncNotifier extends StateNotifier<SyncState> {
         var currentLocalIds = {for (final n in currentLocalNotes) n.id};
 
         // Cross-device deletions: notes in knownIds, present locally, but absent
-        // from the non-empty remote backup were deleted on another device.
-        // Guard with incoming.isNotEmpty to avoid mass deletion if the backup
-        // is empty due to an error or an intentional clear-all.
-        if (incoming.isNotEmpty) {
-          final incomingIds = {for (final n in incoming) n.id};
-          final localNoteById = {for (final n in currentLocalNotes) n.id: n};
-          final sinceLastSync = state.lastSyncedAt;
-          final remoteDeletedIds = knownIds.where((id) {
-            if (!currentLocalIds.contains(id) || incomingIds.contains(id)) return false;
-            // Preserve local edits made after the last sync: we cannot tell
-            // whether the remote deletion or the local edit happened later, so
-            // we keep the edit rather than risk data loss.
-            if (sinceLastSync != null) {
-              final localNote = localNoteById[id];
-              if (localNote != null && localNote.updatedAt.isAfter(sinceLastSync)) {
-                return false;
-              }
+        // from the remote backup were deleted on another device. An empty backup
+        // is valid — it means the remote cleared all notes intentionally.
+        final incomingIds = {for (final n in incoming) n.id};
+        final localNoteById = {for (final n in currentLocalNotes) n.id: n};
+        final sinceLastSync = state.lastSyncedAt;
+        final remoteDeletedIds = knownIds.where((id) {
+          if (!currentLocalIds.contains(id) || incomingIds.contains(id)) return false;
+          // Preserve local edits made after the last sync: we cannot tell
+          // whether the remote deletion or the local edit happened later, so
+          // we keep the edit rather than risk data loss.
+          if (sinceLastSync != null) {
+            final localNote = localNoteById[id];
+            if (localNote != null && localNote.updatedAt.isAfter(sinceLastSync)) {
+              return false;
             }
-            return true;
-          }).toSet();
-          if (remoteDeletedIds.isNotEmpty) {
-            if (_syncGeneration != capturedGeneration) {
-              if (mounted) state = state.copyWith(status: SyncStatus.idle);
-              return;
-            }
-            await deleteNotes(remoteDeletedIds);
-            currentLocalNotes = currentLocalNotes
-                .where((n) => !remoteDeletedIds.contains(n.id))
-                .toList();
-            currentLocalIds = currentLocalIds.difference(remoteDeletedIds);
-            knownIds.removeAll(remoteDeletedIds);
-            await reloadNotes();
           }
+          return true;
+        }).toSet();
+        if (remoteDeletedIds.isNotEmpty) {
+          if (_syncGeneration != capturedGeneration) {
+            if (mounted) state = state.copyWith(status: SyncStatus.idle);
+            return;
+          }
+          await deleteNotes(remoteDeletedIds);
+          currentLocalNotes = currentLocalNotes
+              .where((n) => !remoteDeletedIds.contains(n.id))
+              .toList();
+          currentLocalIds = currentLocalIds.difference(remoteDeletedIds);
+          knownIds.removeAll(remoteDeletedIds);
+          await reloadNotes();
         }
 
         // Merge rules using ID-based deletion tracking:
