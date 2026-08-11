@@ -46,7 +46,8 @@ class _FakeNoteDraftReviewRepository implements NoteDraftReviewRepository {
   Future<Note?> getNoteById(String id) async => notesById[id];
 
   @override
-  Future<Note> insertNote({required String title, required String content}) async {
+  Future<Note> insertNote(
+      {required String title, required String content}) async {
     insertedNotes++;
     final now = DateTime(2026, 5, 18);
     final note = Note(
@@ -167,13 +168,15 @@ Future<void> _askQuestion(WidgetTester tester, String question) async {
 
 void main() {
   group('SearchScreen ask flow', () {
-    testWidgets('shows loading and then the draft review panel', (tester) async {
+    testWidgets('shows loading and then the draft review panel',
+        (tester) async {
       final completer = Completer<NoteDraft>();
       final repository = _FakeNoteDraftReviewRepository();
 
       await _pumpSearchScreen(
         tester,
-        ingestionService: _FakeKnowledgeIngestionService((_) => completer.future),
+        ingestionService:
+            _FakeKnowledgeIngestionService((_) => completer.future),
         repository: repository,
       );
 
@@ -326,10 +329,12 @@ void main() {
       expect(repository.insertedNotes, 0);
       expect(repository.updatedNotes, 0);
       expect(find.text('Draft Review'), findsNothing);
-      expect(find.text('Draft discarded. Nothing was saved.'), findsAtLeastNWidgets(1));
+      expect(find.text('Draft discarded. Nothing was saved.'),
+          findsAtLeastNWidgets(1));
     });
 
-    testWidgets('loading disables asking again until the current draft resolves',
+    testWidgets(
+        'loading disables asking again until the current draft resolves',
         (tester) async {
       final repository = _FakeNoteDraftReviewRepository();
       final service = _PendingKnowledgeIngestionService();
@@ -416,8 +421,8 @@ void main() {
       await _askQuestion(tester, 'Loading test');
 
       expect(find.text('Generating draft...'), findsOneWidget);
-      final askBtn =
-          tester.widget<FilledButton>(find.byKey(const Key('ask-question-button')));
+      final askBtn = tester
+          .widget<FilledButton>(find.byKey(const Key('ask-question-button')));
       expect(askBtn.onPressed, isNull);
     });
 
@@ -433,7 +438,8 @@ void main() {
       expect(find.text('Discard'), findsOneWidget);
     });
 
-    testWidgets('phone – SearchScreen append target dropdown fits on narrow screen',
+    testWidgets(
+        'phone – SearchScreen append target dropdown fits on narrow screen',
         (tester) async {
       await setSurface(tester, const Size(360, 640));
       final note = _note(id: 'n1', title: 'Target', content: 'c');
@@ -449,18 +455,22 @@ void main() {
         find.byKey(const Key('append-target-dropdown')),
       );
       expect(outerDropdownRect.right, lessThanOrEqualTo(360.0),
-          reason: 'SearchScreen dropdown must not exceed screen width on a narrow phone');
+          reason:
+              'SearchScreen dropdown must not exceed screen width on a narrow phone');
 
       // This is the NoteDraftReviewPanel's own dropdown (key is dynamic based on selection)
-      expect(find.byKey(const ValueKey<String>('append-target-none')), findsOneWidget);
+      expect(find.byKey(const ValueKey<String>('append-target-none')),
+          findsOneWidget);
       final panelDropdownRect = tester.getRect(
         find.byKey(const ValueKey<String>('append-target-none')),
       );
       expect(panelDropdownRect.right, lessThanOrEqualTo(360.0),
-          reason: 'Panel dropdown must not exceed screen width on a narrow phone');
+          reason:
+              'Panel dropdown must not exceed screen width on a narrow phone');
     });
 
-    testWidgets('phone – append and save buttons reachable after ask (createNewNote)',
+    testWidgets(
+        'phone – append and save buttons reachable after ask (createNewNote)',
         (tester) async {
       await setSurface(tester, const Size(360, 640));
       await pumpWithDraft(tester, action: NoteDraftAction.createNewNote);
@@ -471,7 +481,8 @@ void main() {
 
     // ── tablet ─────────────────────────────────────────────────────────────
 
-    testWidgets('tablet – ask form and review panel are accessible', (tester) async {
+    testWidgets('tablet – ask form and review panel are accessible',
+        (tester) async {
       await setSurface(tester, const Size(768, 1024));
       await pumpWithDraft(tester, action: NoteDraftAction.createNewNote);
 
@@ -483,7 +494,8 @@ void main() {
       expect(find.text('Discard'), findsOneWidget);
     });
 
-    testWidgets('tablet – append target dropdown is accessible', (tester) async {
+    testWidgets('tablet – append target dropdown is accessible',
+        (tester) async {
       await setSurface(tester, const Size(768, 1024));
       final note = _note(id: 'n1', title: 'Target', content: 'c');
       await pumpWithDraft(
@@ -497,7 +509,8 @@ void main() {
 
     // ── desktop ────────────────────────────────────────────────────────────
 
-    testWidgets('desktop – ask form and review panel are accessible', (tester) async {
+    testWidgets('desktop – ask form and review panel are accessible',
+        (tester) async {
       await setSurface(tester, const Size(1280, 800));
       await pumpWithDraft(tester, action: NoteDraftAction.createNewNote);
 

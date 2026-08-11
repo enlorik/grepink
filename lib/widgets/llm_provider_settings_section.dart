@@ -245,13 +245,13 @@ class _LlmProviderSettingsSectionState
             contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             isDense: true,
           ),
-          onChanged: (v) =>
-              ref.read(llmSettingsProvider.notifier).setModel(v),
+          onChanged: (v) => ref.read(llmSettingsProvider.notifier).setModel(v),
         ),
       ),
       _buildRow(
         title: 'API Key',
-        subtitle: config.apiKeyConfigured ? 'API key saved' : 'No API key saved',
+        subtitle:
+            config.apiKeyConfigured ? 'API key saved' : 'No API key saved',
         child: _buildApiKeyField(),
       ),
       _buildRow(
@@ -266,8 +266,9 @@ class _LlmProviderSettingsSectionState
               .toDouble(),
           min: LlmProviderConfig.kMinTokens.toDouble(),
           max: LlmProviderConfig.kMaxTokens.toDouble(),
-          divisions: (LlmProviderConfig.kMaxTokens - LlmProviderConfig.kMinTokens) ~/
-              50,
+          divisions:
+              (LlmProviderConfig.kMaxTokens - LlmProviderConfig.kMinTokens) ~/
+                  50,
           activeColor: AppColors.primaryAction,
           inactiveColor: AppColors.dividerBorder,
           label: config.maxTokens.toString(),
@@ -323,8 +324,7 @@ class _LlmProviderSettingsSectionState
                 size: 18,
                 color: AppColors.secondaryText,
               ),
-              onPressed: () =>
-                  setState(() => _apiKeyVisible = !_apiKeyVisible),
+              onPressed: () => setState(() => _apiKeyVisible = !_apiKeyVisible),
             ),
           ),
         ),

@@ -33,8 +33,8 @@ class RuleBasedClaimExtractionService implements ClaimExtractionService {
     if (text.trim().isEmpty) return const [];
 
     final allCitations = answer.citations;
-    final hasOffsets = allCitations.any(
-        (c) => c.startIndex != null && c.endIndex != null);
+    final hasOffsets =
+        allCitations.any((c) => c.startIndex != null && c.endIndex != null);
 
     // Build sentence ranges using allMatches for position awareness.
     final sentences = <({int start, int end, String text})>[];
@@ -101,12 +101,8 @@ class RuleBasedClaimExtractionService implements ClaimExtractionService {
         }
       }
 
-      final id = _claimId(
-          answer.providerName,
-          answer.question,
-          trimmed,
-          claims.length,
-          answer.generatedAt);
+      final id = _claimId(answer.providerName, answer.question, trimmed,
+          claims.length, answer.generatedAt);
 
       claims.add(ExtractedClaim(
         id: id,
@@ -128,15 +124,10 @@ class RuleBasedClaimExtractionService implements ClaimExtractionService {
   /// [generatedAt] scopes the ID to the specific answer instance so that two
   /// answers to the same question at different times never share claim IDs,
   /// even when provider/question/text are identical.
-  static String _claimId(
-      String provider,
-      String question,
-      String claimText,
-      int index,
-      DateTime generatedAt) {
+  static String _claimId(String provider, String question, String claimText,
+      int index, DateTime generatedAt) {
     final qKey = question.length > 40 ? question.substring(0, 40) : question;
-    final tKey =
-        claimText.length > 40 ? claimText.substring(0, 40) : claimText;
+    final tKey = claimText.length > 40 ? claimText.substring(0, 40) : claimText;
     final tsKey = generatedAt.millisecondsSinceEpoch.toRadixString(36);
     return '${provider}_ts:${tsKey}_q:${qKey}_i:${index}_t:$tKey'
         .replaceAll(RegExp(r'\s+'), '_');

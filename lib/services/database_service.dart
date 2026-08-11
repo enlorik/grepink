@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
 import '../models/note.dart';
+import '../models/tombstone.dart';
 
 class DatabaseService {
   DatabaseService._();
@@ -20,13 +21,14 @@ class DatabaseService {
     final path = p.join(dbPath, 'grepink.db');
     return openDatabase(
       path,
-      version: 1,
+      version: 2,
       onConfigure: (db) async {
         // WAL mode keeps the main DB file clean between checkpoints, so
         // Android Auto Backup always captures a consistent snapshot.
         await db.execute('PRAGMA journal_mode=WAL');
       },
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -81,6 +83,23 @@ class DatabaseService {
         VALUES (new.rowid, new.id, new.title, new.content, new.tags, new.keywords);
       END
     ''');
+
+    await _createTombstonesTable(db);
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await _createTombstonesTable(db);
+    }
+  }
+
+  Future<void> _createTombstonesTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS tombstones (
+        id TEXT PRIMARY KEY,
+        deleted_at INTEGER NOT NULL
+      )
+    ''');
   }
 
   Future<void> insertNote(Note note) async {
@@ -102,9 +121,18 @@ class DatabaseService {
     );
   }
 
+  // Atomically deletes a note and records a tombstone in one transaction.
   Future<void> deleteNote(String id) async {
     final db = await database;
-    await db.delete('notes', where: 'id = ?', whereArgs: [id]);
+    final now = DateTime.now().millisecondsSinceEpoch;
+    await db.transaction((txn) async {
+      await txn.delete('notes', where: 'id = ?', whereArgs: [id]);
+      await txn.insert(
+        'tombstones',
+        {'id': id, 'deleted_at': now},
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    });
   }
 
   Future<Note?> getNoteById(String id) async {
@@ -121,6 +149,40 @@ class DatabaseService {
       orderBy: 'is_pinned DESC, updated_at DESC',
     );
     return maps.map(Note.fromMap).toList();
+  }
+
+  Future<List<Tombstone>> getTombstones() async {
+    final db = await database;
+    final rows = await db.query('tombstones');
+    return rows
+        .map((r) => Tombstone(
+              id: r['id'] as String,
+              deletedAt: r['deleted_at'] as int,
+            ))
+        .toList();
+  }
+
+  // Inserts tombstones from an incoming sync payload without deleting notes.
+  // Used when receiving tombstones that originated on another device.
+  Future<void> insertTombstones(List<Tombstone> tombstones) async {
+    if (tombstones.isEmpty) return;
+    final db = await database;
+    await db.transaction((txn) async {
+      for (final t in tombstones) {
+        await txn.insert(
+          'tombstones',
+          {'id': t.id, 'deleted_at': t.deletedAt},
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+      }
+    });
+  }
+
+  // Removes tombstones created before [cutoffMs] so they do not accumulate.
+  Future<void> clearTombstonesOlderThan(int cutoffMs) async {
+    final db = await database;
+    await db
+        .delete('tombstones', where: 'deleted_at < ?', whereArgs: [cutoffMs]);
   }
 
   Future<List<Map<String, dynamic>>> searchFts(String query) async {
@@ -192,10 +254,39 @@ class DatabaseService {
     );
   }
 
+  // Atomically deletes all notes and writes tombstones for each deleted note.
   Future<void> clearAll() async {
     final db = await database;
-    await db.delete('notes');
-    await db.execute('DELETE FROM notes_fts');
+    final now = DateTime.now().millisecondsSinceEpoch;
+    await db.transaction((txn) async {
+      final rows = await txn.query('notes', columns: ['id']);
+      await txn.delete('notes');
+      await txn.execute('DELETE FROM notes_fts');
+      for (final row in rows) {
+        final id = row['id'] as String;
+        await txn.insert(
+          'tombstones',
+          {'id': id, 'deleted_at': now},
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+    });
+  }
+
+  /// Atomically replaces all notes. Either every note from [notes] is written
+  /// or the existing data is left completely intact (no partial import).
+  /// Tombstones for replaced notes are NOT written here — the replacedAt
+  /// timestamp in the sync payload serves as the authoritative-reset marker.
+  Future<void> replaceAll(List<Note> notes) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      await txn.delete('notes');
+      await txn.execute('DELETE FROM notes_fts');
+      for (final note in notes) {
+        await txn.insert('notes', note.toMap(),
+            conflictAlgorithm: ConflictAlgorithm.replace);
+      }
+    });
   }
 
   /// Atomically merges [incoming] notes into the database.
@@ -217,14 +308,38 @@ class DatabaseService {
           whereArgs: [note.id],
           limit: 1,
         );
-        final toWrite = note.copyWith(embeddingPending: true, clearEmbedding: true);
+        final toWrite =
+            note.copyWith(embeddingPending: true, clearEmbedding: true);
         if (rows.isEmpty) {
-          await txn.insert('notes', toWrite.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+          // Guard against resurrection: if a local tombstone for this note
+          // is at least as recent as the incoming note's updatedAt, the local
+          // deletion wins and the note is not re-inserted.
+          final tombRows = await txn.query(
+            'tombstones',
+            columns: ['deleted_at'],
+            where: 'id = ?',
+            whereArgs: [note.id],
+            limit: 1,
+          );
+          if (tombRows.isNotEmpty) {
+            final deletedAtMs = tombRows.first['deleted_at'] as int;
+            if (deletedAtMs >= note.updatedAt.millisecondsSinceEpoch) {
+              skipped++;
+              continue;
+            }
+            // Incoming note is newer than the local deletion — override.
+            await txn
+                .delete('tombstones', where: 'id = ?', whereArgs: [note.id]);
+          }
+          await txn.insert('notes', toWrite.toMap(),
+              conflictAlgorithm: ConflictAlgorithm.replace);
           added++;
         } else {
-          final currentUpdatedAt = DateTime.parse(rows.first['updated_at'] as String);
+          final currentUpdatedAt =
+              DateTime.parse(rows.first['updated_at'] as String);
           if (note.updatedAt.isAfter(currentUpdatedAt)) {
-            await txn.update('notes', toWrite.toMap(), where: 'id = ?', whereArgs: [note.id]);
+            await txn.update('notes', toWrite.toMap(),
+                where: 'id = ?', whereArgs: [note.id]);
             updated++;
           } else {
             skipped++;
@@ -233,19 +348,6 @@ class DatabaseService {
       }
     });
     return (added: added, updated: updated, skipped: skipped);
-  }
-
-  /// Atomically replaces all notes. Either every note from [notes] is written
-  /// or the existing data is left completely intact (no partial import).
-  Future<void> replaceAll(List<Note> notes) async {
-    final db = await database;
-    await db.transaction((txn) async {
-      await txn.delete('notes');
-      await txn.execute('DELETE FROM notes_fts');
-      for (final note in notes) {
-        await txn.insert('notes', note.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
-      }
-    });
   }
 
   Future<void> reindexFts() async {

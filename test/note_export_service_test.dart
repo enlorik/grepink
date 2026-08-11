@@ -72,7 +72,7 @@ void main() {
     test('exported JSON contains version and exported_at', () {
       final json = svc.encode([_note(id: 'x', title: 'X', content: 'x')]);
       final map = jsonDecode(json) as Map<String, dynamic>;
-      expect(map['version'], 1);
+      expect(map['version'], 2);
       expect(map['exported_at'], isA<String>());
     });
 
@@ -111,9 +111,34 @@ void main() {
 
     test('throws when version is wrong', () {
       expect(
-        () => svc.decode(jsonEncode({'version': 99, 'exported_at': '', 'notes': []})),
+        () => svc.decode(
+            jsonEncode({'version': 99, 'exported_at': '', 'notes': []})),
         throwsFormatException,
       );
+    });
+
+    test('decode reads version-1 payload (backward compat)', () {
+      final v1 = jsonEncode({'version': 1, 'exported_at': '', 'notes': []});
+      final notes = svc.decode(v1);
+      expect(notes, isEmpty);
+    });
+
+    test('decodePayload reads version-2 tombstones and replacedAt', () {
+      final v2 = jsonEncode({
+        'version': 2,
+        'exported_at': '',
+        'notes': [],
+        'tombstones': [
+          {'id': 'x', 'deletedAt': 1000},
+        ],
+        'replacedAt': 9999,
+      });
+      final payload = svc.decodePayload(v2);
+      expect(payload.notes, isEmpty);
+      expect(payload.tombstones.length, 1);
+      expect(payload.tombstones.first.id, 'x');
+      expect(payload.tombstones.first.deletedAt, 1000);
+      expect(payload.replacedAt, 9999);
     });
 
     test('throws when notes array is missing', () {
@@ -125,14 +150,19 @@ void main() {
 
     test('throws when notes is not a list', () {
       expect(
-        () => svc.decode(jsonEncode({'version': 1, 'exported_at': '', 'notes': 'oops'})),
+        () => svc.decode(
+            jsonEncode({'version': 1, 'exported_at': '', 'notes': 'oops'})),
         throwsFormatException,
       );
     });
 
     test('throws when a note entry is not an object', () {
       expect(
-        () => svc.decode(jsonEncode({'version': 1, 'exported_at': '', 'notes': [42]})),
+        () => svc.decode(jsonEncode({
+          'version': 1,
+          'exported_at': '',
+          'notes': [42]
+        })),
         throwsFormatException,
       );
     });
@@ -167,8 +197,12 @@ void main() {
     });
 
     test('incoming beats existing when newer', () {
-      final existing = [_note(id: 'x', title: 'Old title', content: 'old', updatedAt: older)];
-      final incoming = [_note(id: 'x', title: 'New title', content: 'new', updatedAt: newer)];
+      final existing = [
+        _note(id: 'x', title: 'Old title', content: 'old', updatedAt: older)
+      ];
+      final incoming = [
+        _note(id: 'x', title: 'New title', content: 'new', updatedAt: newer)
+      ];
       final output = svc.merge(existing, incoming);
 
       final merged = output.notes.firstWhere((n) => n.id == 'x');
@@ -178,8 +212,12 @@ void main() {
     });
 
     test('existing wins when incoming is older', () {
-      final existing = [_note(id: 'x', title: 'Current', content: 'current', updatedAt: newer)];
-      final incoming = [_note(id: 'x', title: 'Stale', content: 'stale', updatedAt: older)];
+      final existing = [
+        _note(id: 'x', title: 'Current', content: 'current', updatedAt: newer)
+      ];
+      final incoming = [
+        _note(id: 'x', title: 'Stale', content: 'stale', updatedAt: older)
+      ];
       final output = svc.merge(existing, incoming);
 
       final merged = output.notes.firstWhere((n) => n.id == 'x');
@@ -190,8 +228,12 @@ void main() {
 
     test('existing wins when timestamps are identical', () {
       final ts = DateTime.utc(2026, 3, 1);
-      final existing = [_note(id: 'x', title: 'Existing', content: 'existing', updatedAt: ts)];
-      final incoming = [_note(id: 'x', title: 'Incoming', content: 'incoming', updatedAt: ts)];
+      final existing = [
+        _note(id: 'x', title: 'Existing', content: 'existing', updatedAt: ts)
+      ];
+      final incoming = [
+        _note(id: 'x', title: 'Incoming', content: 'incoming', updatedAt: ts)
+      ];
       final output = svc.merge(existing, incoming);
 
       final merged = output.notes.firstWhere((n) => n.id == 'x');
@@ -216,7 +258,11 @@ void main() {
       ];
       final incoming = [
         _note(id: 'new', title: 'New', content: 'new'),
-        _note(id: 'update', title: 'Updated', content: 'updated', updatedAt: newer),
+        _note(
+            id: 'update',
+            title: 'Updated',
+            content: 'updated',
+            updatedAt: newer),
         _note(id: 'keep', title: 'Stale', content: 'stale', updatedAt: older),
       ];
       final output = svc.merge(existing, incoming);
@@ -244,8 +290,13 @@ void main() {
       ];
       final incoming = [
         _note(id: 'add-me', title: 'C', content: 'c'),
-        _note(id: 'skip-me', title: 'Stale', content: 'stale', updatedAt: older),
-        _note(id: 'update-me', title: 'Newer', content: 'newer', updatedAt: newer),
+        _note(
+            id: 'skip-me', title: 'Stale', content: 'stale', updatedAt: older),
+        _note(
+            id: 'update-me',
+            title: 'Newer',
+            content: 'newer',
+            updatedAt: newer),
       ];
       final p = svc.preview(existing, incoming);
 

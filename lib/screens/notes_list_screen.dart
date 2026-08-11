@@ -59,10 +59,12 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
                 child: Row(
                   children: [
                     Expanded(
-                      child: Text('Grepink', style: AppTextStyles.displayMedium),
+                      child:
+                          Text('Grepink', style: AppTextStyles.displayMedium),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.search, color: AppColors.deepAction),
+                      icon:
+                          const Icon(Icons.search, color: AppColors.deepAction),
                       onPressed: () => context.push('/search'),
                     ),
                   ],
@@ -71,10 +73,12 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
               Expanded(
                 child: notesAsync.when(
                   loading: () => const Center(
-                    child: CircularProgressIndicator(color: AppColors.primaryAction),
+                    child: CircularProgressIndicator(
+                        color: AppColors.primaryAction),
                   ),
                   error: (e, _) => Center(
-                    child: Text('Error loading notes', style: AppTextStyles.bodyMedium),
+                    child: Text('Error loading notes',
+                        style: AppTextStyles.bodyMedium),
                   ),
                   data: (_) {
                     if (pinnedNotes.isEmpty && unpinnedNotes.isEmpty) {
@@ -107,7 +111,8 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
           const SizedBox(
             width: 80,
             height: 80,
-            child: Icon(Icons.lightbulb_outline, size: 80, color: AppColors.primaryAccent),
+            child: Icon(Icons.lightbulb_outline,
+                size: 80, color: AppColors.primaryAccent),
           ),
           const SizedBox(height: 24),
           Text('Your mind is blank...', style: AppTextStyles.titleLarge),
@@ -148,7 +153,8 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
                   padding: EdgeInsets.fromLTRB(margin, 20, margin, 8),
                   child: Row(
                     children: [
-                      const Icon(Icons.push_pin, size: 14, color: AppColors.pinHighlight),
+                      const Icon(Icons.push_pin,
+                          size: 14, color: AppColors.pinHighlight),
                       const SizedBox(width: 6),
                       Text('PINNED', style: AppTextStyles.excerptSource),
                     ],
@@ -195,7 +201,8 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
                         delegate: SliverChildBuilderDelegate(
                           (ctx, i) => Padding(
                             padding: const EdgeInsets.only(bottom: 12),
-                            child: _buildSwipeable(unpinned[i], pinned.length + i),
+                            child:
+                                _buildSwipeable(unpinned[i], pinned.length + i),
                           ),
                           childCount: unpinned.length,
                         ),
@@ -208,7 +215,8 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
                           childAspectRatio: 1.2,
                         ),
                         delegate: SliverChildBuilderDelegate(
-                          (ctx, i) => _buildSwipeable(unpinned[i], pinned.length + i),
+                          (ctx, i) =>
+                              _buildSwipeable(unpinned[i], pinned.length + i),
                           childCount: unpinned.length,
                         ),
                       ),
@@ -246,7 +254,8 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
                 note: note,
                 index: index,
                 onDelete: () => _deleteNote(note.id),
-                onPin: () => ref.read(notesProvider.notifier).togglePin(note.id),
+                onPin: () =>
+                    ref.read(notesProvider.notifier).togglePin(note.id),
               ),
             ),
     );
@@ -257,7 +266,8 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('Delete note?', style: AppTextStyles.titleMedium),
-        content: Text('This cannot be undone.', style: AppTextStyles.bodyMedium),
+        content:
+            Text('This cannot be undone.', style: AppTextStyles.bodyMedium),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -265,7 +275,8 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete', style: TextStyle(color: AppColors.error)),
+            child:
+                const Text('Delete', style: TextStyle(color: AppColors.error)),
           ),
         ],
       ),

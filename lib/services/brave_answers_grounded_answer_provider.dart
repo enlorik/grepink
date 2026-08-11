@@ -51,9 +51,8 @@ class BraveAnswersGroundedAnswerProvider implements GroundedAnswerProvider {
       });
 
       request.followRedirects = false;
-      final response = await _client
-          .send(request)
-          .timeout(const Duration(seconds: 30));
+      final response =
+          await _client.send(request).timeout(const Duration(seconds: 30));
 
       switch (response.statusCode) {
         case 402:
@@ -123,8 +122,7 @@ class BraveAnswersGroundedAnswerProvider implements GroundedAnswerProvider {
       final citations = <GroundedAnswerCitation>[];
       for (final match in _citationTag.allMatches(assembled)) {
         try {
-          final json =
-              jsonDecode(match.group(1)!) as Map<String, dynamic>;
+          final json = jsonDecode(match.group(1)!) as Map<String, dynamic>;
           final url = json['url'] as String? ?? '';
           // Skip citations without a valid URL — an empty URL would produce
           // a broken [Source]() link in saved notes.

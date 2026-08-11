@@ -108,8 +108,8 @@ GroundedAnswerIngestionService _service({
     GroundedAnswerIngestionService(
       provider: provider ?? _FakeProvider(_answer()),
       extractor: const RuleBasedClaimExtractionService(),
-      deduplicator:
-          TextSimilarityClaimDeduplicationService(FakeTextSimilarityProvider(similarity)),
+      deduplicator: TextSimilarityClaimDeduplicationService(
+          FakeTextSimilarityProvider(similarity)),
       localEvidence: _FakeLocalEvidence(localEvidence),
     );
 
@@ -158,7 +158,8 @@ void main() {
       expect(result.shouldCreateDraft, isTrue);
     });
 
-    test('answer with better-source claim appears in betterSourceClaims', () async {
+    test('answer with better-source claim appears in betterSourceClaims',
+        () async {
       final svc = _service(
         similarity: 0.9,
         localEvidence: [_localEvidence('e1', 'Gravity pulls objects.')],
@@ -233,7 +234,8 @@ void main() {
       expect(result.question, 'What is gravity?');
     });
 
-    test('result does not contain API keys or secrets in providerName', () async {
+    test('result does not contain API keys or secrets in providerName',
+        () async {
       final svc = _service(
         provider: _FakeProvider(_answer(provider: 'safe-provider-name')),
       );
@@ -258,7 +260,8 @@ void main() {
       expect(result.hasNewKnowledge, isFalse);
     });
 
-    test('local evidence retriever exception returns safe empty result', () async {
+    test('local evidence retriever exception returns safe empty result',
+        () async {
       // The outer try/catch in ingest() covers the local retrieval call, so a
       // failing retriever must not crash the service or surface an exception.
       final svc = GroundedAnswerIngestionService(

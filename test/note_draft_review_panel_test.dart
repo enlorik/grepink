@@ -137,7 +137,8 @@ void main() {
       expect(find.text('https://example.com/source'), findsWidgets);
       expect(find.text('Append target'), findsOneWidget);
       expect(
-        find.text('No target selected. Append stays blocked until you choose a note.'),
+        find.text(
+            'No target selected. Append stays blocked until you choose a note.'),
         findsOneWidget,
       );
       expect(find.text('Select a target note before append is enabled.'),
@@ -198,11 +199,14 @@ void main() {
         ),
       );
 
-      expect(find.text('Append success for "Existing target note".'), findsOneWidget);
-      expect(find.text('Append will update the selected note only.'), findsOneWidget);
+      expect(find.text('Append success for "Existing target note".'),
+          findsOneWidget);
+      expect(find.text('Append will update the selected note only.'),
+          findsOneWidget);
     });
 
-    testWidgets('dropdown fires callback when in reviewing state', (tester) async {
+    testWidgets('dropdown fires callback when in reviewing state',
+        (tester) async {
       String? selectedTarget;
       final alternateNote = Note(
         id: 'note-2',
@@ -262,7 +266,8 @@ void main() {
         find.widgetWithText(OutlinedButton, 'Append to existing note'),
       );
       expect(enabledAppendButton.onPressed, isNotNull);
-      expect(find.text('Target selected: "Existing target note".'), findsOneWidget);
+      expect(find.text('Target selected: "Existing target note".'),
+          findsOneWidget);
     });
 
     testWidgets('web sources with URL appear before unsourced web items',
@@ -336,7 +341,8 @@ void main() {
           tester.getTopLeft(find.text('Note without source ID').first);
 
       expect(withIdOffset.dy, lessThan(withoutIdOffset.dy),
-          reason: 'local note with sourceNoteId should appear above one without');
+          reason:
+              'local note with sourceNoteId should appear above one without');
     });
 
     testWidgets('append target dropdown fits within a 360px phone screen width',
@@ -389,7 +395,8 @@ void main() {
       expect(
         dropdownRect.right,
         lessThanOrEqualTo(360.0),
-        reason: 'Dropdown must not overflow when a note is selected on a narrow screen',
+        reason:
+            'Dropdown must not overflow when a note is selected on a narrow screen',
       );
     });
 

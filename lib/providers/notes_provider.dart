@@ -68,7 +68,8 @@ class NotesNotifier extends StateNotifier<AsyncValue<List<Note>>> {
   Future<void> togglePin(String id) async {
     final notes = state.valueOrNull ?? [];
     final note = notes.firstWhere((n) => n.id == id);
-    final updated = note.copyWith(isPinned: !note.isPinned, updatedAt: DateTime.now());
+    final updated =
+        note.copyWith(isPinned: !note.isPinned, updatedAt: DateTime.now());
     await DatabaseService.instance.updateNote(updated);
     await loadNotes();
     _ref.read(syncProvider.notifier).scheduleSync();
@@ -82,7 +83,8 @@ class NotesNotifier extends StateNotifier<AsyncValue<List<Note>>> {
     final notes = state.valueOrNull ?? [];
     for (final note in notes) {
       try {
-        final embedding = await EmbeddingService.instance.embedNote(note, apiKey);
+        final embedding =
+            await EmbeddingService.instance.embedNote(note, apiKey);
         await DatabaseService.instance.updateEmbedding(note.id, embedding);
       } catch (_) {
         // Continue with next note
@@ -99,10 +101,12 @@ class NotesNotifier extends StateNotifier<AsyncValue<List<Note>>> {
       final apiKey = settings.apiKey;
       if (apiKey.isEmpty) return;
 
-      final pending = await DatabaseService.instance.getNotesWithPendingEmbeddings();
+      final pending =
+          await DatabaseService.instance.getNotesWithPendingEmbeddings();
       for (final note in pending) {
         try {
-          final embedding = await EmbeddingService.instance.embedNote(note, apiKey);
+          final embedding =
+              await EmbeddingService.instance.embedNote(note, apiKey);
           await DatabaseService.instance.updateEmbedding(note.id, embedding);
         } catch (_) {}
       }
@@ -124,7 +128,8 @@ class NotesNotifier extends StateNotifier<AsyncValue<List<Note>>> {
   }
 }
 
-final notesProvider = StateNotifierProvider<NotesNotifier, AsyncValue<List<Note>>>(
+final notesProvider =
+    StateNotifierProvider<NotesNotifier, AsyncValue<List<Note>>>(
   (ref) => NotesNotifier(ref),
 );
 

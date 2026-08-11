@@ -19,7 +19,8 @@ class _FakeRepository implements NoteDraftReviewRepository {
   Future<Note?> getNoteById(String id) async => notesById[id];
 
   @override
-  Future<Note> insertNote({required String title, required String content}) async {
+  Future<Note> insertNote(
+      {required String title, required String content}) async {
     insertedNotes++;
     final now = DateTime(2026, 6, 1);
     final note = Note(
@@ -69,7 +70,8 @@ NoteDraft _draft({
     markdownContent: markdownBody ?? '# Draft\n\nSome synthesised content.',
     action: action,
     deltas: const [
-      KnowledgeDelta(evidence: _evidence, deltaType: DeltaType.newClaim, reason: 'test'),
+      KnowledgeDelta(
+          evidence: _evidence, deltaType: DeltaType.newClaim, reason: 'test'),
     ],
     localEvidence: const [],
     webEvidence: const [_evidence],
@@ -108,7 +110,8 @@ ProviderContainer _container(_FakeRepository repo) {
 
 void main() {
   group('Generated note metadata — content contract', () {
-    test('metadata comment contains question, generated_at, action, source_count',
+    test(
+        'metadata comment contains question, generated_at, action, source_count',
         () async {
       final repo = _FakeRepository();
       final container = _container(repo);
@@ -145,7 +148,8 @@ void main() {
         returnsNormally,
         reason: 'generated_at value must be a parseable ISO 8601 datetime',
       );
-      expect(timestampStr, endsWith('Z'), reason: 'timestamp must be UTC (ending in Z)');
+      expect(timestampStr, endsWith('Z'),
+          reason: 'timestamp must be UTC (ending in Z)');
     });
 
     test('metadata comment does not contain source URLs', () async {
@@ -211,7 +215,8 @@ void main() {
   });
 
   group('Generated note metadata — sanitisation', () {
-    test('double-dash in question is replaced with single-dash-space-dash', () async {
+    test('double-dash in question is replaced with single-dash-space-dash',
+        () async {
       final repo = _FakeRepository();
       final container = _container(repo);
       final notifier = container.read(noteDraftReviewProvider.notifier);
@@ -222,28 +227,34 @@ void main() {
       expect(note, isNotNull);
       final content = note!.content;
       expect(content, contains('question: A- -B question'),
-          reason: '-- in the question must be sanitised to - - to keep the comment valid');
+          reason:
+              '-- in the question must be sanitised to - - to keep the comment valid');
     });
 
-    test('sanitised question does not prematurely close the HTML comment', () async {
+    test('sanitised question does not prematurely close the HTML comment',
+        () async {
       final repo = _FakeRepository();
       final container = _container(repo);
       final notifier = container.read(noteDraftReviewProvider.notifier);
 
       notifier.startReview(
-        _draft(question: 'Close comment attempt -->', action: NoteDraftAction.createNewNote),
+        _draft(
+            question: 'Close comment attempt -->',
+            action: NoteDraftAction.createNewNote),
       );
       final note = await notifier.saveAsNewNote();
 
       expect(note, isNotNull);
       final content = note!.content;
       // The comment must remain a single valid block that ends with -->
-      final commentMatches = RegExp(r'<!--.*?-->', dotAll: true).allMatches(content).toList();
+      final commentMatches =
+          RegExp(r'<!--.*?-->', dotAll: true).allMatches(content).toList();
       expect(commentMatches.length, 1,
           reason: 'There must be exactly one closed metadata comment block');
     });
 
-    test('multiple whitespace in question is collapsed to single space', () async {
+    test('multiple whitespace in question is collapsed to single space',
+        () async {
       final repo = _FakeRepository();
       final container = _container(repo);
       final notifier = container.read(noteDraftReviewProvider.notifier);
@@ -257,7 +268,8 @@ void main() {
   });
 
   group('Generated note metadata — append behaviour', () {
-    test('appended draft has its own metadata block with appendToExistingNote action',
+    test(
+        'appended draft has its own metadata block with appendToExistingNote action',
         () async {
       final repo = _FakeRepository();
       repo.notesById['note-1'] = _existingNote();
@@ -265,7 +277,9 @@ void main() {
       final notifier = container.read(noteDraftReviewProvider.notifier);
 
       notifier.startReview(
-        _draft(question: 'Append question', action: NoteDraftAction.appendToExistingNote),
+        _draft(
+            question: 'Append question',
+            action: NoteDraftAction.appendToExistingNote),
       );
       notifier.selectTargetNote('note-1');
       final updated = await notifier.appendToExistingNote();
@@ -276,7 +290,8 @@ void main() {
       expect(updated.content, contains('<!-- grepink-generated-note'));
     });
 
-    test('appended draft preserves existing note content before the separator', () async {
+    test('appended draft preserves existing note content before the separator',
+        () async {
       final repo = _FakeRepository();
       const existingText = 'Original note text that must be preserved.';
       repo.notesById['note-1'] = _existingNote(content: existingText);
@@ -291,9 +306,11 @@ void main() {
 
       expect(updated, isNotNull);
       expect(updated!.content, contains(existingText),
-          reason: 'Existing content must be preserved before the appended block');
+          reason:
+              'Existing content must be preserved before the appended block');
       expect(updated.content, contains('---'),
-          reason: 'A separator must appear between existing and appended content');
+          reason:
+              'A separator must appear between existing and appended content');
     });
 
     test('two sequential appends each get their own metadata block', () async {
@@ -304,7 +321,9 @@ void main() {
       // First append
       final notifier1 = container.read(noteDraftReviewProvider.notifier);
       notifier1.startReview(
-        _draft(question: 'First append', action: NoteDraftAction.appendToExistingNote),
+        _draft(
+            question: 'First append',
+            action: NoteDraftAction.appendToExistingNote),
       );
       notifier1.selectTargetNote('note-1');
       await notifier1.appendToExistingNote();
@@ -312,14 +331,17 @@ void main() {
       // Second append uses the already-updated note from the repo
       notifier1.clear();
       notifier1.startReview(
-        _draft(question: 'Second append', action: NoteDraftAction.appendToExistingNote),
+        _draft(
+            question: 'Second append',
+            action: NoteDraftAction.appendToExistingNote),
       );
       notifier1.selectTargetNote('note-1');
       await notifier1.appendToExistingNote();
 
       final finalNote = repo.notesById['note-1']!;
-      final commentMatches =
-          RegExp(r'<!--.*?-->', dotAll: true).allMatches(finalNote.content).toList();
+      final commentMatches = RegExp(r'<!--.*?-->', dotAll: true)
+          .allMatches(finalNote.content)
+          .toList();
       expect(commentMatches.length, 2,
           reason: 'Each append should add exactly one metadata block');
       expect(finalNote.content, contains('question: First append'));

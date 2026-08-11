@@ -53,7 +53,8 @@ class NoteDraftReviewPanel extends StatelessWidget {
           (note) => note?.id == selectedTargetNoteId,
           orElse: () => null,
         );
-    final canAppend = !isActionBlocked && availableNotes.isNotEmpty && hasTarget;
+    final canAppend =
+        !isActionBlocked && availableNotes.isNotEmpty && hasTarget;
 
     return Container(
       decoration: BoxDecoration(
@@ -137,9 +138,11 @@ class NoteDraftReviewPanel extends StatelessWidget {
               )
             else ...[
               DropdownButtonFormField<String>(
-                key: ValueKey<String>('append-target-${selectedTargetNoteId ?? 'none'}'),
+                key: ValueKey<String>(
+                    'append-target-${selectedTargetNoteId ?? 'none'}'),
                 isExpanded: true,
-                initialValue: availableNotes.any((note) => note.id == selectedTargetNoteId)
+                initialValue: availableNotes
+                        .any((note) => note.id == selectedTargetNoteId)
                     ? selectedTargetNoteId
                     : null,
                 onChanged: isActionBlocked ? null : onTargetNoteSelected,
@@ -163,15 +166,18 @@ class NoteDraftReviewPanel extends StatelessWidget {
                   fillColor: AppColors.aiResponseBackground,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.dividerBorder),
+                    borderSide:
+                        const BorderSide(color: AppColors.dividerBorder),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.dividerBorder),
+                    borderSide:
+                        const BorderSide(color: AppColors.dividerBorder),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.primaryAccent),
+                    borderSide:
+                        const BorderSide(color: AppColors.primaryAccent),
                   ),
                 ),
               ),
@@ -202,7 +208,8 @@ class NoteDraftReviewPanel extends StatelessWidget {
   }
 
   Map<String, List<EvidenceItem>> _groupSources(NoteDraft draft) {
-    final localNotes = [...draft.localEvidence]..sort(EvidenceSourceQuality.compare);
+    final localNotes = [...draft.localEvidence]
+      ..sort(EvidenceSourceQuality.compare);
     final webSources = draft.webEvidence
         .where((item) => item.type == EvidenceType.webSearch)
         .toList()
@@ -215,7 +222,8 @@ class NoteDraftReviewPanel extends StatelessWidget {
     return {
       if (localNotes.isNotEmpty) 'Local notes': localNotes,
       if (webSources.isNotEmpty) 'Web search results': webSources,
-      if (groundedAnswers.isNotEmpty) 'Grounded AI answer sources': groundedAnswers,
+      if (groundedAnswers.isNotEmpty)
+        'Grounded AI answer sources': groundedAnswers,
     };
   }
 }
@@ -302,9 +310,8 @@ class _DeltaCountsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final counts = <String, int>{
-      'New claims': deltas
-          .where((delta) => delta.deltaType == DeltaType.newClaim)
-          .length,
+      'New claims':
+          deltas.where((delta) => delta.deltaType == DeltaType.newClaim).length,
       'Related but new': deltas
           .where((delta) => delta.deltaType == DeltaType.relatedButNew)
           .length,

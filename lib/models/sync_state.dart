@@ -27,10 +27,13 @@ class SyncState {
   }) {
     return SyncState(
       status: status ?? this.status,
-      lastSyncedAt: clearLastSyncedAt ? null : (lastSyncedAt ?? this.lastSyncedAt),
-      errorMessage: clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
+      lastSyncedAt:
+          clearLastSyncedAt ? null : (lastSyncedAt ?? this.lastSyncedAt),
+      errorMessage:
+          clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
       isSignedIn: isSignedIn ?? this.isSignedIn,
-      accountEmail: clearAccountEmail ? null : (accountEmail ?? this.accountEmail),
+      accountEmail:
+          clearAccountEmail ? null : (accountEmail ?? this.accountEmail),
     );
   }
 }

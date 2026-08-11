@@ -26,7 +26,7 @@ class _FakeDriveSyncService implements DriveSyncService {
     this.throwOnUpload = false,
     this.throwOnDownload = false,
     this.silentSignInResult = false,
-  })  : _signedIn = signedIn;
+  }) : _signedIn = signedIn;
 
   @override
   bool get isSignedIn => _signedIn;
@@ -119,6 +119,9 @@ ProviderContainer _makeContainer({
         _deletedIds.addAll(ids);
         _localNotes.removeWhere((n) => ids.contains(n.id));
       }),
+      notesReloaderProvider.overrideWithValue(() async {}),
+      embeddingReindexerProvider.overrideWithValue(() async {}),
+      tombstonesGetterProvider.overrideWithValue(() async => []),
     ],
   );
 }
@@ -224,7 +227,8 @@ void main() {
       expect(syncState.status, SyncStatus.idle);
       expect(syncState.lastSyncedAt, isNotNull);
       expect(
-        syncState.lastSyncedAt!.isAfter(before.subtract(const Duration(seconds: 1))),
+        syncState.lastSyncedAt!
+            .isAfter(before.subtract(const Duration(seconds: 1))),
         isTrue,
       );
       expect(
@@ -233,7 +237,8 @@ void main() {
       );
     });
 
-    test('sync() sets status=error and errorMessage on DriveApi failure', () async {
+    test('sync() sets status=error and errorMessage on DriveApi failure',
+        () async {
       final service = _FakeDriveSyncService(throwOnDownload: true);
       final container = _makeContainer(service: service);
       addTearDown(container.dispose);
@@ -267,7 +272,9 @@ void main() {
       expect(msg.contains('Step 1'), isFalse);
     });
 
-    test('sync() does not resurrect a note that was deleted after the last sync', () async {
+    test(
+        'sync() does not resurrect a note that was deleted after the last sync',
+        () async {
       // Scenario: note 'deleted' existed locally and was successfully synced
       // (so its ID is recorded in knownIds). The user then deleted it locally.
       // The remote backup still has it. A subsequent sync must NOT re-insert it.
@@ -275,10 +282,12 @@ void main() {
       final remoteJson = NoteExportService.instance.encode([deletedNote]);
       final service = _FakeDriveSyncService(remote: remoteJson);
 
-      // Step 1: note is present locally — first sync records it in knownIds.
-      final container = _makeContainer(service: service, localNotes: [deletedNote]);
+      // Step 1: sign in (sets accountEmail so scoped prefs keys work) — first sync
+      // records 'deleted' in knownIds.
+      final container =
+          _makeContainer(service: service, localNotes: [deletedNote]);
       addTearDown(container.dispose);
-      await container.read(syncProvider.notifier).sync();
+      await container.read(syncProvider.notifier).signIn();
 
       // Step 2: user deletes the note locally.
       _localNotes = [];
@@ -292,7 +301,8 @@ void main() {
         (c) => c.incoming.any((n) => n.id == 'deleted'),
       );
       expect(resurrected, isFalse,
-          reason: 'Deleted note should not be resurrected from stale remote backup');
+          reason:
+              'Deleted note should not be resurrected from stale remote backup');
       expect(service.uploadCalls, greaterThan(uploadsBeforeSecondSync));
     });
 
@@ -306,24 +316,30 @@ void main() {
       final remoteJson = NoteExportService.instance.encode([noteY]);
 
       // Pre-populate knownIds so 'x' is considered a previously synced note.
-      SharedPreferences.setMockInitialValues({'sync.knownIds': ['x']});
+      SharedPreferences.setMockInitialValues({
+        'sync.user@example.com.knownIds': ['x']
+      });
 
       final service = _FakeDriveSyncService(remote: remoteJson);
       final container = _makeContainer(service: service, localNotes: [noteX]);
       addTearDown(container.dispose);
 
-      await container.read(syncProvider.notifier).sync();
+      // signIn() sets accountEmail so the scoped knownIds key is read correctly,
+      // then immediately runs a sync that sees 'x' in knownIds but absent from remote.
+      await container.read(syncProvider.notifier).signIn();
 
       expect(_deletedIds.contains('x'), isTrue,
           reason: 'Note deleted on another device should be removed locally');
-      expect(_mergeCalls.any((c) => c.incoming.any((n) => n.id == 'x')), isFalse,
+      expect(
+          _mergeCalls.any((c) => c.incoming.any((n) => n.id == 'x')), isFalse,
           reason: 'Remotely deleted note must not be re-merged');
     });
 
     test('syncUploadOnly() uploads without downloading', () async {
       final localNote = _note(id: 'l1');
       final service = _FakeDriveSyncService();
-      final container = _makeContainer(service: service, localNotes: [localNote]);
+      final container =
+          _makeContainer(service: service, localNotes: [localNote]);
       addTearDown(container.dispose);
 
       await container.read(syncProvider.notifier).syncUploadOnly();
@@ -331,7 +347,8 @@ void main() {
       expect(service.uploadCalls, 1,
           reason: 'syncUploadOnly should upload current notes');
       expect(service.downloadCalls, 0,
-          reason: 'syncUploadOnly must not download to avoid overwriting restored notes');
+          reason:
+              'syncUploadOnly must not download to avoid overwriting restored notes');
       expect(_mergeCalls, isEmpty,
           reason: 'syncUploadOnly must not merge remote notes');
     });
@@ -344,7 +361,8 @@ void main() {
       await container.read(syncProvider.notifier).signIn();
 
       expect(service.uploadCalls, 1,
-          reason: 'signIn should immediately sync so Drive notes are downloaded');
+          reason:
+              'signIn should immediately sync so Drive notes are downloaded');
     });
 
     test('sync() sets status=error when connectivity check throws', () async {

@@ -19,8 +19,12 @@ class GrepinkBottomNav extends StatefulWidget {
 class _GrepinkBottomNavState extends State<GrepinkBottomNav> {
   static const _items = [
     _NavItem(icon: Icons.home_outlined, activeIcon: Icons.home, label: 'Notes'),
-    _NavItem(icon: Icons.search_outlined, activeIcon: Icons.search, label: 'Search'),
-    _NavItem(icon: Icons.settings_outlined, activeIcon: Icons.settings, label: 'Settings'),
+    _NavItem(
+        icon: Icons.search_outlined, activeIcon: Icons.search, label: 'Search'),
+    _NavItem(
+        icon: Icons.settings_outlined,
+        activeIcon: Icons.settings,
+        label: 'Settings'),
   ];
 
   @override
@@ -42,7 +46,8 @@ class _GrepinkBottomNavState extends State<GrepinkBottomNav> {
           child: Row(
             children: [
               for (int i = 0; i < _items.length; i++)
-                Expanded(child: _NavButton(
+                Expanded(
+                    child: _NavButton(
                   item: _items[i],
                   isActive: widget.currentIndex == i,
                   onTap: () => widget.onTap(i),
@@ -59,7 +64,8 @@ class _NavItem {
   final IconData icon;
   final IconData activeIcon;
   final String label;
-  const _NavItem({required this.icon, required this.activeIcon, required this.label});
+  const _NavItem(
+      {required this.icon, required this.activeIcon, required this.label});
 }
 
 class _NavButton extends StatefulWidget {
@@ -67,13 +73,15 @@ class _NavButton extends StatefulWidget {
   final bool isActive;
   final VoidCallback onTap;
 
-  const _NavButton({required this.item, required this.isActive, required this.onTap});
+  const _NavButton(
+      {required this.item, required this.isActive, required this.onTap});
 
   @override
   State<_NavButton> createState() => _NavButtonState();
 }
 
-class _NavButtonState extends State<_NavButton> with SingleTickerProviderStateMixin {
+class _NavButtonState extends State<_NavButton>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _scale;
 
@@ -111,7 +119,8 @@ class _NavButtonState extends State<_NavButton> with SingleTickerProviderStateMi
   @override
   Widget build(BuildContext context) {
     final reduce = MediaQuery.of(context).disableAnimations;
-    final color = widget.isActive ? AppColors.primaryAction : AppColors.secondaryText;
+    final color =
+        widget.isActive ? AppColors.primaryAction : AppColors.secondaryText;
 
     return GestureDetector(
       onTap: widget.onTap,

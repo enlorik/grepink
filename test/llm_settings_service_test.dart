@@ -42,7 +42,8 @@ void main() {
     // Config persistence
     // -----------------------------------------------------------------------
     group('saveConfig / loadConfig', () {
-      test('saves and loads non-sensitive config via SharedPreferences', () async {
+      test('saves and loads non-sensitive config via SharedPreferences',
+          () async {
         const config = LlmProviderConfig(
           providerKind: LlmProviderKind.openAICompatible,
           baseUrl: 'http://localhost:1234/v1',

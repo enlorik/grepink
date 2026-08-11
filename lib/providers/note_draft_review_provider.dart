@@ -56,7 +56,8 @@ class NoteDraftReviewNotifier extends StateNotifier<NoteDraftReviewState> {
     state = state.copyWith(
       status: NoteDraftReviewStatus.reviewing,
       selectedDecision: decision,
-      clearTargetNoteId: decision != NoteDraftReviewDecision.appendToExistingNote,
+      clearTargetNoteId:
+          decision != NoteDraftReviewDecision.appendToExistingNote,
       clearError: true,
     );
   }
@@ -195,7 +196,8 @@ class NoteDraftReviewNotifier extends StateNotifier<NoteDraftReviewState> {
   }
 
   String _titleFor(NoteDraft draft) {
-    final compactQuestion = draft.question.replaceAll(RegExp(r'\s+'), ' ').trim();
+    final compactQuestion =
+        draft.question.replaceAll(RegExp(r'\s+'), ' ').trim();
     if (compactQuestion.isEmpty) return 'Generated note';
     if (compactQuestion.length <= 80) return compactQuestion;
     return '${compactQuestion.substring(0, 77)}...';

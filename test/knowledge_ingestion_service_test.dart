@@ -136,7 +136,8 @@ void main() {
     test('draft contains the original question', () async {
       const question = 'How does photosynthesis work?';
       final w1 = _webItem('w1', 'photosynthesis content');
-      final svc = _service(webItems: [w1], deltas: [_delta(w1, DeltaType.newClaim)]);
+      final svc =
+          _service(webItems: [w1], deltas: [_delta(w1, DeltaType.newClaim)]);
       final draft = await svc.ingest(question);
 
       expect(draft.question, question);
@@ -144,7 +145,8 @@ void main() {
 
     test('draft markdown is non-empty', () async {
       final w1 = _webItem('w1', 'some content');
-      final svc = _service(webItems: [w1], deltas: [_delta(w1, DeltaType.newClaim)]);
+      final svc =
+          _service(webItems: [w1], deltas: [_delta(w1, DeltaType.newClaim)]);
       final draft = await svc.ingest('Some question');
 
       expect(draft.markdownContent, isNotEmpty);
@@ -176,8 +178,8 @@ void main() {
 
     test('all-duplicate evidence returns doNotSave', () async {
       final w1 = _webItem('w1', 'old info');
-      final svc = _service(
-          webItems: [w1], deltas: [_delta(w1, DeltaType.duplicate)]);
+      final svc =
+          _service(webItems: [w1], deltas: [_delta(w1, DeltaType.duplicate)]);
       final draft = await svc.ingest('Already known');
 
       expect(draft.action, NoteDraftAction.doNotSave);
@@ -208,8 +210,8 @@ void main() {
       final webEvidence = _webItem('w1', 'Same claim.',
           sourceUrl: 'https://example.com'); // has sourceUrl
 
-      final delta = _delta(webEvidence, DeltaType.betterSource,
-          existingNoteId: 'n1');
+      final delta =
+          _delta(webEvidence, DeltaType.betterSource, existingNoteId: 'n1');
 
       final svc = _service(
         localItems: [localNote],
@@ -235,8 +237,8 @@ void main() {
 
   group('KnowledgeIngestionService – source URL in markdown', () {
     test('source URL appears in markdown for web evidence', () async {
-      final web = _webItem('w1', 'Some content',
-          sourceUrl: 'https://example.com/page');
+      final web =
+          _webItem('w1', 'Some content', sourceUrl: 'https://example.com/page');
       final delta = _delta(web, DeltaType.newClaim);
 
       final svc = _service(webItems: [web], deltas: [delta]);

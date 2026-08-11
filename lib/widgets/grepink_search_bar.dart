@@ -46,7 +46,8 @@ class _GrepinkSearchBarState extends State<GrepinkSearchBar>
       duration: const Duration(milliseconds: 400),
       value: 1.0,
     );
-    _fadeAnimation = CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut);
+    _fadeAnimation =
+        CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut);
   }
 
   @override
@@ -64,7 +65,8 @@ class _GrepinkSearchBarState extends State<GrepinkSearchBar>
         _fadeController.reverse().then((_) {
           if (mounted) {
             setState(() {
-              _placeholderIndex = (_placeholderIndex + 1) % _placeholders.length;
+              _placeholderIndex =
+                  (_placeholderIndex + 1) % _placeholders.length;
             });
             _fadeController.forward();
           }
@@ -142,7 +144,8 @@ class _GrepinkSearchBarState extends State<GrepinkSearchBar>
           ),
           if (_controller.text.isNotEmpty)
             IconButton(
-              icon: const Icon(Icons.close, color: AppColors.secondaryText, size: 18),
+              icon: const Icon(Icons.close,
+                  color: AppColors.secondaryText, size: 18),
               tooltip: 'Clear search',
               onPressed: () {
                 _controller.clear();

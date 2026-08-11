@@ -113,6 +113,5 @@ class BraveApiException implements Exception {
   const BraveApiException({required this.statusCode, required this.body});
 
   @override
-  String toString() =>
-      'BraveApiException: HTTP $statusCode\n$body';
+  String toString() => 'BraveApiException: HTTP $statusCode\n$body';
 }

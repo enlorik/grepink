@@ -69,17 +69,20 @@ void main() {
 
     test('saving empty string clears the key (including legacy key)', () async {
       await secureStorage.write(key: 'brave_api_key', value: 'legacy-value');
-      await service.loadSettings(); // trigger migration → brave_search_api_key set
+      await service
+          .loadSettings(); // trigger migration → brave_search_api_key set
 
       await service.saveSearchApiKey('');
 
       expect(secureStorage.data.containsKey('brave_search_api_key'), isFalse);
       expect(secureStorage.data.containsKey('brave_api_key'), isFalse,
-          reason: 'legacy key must be removed to prevent re-migration after empty save');
+          reason:
+              'legacy key must be removed to prevent re-migration after empty save');
     });
 
     group('legacy key migration', () {
-      test('existing brave_api_key is copied to brave_search_api_key on first load',
+      test(
+          'existing brave_api_key is copied to brave_search_api_key on first load',
           () async {
         await secureStorage.write(
             key: 'brave_api_key', value: 'legacy-key-value');
@@ -100,7 +103,8 @@ void main() {
         expect(secureStorage.data['brave_api_key'], 'legacy-key-value');
       });
 
-      test('clearSearchApiKey also removes the legacy key to prevent re-migration',
+      test(
+          'clearSearchApiKey also removes the legacy key to prevent re-migration',
           () async {
         await secureStorage.write(
             key: 'brave_api_key', value: 'legacy-key-value');
@@ -110,10 +114,12 @@ void main() {
 
         expect(secureStorage.data.containsKey('brave_search_api_key'), isFalse);
         expect(secureStorage.data.containsKey('brave_api_key'), isFalse,
-            reason: 'legacy key must be removed so next loadSettings does not re-populate it');
+            reason:
+                'legacy key must be removed so next loadSettings does not re-populate it');
       });
 
-      test('brave_answers_api_key is empty after legacy key migration', () async {
+      test('brave_answers_api_key is empty after legacy key migration',
+          () async {
         await secureStorage.write(
             key: 'brave_api_key', value: 'legacy-key-value');
 
@@ -131,14 +137,15 @@ void main() {
         expect(await service.loadAnswersApiKey(), 'answers-key-xyz');
         expect(secureStorage.data['brave_search_api_key'], 'search-key-abc');
         expect(secureStorage.data['brave_answers_api_key'], 'answers-key-xyz');
-        expect(
-            secureStorage.data['brave_search_api_key'], isNot('answers-key-xyz'));
-        expect(
-            secureStorage.data['brave_answers_api_key'], isNot('search-key-abc'));
+        expect(secureStorage.data['brave_search_api_key'],
+            isNot('answers-key-xyz'));
+        expect(secureStorage.data['brave_answers_api_key'],
+            isNot('search-key-abc'));
       });
     });
 
-    test('loadSettings derives searchKeyConfigured from secure storage', () async {
+    test('loadSettings derives searchKeyConfigured from secure storage',
+        () async {
       await service.saveSettings(
         const BraveSettings(enabled: true, resultCount: 9),
       );

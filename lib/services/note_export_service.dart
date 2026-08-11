@@ -1,10 +1,31 @@
 import 'dart:convert';
 import '../models/note.dart';
+import '../models/tombstone.dart';
 
-const _exportVersion = 1;
+// Current export version. Version 1 payloads (notes only) are still readable.
+const _exportVersion = 2;
 const _exportKey = 'notes';
+const _tombstonesKey = 'tombstones';
+const _replacedAtKey = 'replacedAt';
 const _versionKey = 'version';
 const _exportedAtKey = 'exported_at';
+
+/// Result of decoding a sync payload — contains notes, tombstones, and an
+/// optional authoritative-replacement timestamp.
+class SyncPayload {
+  final List<Note> notes;
+  final List<Tombstone> tombstones;
+  // Non-null when this payload is an authoritative "Replace all" reset.
+  // All notes and tombstones on the receiving device that predate this
+  // timestamp are superseded by the incoming data.
+  final int? replacedAt; // milliseconds since epoch
+
+  const SyncPayload({
+    required this.notes,
+    this.tombstones = const [],
+    this.replacedAt,
+  });
+}
 
 class ImportPreview {
   final int total;
@@ -36,16 +57,28 @@ class NoteExportService {
   NoteExportService._();
   static final NoteExportService instance = NoteExportService._();
 
-  String encode(List<Note> notes) {
-    final payload = {
+  /// Encodes [notes] as a version-2 sync payload with optional [tombstones]
+  /// and [replacedAt] for authoritative-replacement semantics.
+  String encode(
+    List<Note> notes, {
+    List<Tombstone> tombstones = const [],
+    int? replacedAt,
+  }) {
+    final payload = <String, dynamic>{
       _versionKey: _exportVersion,
       _exportedAtKey: DateTime.now().toUtc().toIso8601String(),
       _exportKey: notes.map((n) => n.toJson()).toList(),
+      _tombstonesKey: tombstones.map((t) => t.toJson()).toList(),
     };
+    if (replacedAt != null) {
+      payload[_replacedAtKey] = replacedAt;
+    }
     return const JsonEncoder.withIndent('  ').convert(payload);
   }
 
-  List<Note> decode(String json) {
+  /// Decodes a sync payload (version 1 or 2) and returns notes, tombstones,
+  /// and an optional replacedAt timestamp.
+  SyncPayload decodePayload(String json) {
     final Object? raw;
     try {
       raw = jsonDecode(json);
@@ -56,7 +89,7 @@ class NoteExportService {
       throw const FormatException('Expected a JSON object at the top level');
     }
     final version = raw[_versionKey];
-    if (version is! int || version != _exportVersion) {
+    if (version is! int || (version != 1 && version != 2)) {
       throw FormatException('Unsupported export version: $version');
     }
     final notesList = raw[_exportKey];
@@ -75,8 +108,28 @@ class NoteExportService {
         throw FormatException('Note at index $i is malformed: $e');
       }
     }
-    return notes;
+
+    // Version 2 extras
+    List<Tombstone> tombstones = const [];
+    int? replacedAt;
+    if (version == 2) {
+      final ts = raw[_tombstonesKey];
+      if (ts is List) {
+        tombstones = ts.map((t) {
+          if (t is Map<String, dynamic>) return Tombstone.fromJson(t);
+          throw const FormatException('Tombstone entry is not an object');
+        }).toList();
+      }
+      final rat = raw[_replacedAtKey];
+      if (rat is int) replacedAt = rat;
+    }
+
+    return SyncPayload(
+        notes: notes, tombstones: tombstones, replacedAt: replacedAt);
   }
+
+  /// Convenience wrapper that returns only the notes list (for import UI).
+  List<Note> decode(String json) => decodePayload(json).notes;
 
   ImportPreview preview(List<Note> existing, List<Note> incoming) {
     final existingById = {for (final n in existing) n.id: n};
@@ -111,10 +164,12 @@ class NoteExportService {
     for (final note in incoming) {
       final current = merged[note.id];
       if (current == null) {
-        merged[note.id] = note.copyWith(embeddingPending: true, clearEmbedding: true);
+        merged[note.id] =
+            note.copyWith(embeddingPending: true, clearEmbedding: true);
         added++;
       } else if (note.updatedAt.isAfter(current.updatedAt)) {
-        merged[note.id] = note.copyWith(embeddingPending: true, clearEmbedding: true);
+        merged[note.id] =
+            note.copyWith(embeddingPending: true, clearEmbedding: true);
         updated++;
       } else {
         skipped++;

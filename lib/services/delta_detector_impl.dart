@@ -24,7 +24,8 @@ class DeltaDetectorImpl implements DeltaDetector {
   DeltaDetectorImpl({
     TextSimilarityProvider? similarityProvider,
     TextChunker? chunker,
-  })  : _similarityProvider = similarityProvider ?? const JaccardTextSimilarityProvider(),
+  })  : _similarityProvider =
+            similarityProvider ?? const JaccardTextSimilarityProvider(),
         _chunker = chunker ?? TextChunker();
 
   @override
@@ -34,7 +35,8 @@ class DeltaDetectorImpl implements DeltaDetector {
   ) async {
     // Pre-compute chunks for all local evidence so we compare incoming items
     // against individual paragraphs, not full (possibly long) note bodies.
-    final localChunks = localEvidence.expand((item) => _chunker.chunk(item)).toList();
+    final localChunks =
+        localEvidence.expand((item) => _chunker.chunk(item)).toList();
 
     final results = <KnowledgeDelta>[];
     for (final item in incomingEvidence) {
@@ -89,8 +91,8 @@ class DeltaDetectorImpl implements DeltaDetector {
     TextChunk? bestChunk;
 
     for (final chunk in localChunks) {
-      final score = await _similarityProvider.similarity(
-          incoming.content, chunk.content);
+      final score =
+          await _similarityProvider.similarity(incoming.content, chunk.content);
       if (score > bestScore) {
         bestScore = score;
         bestChunk = chunk;
@@ -173,8 +175,8 @@ class DeltaDetectorImpl implements DeltaDetector {
       String text, List<EvidenceItem> localItems) {
     final normalized = text.trim().toLowerCase();
     try {
-      return localItems.firstWhere(
-          (e) => e.content.trim().toLowerCase() == normalized);
+      return localItems
+          .firstWhere((e) => e.content.trim().toLowerCase() == normalized);
     } catch (_) {
       return null;
     }
@@ -189,4 +191,3 @@ class DeltaDetectorImpl implements DeltaDetector {
         .toSet();
   }
 }
-

@@ -52,7 +52,8 @@ class _RecordingNoteDraftReviewRepository implements NoteDraftReviewRepository {
   Future<Note?> getNoteById(String id) async => null;
 
   @override
-  Future<Note> insertNote({required String title, required String content}) async {
+  Future<Note> insertNote(
+      {required String title, required String content}) async {
     if (failWith != null) throw failWith!;
     final note = Note(
       id: 'note-${insertedNotes.length}',
@@ -75,7 +76,8 @@ class _RecordingNoteDraftReviewRepository implements NoteDraftReviewRepository {
   }
 }
 
-class _AppendableNoteDraftReviewRepository implements NoteDraftReviewRepository {
+class _AppendableNoteDraftReviewRepository
+    implements NoteDraftReviewRepository {
   Note? existingNote;
   Object? failWith;
   final List<Note> updatedNotes = [];
@@ -105,7 +107,7 @@ class _NoAnswerGroundedAnswerProvider implements GroundedAnswerProvider {
   const _NoAnswerGroundedAnswerProvider();
   @override
   Future<GroundedAnswerProviderOutcome> fetchGroundedAnswer(
-      String question) async =>
+          String question) async =>
       const GroundedAnswerEmpty();
 }
 
@@ -127,10 +129,10 @@ class _FixedGroundedAnswerProvider implements GroundedAnswerProvider {
   final GroundedAnswer answer;
   _FixedGroundedAnswerProvider(this.answer);
   @override
-  Future<GroundedAnswerProviderOutcome> fetchGroundedAnswer(String question) async =>
+  Future<GroundedAnswerProviderOutcome> fetchGroundedAnswer(
+          String question) async =>
       GroundedAnswerSuccess(answer);
 }
-
 
 class _FixedClaimExtractionService implements ClaimExtractionService {
   final List<ExtractedClaim> claims;
@@ -201,7 +203,8 @@ class _GatedNoteDraftReviewRepository implements NoteDraftReviewRepository {
   Future<Note?> getNoteById(String id) async => null;
 
   @override
-  Future<Note> insertNote({required String title, required String content}) async {
+  Future<Note> insertNote(
+      {required String title, required String content}) async {
     await gate.future;
     return Note(
       id: 'gated-note',
@@ -279,9 +282,11 @@ GroundedAnswerIngestionService _serviceWithOneNewClaim(
 ) =>
     GroundedAnswerIngestionService(
       provider: provider,
-      extractor: _FixedClaimExtractionService([_claim('n1', 'A brand new claim.')]),
+      extractor:
+          _FixedClaimExtractionService([_claim('n1', 'A brand new claim.')]),
       deduplicator: _FixedClaimDeduplicationService([
-        _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+        _result(
+            'n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
       ]),
       localEvidence: _EmptyLocalEvidenceRetriever(),
     );
@@ -301,7 +306,8 @@ Future<ProviderContainer> _pumpSearchScreen(
       noteDraftReviewRepositoryProvider.overrideWithValue(
         repository ?? _RecordingNoteDraftReviewRepository(),
       ),
-      groundedAnswerIngestionServiceProvider.overrideWith((_) async => ingestionService),
+      groundedAnswerIngestionServiceProvider
+          .overrideWith((_) async => ingestionService),
       braveSettingsOverride(const BraveSettings(answersKeyConfigured: true)),
       llmSettingsOverride(LlmProviderConfig.defaults),
       if (mapper != null) claimReviewMapperProvider.overrideWithValue(mapper),
@@ -355,9 +361,11 @@ void main() {
         _GatedGroundedAnswerProvider(_answer(), gate),
       );
 
-      final container = await _pumpSearchScreen(tester, ingestionService: service);
+      final container =
+          await _pumpSearchScreen(tester, ingestionService: service);
 
-      await tester.enterText(find.byKey(const Key('ask-question-field')), 'question');
+      await tester.enterText(
+          find.byKey(const Key('ask-question-field')), 'question');
       await tester.pump();
       await tester.tap(find.byKey(const Key('ask-question-button')));
       // Two pumps: one for _onAsk microtask, one for the state update.
@@ -365,12 +373,14 @@ void main() {
       await tester.pump();
 
       expect(container.read(claimReviewProvider).isLoading, isTrue);
-      expect(find.byKey(const Key('claim-review-loading-indicator')), findsOneWidget);
+      expect(find.byKey(const Key('claim-review-loading-indicator')),
+          findsOneWidget);
 
       gate.complete();
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('claim-review-loading-indicator')), findsNothing);
+      expect(find.byKey(const Key('claim-review-loading-indicator')),
+          findsNothing);
     });
 
     testWidgets('Ask button is disabled while claim review is loading',
@@ -380,9 +390,11 @@ void main() {
         _GatedGroundedAnswerProvider(_answer(), gate),
       );
 
-      final container = await _pumpSearchScreen(tester, ingestionService: service);
+      final container =
+          await _pumpSearchScreen(tester, ingestionService: service);
 
-      await tester.enterText(find.byKey(const Key('ask-question-field')), 'question');
+      await tester.enterText(
+          find.byKey(const Key('ask-question-field')), 'question');
       await tester.pump();
       await tester.tap(find.byKey(const Key('ask-question-button')));
       await tester.pump();
@@ -410,13 +422,17 @@ void main() {
         localEvidence: _EmptyLocalEvidenceRetriever(),
       );
 
-      final container = await _pumpSearchScreen(tester, ingestionService: service);
+      final container =
+          await _pumpSearchScreen(tester, ingestionService: service);
       await _askQuestion(tester, 'question');
 
       expect(container.read(claimReviewProvider).hasNoAnswer, isTrue);
-      expect(find.byKey(const Key('claim-review-empty-answer-state')), findsOneWidget);
-      expect(find.byKey(const Key('claim-review-no-claims-state')), findsNothing);
-      expect(find.byKey(const Key('claim-review-all-known-state')), findsNothing);
+      expect(find.byKey(const Key('claim-review-empty-answer-state')),
+          findsOneWidget);
+      expect(
+          find.byKey(const Key('claim-review-no-claims-state')), findsNothing);
+      expect(
+          find.byKey(const Key('claim-review-all-known-state')), findsNothing);
     });
 
     testWidgets(
@@ -429,15 +445,19 @@ void main() {
         localEvidence: _EmptyLocalEvidenceRetriever(),
       );
 
-      final container = await _pumpSearchScreen(tester, ingestionService: service);
+      final container =
+          await _pumpSearchScreen(tester, ingestionService: service);
       await _askQuestion(tester, 'question');
 
       expect(container.read(claimReviewProvider).hasNoClaimsExtracted, isTrue);
-      expect(find.byKey(const Key('claim-review-no-claims-state')), findsOneWidget);
-      expect(find.byKey(const Key('claim-review-empty-answer-state')), findsNothing);
+      expect(find.byKey(const Key('claim-review-no-claims-state')),
+          findsOneWidget);
+      expect(find.byKey(const Key('claim-review-empty-answer-state')),
+          findsNothing);
     });
 
-    testWidgets('all-known state is shown when every extracted claim is already known',
+    testWidgets(
+        'all-known state is shown when every extracted claim is already known',
         (tester) async {
       final service = GroundedAnswerIngestionService(
         provider: _FixedGroundedAnswerProvider(_answer()),
@@ -448,11 +468,14 @@ void main() {
         localEvidence: _EmptyLocalEvidenceRetriever(),
       );
 
-      final container = await _pumpSearchScreen(tester, ingestionService: service);
+      final container =
+          await _pumpSearchScreen(tester, ingestionService: service);
       await _askQuestion(tester, 'question');
 
-      expect(container.read(claimReviewProvider).isAllClaimsAlreadyKnown, isTrue);
-      expect(find.byKey(const Key('claim-review-all-known-state')), findsOneWidget);
+      expect(
+          container.read(claimReviewProvider).isAllClaimsAlreadyKnown, isTrue);
+      expect(find.byKey(const Key('claim-review-all-known-state')),
+          findsOneWidget);
     });
 
     testWidgets(
@@ -470,11 +493,15 @@ void main() {
       await _pumpSearchScreen(tester, ingestionService: service);
       await _askQuestion(tester, 'question');
 
-      expect(find.byKey(const Key('claim-review-empty-answer-state')), findsNothing);
-      expect(find.byKey(const Key('claim-review-no-claims-state')), findsNothing);
-      expect(find.byKey(const Key('claim-review-all-known-state')), findsNothing);
+      expect(find.byKey(const Key('claim-review-empty-answer-state')),
+          findsNothing);
+      expect(
+          find.byKey(const Key('claim-review-no-claims-state')), findsNothing);
+      expect(
+          find.byKey(const Key('claim-review-all-known-state')), findsNothing);
       expect(find.byKey(const Key('claim-review-error-state')), findsNothing);
-      expect(find.byKey(const Key('claim-review-loading-indicator')), findsNothing);
+      expect(find.byKey(const Key('claim-review-loading-indicator')),
+          findsNothing);
     });
 
     // ── Review failure ─────────────────────────────────────────────────────
@@ -504,10 +531,12 @@ void main() {
       );
       expect(errorText.data, isNot(contains('provider-secret-token-abc123')));
       expect(errorText.data, isNot(contains('Exception')));
-      expect(find.byKey(const Key('claim-review-retry-button')), findsOneWidget);
+      expect(
+          find.byKey(const Key('claim-review-retry-button')), findsOneWidget);
     });
 
-    testWidgets('Retry reruns the claim review and can succeed on the second attempt',
+    testWidgets(
+        'Retry reruns the claim review and can succeed on the second attempt',
         (tester) async {
       final mutableMapper = _MutableClaimReviewMapper();
       final service = _serviceWithOneNewClaim(
@@ -523,7 +552,8 @@ void main() {
       mutableMapper.shouldThrow = true;
       await _askQuestion(tester, 'question');
       expect(container.read(claimReviewProvider).isError, isTrue);
-      expect(find.byKey(const Key('claim-review-retry-button')), findsOneWidget);
+      expect(
+          find.byKey(const Key('claim-review-retry-button')), findsOneWidget);
 
       // Retry: mapper succeeds → review items shown.
       mutableMapper.shouldThrow = false;
@@ -563,7 +593,8 @@ void main() {
         container.read(claimReviewProvider).draftGenerationErrorMessage,
         isNotNull,
       );
-      final errorCard = find.byKey(const Key('claim-draft-generation-error-state'));
+      final errorCard =
+          find.byKey(const Key('claim-draft-generation-error-state'));
       expect(errorCard, findsOneWidget);
 
       final errorText = tester.widget<Text>(
@@ -604,7 +635,8 @@ void main() {
       );
       expect(errorText.data, isNot(contains('sk-live-supersecretkey123')));
       expect(errorText.data, isNot(contains('Exception')));
-      expect(find.byKey(const Key('claim-draft-save-retry-button')), findsOneWidget);
+      expect(find.byKey(const Key('claim-draft-save-retry-button')),
+          findsOneWidget);
     });
 
     testWidgets('save Retry retriggers the save and succeeds', (tester) async {
@@ -635,7 +667,8 @@ void main() {
 
       // Clear the failure so retry succeeds.
       repo.failWith = null;
-      final retryButton = find.byKey(const Key('claim-draft-save-retry-button'));
+      final retryButton =
+          find.byKey(const Key('claim-draft-save-retry-button'));
       await tester.ensureVisible(retryButton);
       await tester.tap(retryButton);
       await tester.pumpAndSettle();
@@ -676,7 +709,9 @@ void main() {
       await _askQuestion(tester, 'question');
       await _generateDraft(tester);
 
-      container.read(claimReviewProvider.notifier).selectTargetNote(existing.id);
+      container
+          .read(claimReviewProvider.notifier)
+          .selectTargetNote(existing.id);
       await tester.pumpAndSettle();
 
       final appendButton = find.byKey(const Key('append-claim-draft-button'));
@@ -699,7 +734,8 @@ void main() {
       );
     });
 
-    testWidgets('append Retry retriggers the append and succeeds', (tester) async {
+    testWidgets('append Retry retriggers the append and succeeds',
+        (tester) async {
       final existing = Note(
         id: 'existing-note',
         title: 'Existing note',
@@ -726,7 +762,9 @@ void main() {
       await _askQuestion(tester, 'question');
       await _generateDraft(tester);
 
-      container.read(claimReviewProvider.notifier).selectTargetNote(existing.id);
+      container
+          .read(claimReviewProvider.notifier)
+          .selectTargetNote(existing.id);
       await tester.pumpAndSettle();
 
       // First append fails.
@@ -742,7 +780,8 @@ void main() {
 
       // Clear failure so retry succeeds.
       repo.failWith = null;
-      final retryButton = find.byKey(const Key('claim-draft-append-retry-button'));
+      final retryButton =
+          find.byKey(const Key('claim-draft-append-retry-button'));
       await tester.ensureVisible(retryButton);
       await tester.tap(retryButton);
       await tester.pumpAndSettle();
@@ -820,11 +859,14 @@ void main() {
       await _askQuestion(tester, 'question');
       await _generateDraft(tester);
 
-      container.read(claimReviewProvider.notifier).selectTargetNote(existing.id);
+      container
+          .read(claimReviewProvider.notifier)
+          .selectTargetNote(existing.id);
       await tester.pump();
 
       // Trigger append — will block at updateNote.
-      unawaited(container.read(claimReviewProvider.notifier).appendToExistingNote());
+      unawaited(
+          container.read(claimReviewProvider.notifier).appendToExistingNote());
       await tester.pump();
 
       expect(

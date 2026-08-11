@@ -23,7 +23,8 @@ class NoteCard extends StatefulWidget {
   State<NoteCard> createState() => _NoteCardState();
 }
 
-class _NoteCardState extends State<NoteCard> with SingleTickerProviderStateMixin {
+class _NoteCardState extends State<NoteCard>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _opacity;
   late final Animation<Offset> _slide;
@@ -38,7 +39,8 @@ class _NoteCardState extends State<NoteCard> with SingleTickerProviderStateMixin
     _opacity = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeOut),
     );
-    _slide = Tween<Offset>(begin: const Offset(0, 0.05), end: Offset.zero).animate(
+    _slide =
+        Tween<Offset>(begin: const Offset(0, 0.05), end: Offset.zero).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeOut),
     );
 
@@ -85,7 +87,9 @@ class _NoteCardState extends State<NoteCard> with SingleTickerProviderStateMixin
               borderRadius: BorderRadius.circular(16),
               border: Border(
                 left: BorderSide(
-                  color: widget.note.isPinned ? AppColors.pinHighlight : Colors.transparent,
+                  color: widget.note.isPinned
+                      ? AppColors.pinHighlight
+                      : Colors.transparent,
                   width: 3,
                 ),
                 top: const BorderSide(color: AppColors.dividerBorder),
@@ -112,7 +116,9 @@ class _NoteCardState extends State<NoteCard> with SingleTickerProviderStateMixin
                       children: [
                         Expanded(
                           child: Text(
-                            widget.note.title.isEmpty ? 'Untitled' : widget.note.title,
+                            widget.note.title.isEmpty
+                                ? 'Untitled'
+                                : widget.note.title,
                             style: AppTextStyles.titleMedium,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -126,7 +132,8 @@ class _NoteCardState extends State<NoteCard> with SingleTickerProviderStateMixin
                         if (widget.note.isPinned)
                           const Padding(
                             padding: EdgeInsets.only(left: 4),
-                            child: Icon(Icons.push_pin, size: 14, color: AppColors.pinHighlight),
+                            child: Icon(Icons.push_pin,
+                                size: 14, color: AppColors.pinHighlight),
                           ),
                       ],
                     ),
@@ -144,18 +151,24 @@ class _NoteCardState extends State<NoteCard> with SingleTickerProviderStateMixin
                       Wrap(
                         spacing: 6,
                         runSpacing: 4,
-                        children: widget.note.tags.take(3).map((tag) => Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: AppColors.tagBackground,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: AppColors.tagBorder),
-                          ),
-                          child: Text(
-                            tag,
-                            style: AppTextStyles.bodySmall.copyWith(color: AppColors.deepAction),
-                          ),
-                        )).toList(),
+                        children: widget.note.tags
+                            .take(3)
+                            .map((tag) => Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.tagBackground,
+                                    borderRadius: BorderRadius.circular(20),
+                                    border:
+                                        Border.all(color: AppColors.tagBorder),
+                                  ),
+                                  child: Text(
+                                    tag,
+                                    style: AppTextStyles.bodySmall
+                                        .copyWith(color: AppColors.deepAction),
+                                  ),
+                                ))
+                            .toList(),
                       ),
                     ],
                     const SizedBox(height: 10),
@@ -205,7 +218,8 @@ class _NoteCardState extends State<NoteCard> with SingleTickerProviderStateMixin
               },
             ),
             ListTile(
-              leading: const Icon(Icons.delete_outline, color: AppColors.deleteHighlight),
+              leading: const Icon(Icons.delete_outline,
+                  color: AppColors.deleteHighlight),
               title: const Text('Delete'),
               onTap: () {
                 Navigator.pop(ctx);

@@ -103,7 +103,8 @@ class AiLoadingDots extends StatefulWidget {
   State<AiLoadingDots> createState() => _AiLoadingDotsState();
 }
 
-class _AiLoadingDotsState extends State<AiLoadingDots> with TickerProviderStateMixin {
+class _AiLoadingDotsState extends State<AiLoadingDots>
+    with TickerProviderStateMixin {
   final List<AnimationController> _controllers = [];
   final List<Animation<double>> _scales = [];
   bool _animationsStarted = false;
@@ -167,9 +168,7 @@ class _AiLoadingDotsState extends State<AiLoadingDots> with TickerProviderStateM
         );
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 3),
-          child: reduce
-              ? dot
-              : ScaleTransition(scale: _scales[i], child: dot),
+          child: reduce ? dot : ScaleTransition(scale: _scales[i], child: dot),
         );
       }),
     );

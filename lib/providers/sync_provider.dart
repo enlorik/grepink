@@ -1,19 +1,23 @@
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/note.dart';
 import '../models/sync_state.dart';
+import '../models/tombstone.dart';
 import '../services/database_service.dart';
 import '../services/drive_sync_service.dart';
 import '../services/note_export_service.dart';
 
 typedef ConnectivityChecker = Future<List<ConnectivityResult>> Function();
 typedef NotesGetter = Future<List<Note>> Function();
-typedef NotesMerger = Future<void> Function(List<Note> existing, List<Note> incoming);
+typedef NotesMerger = Future<void> Function(
+    List<Note> existing, List<Note> incoming);
 typedef NotesReloader = Future<void> Function();
 typedef EmbeddingReindexer = Future<void> Function();
 typedef NotesDeleter = Future<void> Function(Set<String> ids);
+typedef TombstonesGetter = Future<List<Tombstone>> Function();
 
 final connectivityCheckerProvider = Provider<ConnectivityChecker>(
   (ref) => () => Connectivity().checkConnectivity(),
@@ -49,31 +53,67 @@ final notesDeleterProvider = Provider<NotesDeleter>(
   },
 );
 
-final syncServiceProvider = Provider<DriveSyncService>(
-  (ref) => DriveSyncService(),
+// Returns all local tombstones for inclusion in the next upload payload.
+// Overridden in tests to return an empty list by default.
+final tombstonesGetterProvider = Provider<TombstonesGetter>(
+  (ref) => () => DatabaseService.instance.getTombstones(),
 );
 
-const _lastSyncKey = 'sync.lastSyncedAt';
-// Tracks note IDs present in the last successful upload so we can distinguish
-// "deleted locally" (ID in knownIds, absent in local) from "new from another
-// device" (ID not in knownIds) when processing the remote backup.
-const _knownIdsKey = 'sync.knownIds';
-// Survives process termination so that a failed force-upload (e.g. app killed
-// mid-upload after replaceAll) is retried on the next launch rather than
-// letting a download-merge overwrite the explicitly restored backup.
-const _forceUploadPendingKey = 'sync.forceUploadPending';
+// On non-Android platforms (and unonfigured iOS/web) google_sign_in must not
+// be constructed. An unsupported-platform service signals not-signed-in so the
+// UI can show an appropriate message.
+final syncServiceProvider = Provider<DriveSyncService>((ref) {
+  if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+    return const _UnsupportedDriveSyncService();
+  }
+  return DriveSyncService();
+});
+
+// ---------------------------------------------------------------------------
+// Account-scoped SharedPreferences keys
+// ---------------------------------------------------------------------------
+
+String _lastSyncKey(String email) => 'sync.$email.lastSyncedAt';
+String _knownIdsKey(String email) => 'sync.$email.knownIds';
+String _forceUploadPendingKey(String email) => 'sync.$email.forceUploadPending';
+
+// Legacy (unnamespaced) keys present before account-scoping was introduced.
+const _legacyLastSyncKey = 'sync.lastSyncedAt';
+const _legacyKnownIdsKey = 'sync.knownIds';
+const _legacyForceUploadPendingKey = 'sync.forceUploadPending';
+
+// ---------------------------------------------------------------------------
+// Internal coordinator types
+// ---------------------------------------------------------------------------
+
+enum _SyncKind { forceUpload, regular }
+
+class _WorkItem {
+  final _SyncKind kind;
+  // completer may be null for internally-injected recovery items.
+  final Completer<void>? completer;
+  _WorkItem(this.kind, [this.completer]);
+}
+
+// ---------------------------------------------------------------------------
+// SyncNotifier
+// ---------------------------------------------------------------------------
 
 class SyncNotifier extends StateNotifier<SyncState> {
   final Ref _ref;
   Timer? _debounce;
-  bool _syncInProgress = false;
-  bool _syncPending = false;
-  // Set when syncUploadOnly() is called while a regular sync is in progress,
-  // so the upload-only pass runs immediately after the active sync finishes.
-  bool _forceUploadPending = false;
+
+  // Serialized coordinator state.
+  final List<_WorkItem> _queue = [];
+  bool _draining = false;
+
   // Incremented on sign-out so in-flight syncs can detect the cancellation and
   // avoid writing stale watermarks back to SharedPreferences.
   int _syncGeneration = 0;
+
+  // Throttle for lifecycle-triggered syncs (app resume).
+  DateTime? _lastCompletedSyncAt;
+  static const _resumeThrottle = Duration(seconds: 60);
 
   SyncNotifier(this._ref) : super(const SyncState()) {
     _init();
@@ -82,40 +122,38 @@ class SyncNotifier extends StateNotifier<SyncState> {
   @override
   void dispose() {
     _debounce?.cancel();
+    // Complete any pending queue items so callers are not left hanging.
+    for (final item in [..._queue]) {
+      item.completer?.complete();
+    }
+    _queue.clear();
     super.dispose();
   }
 
+  // ---------------------------------------------------------------------------
+  // Initialization
+  // ---------------------------------------------------------------------------
+
   Future<void> _init() async {
-    final forceUpload = await _loadPersistedState();
-    await _silentSignIn(forceUpload: forceUpload);
+    await _silentSignIn();
   }
 
-  // Returns true when a durable force-upload flag is set (a replaceAll was
-  // interrupted before the backup reached Drive).
-  Future<bool> _loadPersistedState() async {
-    final prefs = await SharedPreferences.getInstance();
-    final millis = prefs.getInt(_lastSyncKey);
-    if (millis != null && mounted) {
-      state = state.copyWith(
-        lastSyncedAt: DateTime.fromMillisecondsSinceEpoch(millis),
-      );
-    }
-    return prefs.getBool(_forceUploadPendingKey) ?? false;
-  }
-
-  Future<void> _silentSignIn({bool forceUpload = false}) async {
+  Future<void> _silentSignIn() async {
     final service = _ref.read(syncServiceProvider);
     final ok = await service.signInSilently();
     if (!mounted) return;
     if (ok) {
+      final email = service.accountEmail!;
       state = state.copyWith(
         isSignedIn: true,
-        accountEmail: service.accountEmail,
+        accountEmail: email,
         clearErrorMessage: true,
       );
-      // If a replaceAll was interrupted by process termination before the
-      // upload completed, upload-only so the restored snapshot reaches Drive
-      // before any download-merge can overwrite it.
+      await _migratePrefs(email);
+      final prefs = await SharedPreferences.getInstance();
+      if (!mounted) return;
+      await _loadPersistedLastSync(prefs, email);
+      final forceUpload = prefs.getBool(_forceUploadPendingKey(email)) ?? false;
       if (forceUpload) {
         await syncUploadOnly();
       } else {
@@ -124,22 +162,69 @@ class SyncNotifier extends StateNotifier<SyncState> {
     }
   }
 
+  Future<void> _loadPersistedLastSync(
+      SharedPreferences prefs, String email) async {
+    final millis = prefs.getInt(_lastSyncKey(email));
+    if (millis != null && mounted) {
+      state = state.copyWith(
+        lastSyncedAt: DateTime.fromMillisecondsSinceEpoch(millis),
+      );
+    }
+  }
+
+  // One-time migration: copy unnamespaced keys to account-scoped keys, then
+  // remove the legacy keys so they are not re-read by a signed-out startup.
+  Future<void> _migratePrefs(String email) async {
+    final prefs = await SharedPreferences.getInstance();
+    bool dirty = false;
+
+    if (prefs.containsKey(_legacyLastSyncKey) &&
+        !prefs.containsKey(_lastSyncKey(email))) {
+      final v = prefs.getInt(_legacyLastSyncKey);
+      if (v != null) await prefs.setInt(_lastSyncKey(email), v);
+      dirty = true;
+    }
+    if (prefs.containsKey(_legacyKnownIdsKey) &&
+        !prefs.containsKey(_knownIdsKey(email))) {
+      final v = prefs.getStringList(_legacyKnownIdsKey);
+      if (v != null) await prefs.setStringList(_knownIdsKey(email), v);
+      dirty = true;
+    }
+    if (prefs.containsKey(_legacyForceUploadPendingKey) &&
+        !prefs.containsKey(_forceUploadPendingKey(email))) {
+      final v = prefs.getBool(_legacyForceUploadPendingKey);
+      if (v != null) await prefs.setBool(_forceUploadPendingKey(email), v);
+      dirty = true;
+    }
+
+    if (dirty) {
+      await prefs.remove(_legacyLastSyncKey);
+      await prefs.remove(_legacyKnownIdsKey);
+      await prefs.remove(_legacyForceUploadPendingKey);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Public API
+  // ---------------------------------------------------------------------------
+
   Future<void> signIn() async {
     final service = _ref.read(syncServiceProvider);
     final ok = await service.signIn();
     if (!mounted) return;
+    final email = ok ? service.accountEmail : null;
     state = state.copyWith(
       isSignedIn: ok,
-      accountEmail: ok ? service.accountEmail : null,
+      accountEmail: ok ? email : null,
       clearAccountEmail: !ok,
       clearErrorMessage: true,
     );
-    if (ok) {
-      // If a replaceAll was interrupted while signed out, honor the durable
-      // flag so newer Drive versions cannot overwrite the restored backup.
+    if (ok && email != null) {
       final prefs = await SharedPreferences.getInstance();
       if (!mounted) return;
-      final forceUpload = prefs.getBool(_forceUploadPendingKey) ?? false;
+      await _loadPersistedLastSync(prefs, email);
+      // Honor a durable force-upload flag that was set before sign-in.
+      final forceUpload = prefs.getBool(_forceUploadPendingKey(email)) ?? false;
       if (forceUpload) {
         await syncUploadOnly();
       } else {
@@ -149,20 +234,28 @@ class SyncNotifier extends StateNotifier<SyncState> {
   }
 
   Future<void> signOut() async {
-    final service = _ref.read(syncServiceProvider);
-    // Increment before awaiting sign-out so any in-flight sync that completes
-    // its download while we await will see the changed generation and abort
-    // before merging or uploading.
+    final email = state.accountEmail;
+    // Increment before awaiting so any in-flight sync that resumes after an
+    // internal await sees the changed generation and aborts before writing state.
     _syncGeneration++;
+    final service = _ref.read(syncServiceProvider);
     try {
       await service.signOut();
     } catch (_) {}
     if (!mounted) return;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_lastSyncKey);
-    await prefs.remove(_knownIdsKey);
-    await prefs.remove(_forceUploadPendingKey);
+    if (email != null) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_lastSyncKey(email));
+      await prefs.remove(_knownIdsKey(email));
+      await prefs.remove(_forceUploadPendingKey(email));
+      await prefs.remove('sync.$email.fileId');
+    }
     if (!mounted) return;
+    // Drain the coordinator without running any more operations.
+    for (final item in [..._queue]) {
+      item.completer?.complete();
+    }
+    _queue.clear();
     state = state.copyWith(
       isSignedIn: false,
       clearAccountEmail: true,
@@ -176,71 +269,157 @@ class SyncNotifier extends StateNotifier<SyncState> {
     _debounce = Timer(const Duration(seconds: 5), sync);
   }
 
+  // Enqueues a full download-merge-upload cycle with the lowest priority
+  // (force uploads run first). If a durable force-upload flag is set from a
+  // previous session, a recovery force-upload is inserted before this sync.
   Future<void> sync() async {
-    if (_syncInProgress) {
-      _syncPending = true;
-      return;
-    }
-    _syncInProgress = true;
-    try {
-      do {
-        _syncPending = false;
-        await _doSync();
-      } while (_syncPending);
-      // If syncUploadOnly() was called while the drain loop was running
-      // (e.g. replaceAll fired mid-sync), drain all queued upload-only passes
-      // so Drive reflects every replacement, even if multiple fired mid-sync.
-      while (_forceUploadPending) {
-        _forceUploadPending = false;
-        await _doUploadOnly();
+    final email = state.accountEmail;
+    if (email != null) {
+      final prefs = await SharedPreferences.getInstance();
+      if (!mounted) return;
+      if (prefs.getBool(_forceUploadPendingKey(email)) ?? false) {
+        // Ensure a force upload drains first; do NOT await it so this sync
+        // request is also queued and runs after.
+        _enqueueNoWait(_SyncKind.forceUpload);
       }
-    } finally {
-      _syncInProgress = false;
-      _syncPending = false;
-      _forceUploadPending = false;
     }
+    return _enqueue(_SyncKind.regular);
   }
 
-  // Uploads current local notes to Drive without downloading or merging first.
-  // Used after replaceAll to avoid a subsequent merge overwriting the restored notes.
-  // If a sync is already in progress, queues a force-upload-only pass to run
-  // immediately after the active sync finishes.
+  // Immediately uploads all local notes to Drive without downloading first.
+  // Sets a durable marker before queuing so a process kill before the upload
+  // completes causes a retry on the next launch or sign-in.
   Future<void> syncUploadOnly() async {
-    // Record durably so a process kill before the upload completes triggers
-    // a retry on the next launch instead of allowing a merge to overwrite
-    // the explicitly restored backup.
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_forceUploadPendingKey, true);
+    final email = state.accountEmail;
+    if (email != null) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_forceUploadPendingKey(email), true);
+    }
+    return _enqueue(_SyncKind.forceUpload);
+  }
 
-    if (_syncInProgress) {
-      _forceUploadPending = true;
+  // Throttled resume-triggered sync (called from lifecycle observer).
+  void syncOnResume() {
+    if (!state.isSignedIn) return;
+    final now = DateTime.now();
+    if (_lastCompletedSyncAt != null &&
+        now.difference(_lastCompletedSyncAt!) < _resumeThrottle) {
       return;
     }
-    _syncInProgress = true;
-    try {
-      // Drain consecutive force uploads (e.g. a second replaceAll fired while
-      // an earlier upload-only pass was still in flight).
-      do {
-        _forceUploadPending = false;
-        await _doUploadOnly();
-      } while (_forceUploadPending);
-      // Then drain any regular sync requests queued during the upload(s).
-      while (_syncPending) {
-        _syncPending = false;
-        await _doSync();
+    sync();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Coordinator
+  // ---------------------------------------------------------------------------
+
+  // Enqueues [kind] and starts the drain loop if not already running.
+  // Returns a Future that completes when this specific work item finishes.
+  Future<void> _enqueue(_SyncKind kind) {
+    final item = _WorkItem(kind, Completer<void>());
+    _queue.add(item);
+    _maybeStartDrain();
+    return item.completer!.future;
+  }
+
+  // Enqueues [kind] without returning a waitable future (fire-and-forget).
+  void _enqueueNoWait(_SyncKind kind) {
+    _queue.add(_WorkItem(kind));
+    _maybeStartDrain();
+  }
+
+  void _maybeStartDrain() {
+    if (_draining) return;
+    _draining = true;
+    _drainLoop().whenComplete(() => _draining = false);
+  }
+
+  Future<void> _drainLoop() async {
+    final gen = _syncGeneration;
+
+    while (_syncGeneration == gen) {
+      // At the top of each iteration, inject a recovery force-upload if the
+      // durable flag is set and no force-upload is already queued.
+      await _injectDurableForceUploadIfNeeded(gen);
+
+      if (!mounted) break;
+      if (_syncGeneration != gen) break;
+
+      if (_queue.isEmpty) break;
+
+      // Force uploads always run before regular syncs.
+      final fi = _queue.indexWhere((e) => e.kind == _SyncKind.forceUpload);
+      final item = fi >= 0 ? _queue.removeAt(fi) : _queue.removeAt(0);
+
+      bool success = false;
+      if (item.kind == _SyncKind.forceUpload) {
+        success = await _doUploadOnly(gen);
+        // Clear the durable marker only when this was the last force-upload
+        // in the queue and it succeeded.
+        if (success && !_queue.any((e) => e.kind == _SyncKind.forceUpload)) {
+          await _clearForceUploadMarker();
+        }
+      } else {
+        await _doSync(gen);
       }
-    } finally {
-      _syncInProgress = false;
-      _syncPending = false;
-      _forceUploadPending = false;
+
+      item.completer?.complete();
+    }
+
+    // Sign-out cancelled this drain — complete remaining items.
+    if (_syncGeneration != gen) {
+      for (final item in [..._queue]) {
+        item.completer?.complete();
+      }
+      _queue.clear();
     }
   }
 
-  Future<void> _doUploadOnly() async {
-    final capturedGeneration = _syncGeneration;
-    final service = _ref.read(syncServiceProvider);
-    if (!service.isSignedIn) return;
+  Future<void> _injectDurableForceUploadIfNeeded(int gen) async {
+    if (_syncGeneration != gen) return;
+    if (!mounted) return;
+    final email = state.accountEmail;
+    if (email == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    if (_syncGeneration != gen) return;
+    if ((prefs.getBool(_forceUploadPendingKey(email)) ?? false) &&
+        !_queue.any((e) => e.kind == _SyncKind.forceUpload)) {
+      _queue.insert(0, _WorkItem(_SyncKind.forceUpload));
+    }
+  }
 
+  Future<void> _clearForceUploadMarker() async {
+    final service = _ref.read(syncServiceProvider);
+    final email = state.accountEmail ??
+        (service.isSignedIn ? service.accountEmail : null);
+    if (email == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_forceUploadPendingKey(email));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Core sync operations
+  // ---------------------------------------------------------------------------
+
+  // Returns true on success, false on failure (state is updated internally).
+  Future<bool> _doUploadOnly(int capturedGeneration) async {
+    final service = _ref.read(syncServiceProvider);
+    if (!service.isSignedIn) return true;
+
+    // Resolve account email from state first, then fall back to the service so
+    // the durable marker is always written even when state has not yet been
+    // updated (e.g. first call before silent sign-in updates the notifier state).
+    final email = state.accountEmail ??
+        (service.isSignedIn ? service.accountEmail : null);
+
+    // Ensure the durable marker is written before the upload attempt so that
+    // a process kill between here and a successful upload triggers a retry.
+    if (email != null) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_forceUploadPendingKey(email), true);
+    }
+
+    if (!mounted) return false;
     state = state.copyWith(status: SyncStatus.syncing, clearErrorMessage: true);
     try {
       final checkConnectivity = _ref.read(connectivityCheckerProvider);
@@ -248,55 +427,56 @@ class SyncNotifier extends StateNotifier<SyncState> {
       if (connectivity.contains(ConnectivityResult.none) &&
           connectivity.length == 1) {
         if (mounted) state = state.copyWith(status: SyncStatus.idle);
-        return;
+        return false;
       }
       if (_syncGeneration != capturedGeneration) {
         if (mounted) state = state.copyWith(status: SyncStatus.idle);
-        return;
+        return false;
       }
       final getNotes = _ref.read(notesGetterProvider);
+      final getTombstones = _ref.read(tombstonesGetterProvider);
       final allNotes = await getNotes();
-      final encoded = NoteExportService.instance.encode(allNotes);
+      final tombstones = await getTombstones();
+      final encoded =
+          NoteExportService.instance.encode(allNotes, tombstones: tombstones);
       await service.upload(encoded);
       if (_syncGeneration != capturedGeneration) {
         if (mounted) state = state.copyWith(status: SyncStatus.idle);
-        return;
+        return false;
       }
       final prefs = await SharedPreferences.getInstance();
       final now = DateTime.now();
-      await prefs.setInt(_lastSyncKey, now.millisecondsSinceEpoch);
-      await prefs.setStringList(_knownIdsKey, allNotes.map((n) => n.id).toList());
-      // Only clear the durable flag when no further force-upload is queued.
-      // If _forceUploadPending was set by a concurrent syncUploadOnly() while
-      // this upload was in flight, the drain loop will call us again — keep
-      // the flag so a crash before that second upload still triggers recovery.
-      if (!_forceUploadPending) {
-        await prefs.remove(_forceUploadPendingKey);
+      if (email != null) {
+        await prefs.setInt(_lastSyncKey(email), now.millisecondsSinceEpoch);
+        await prefs.setStringList(
+            _knownIdsKey(email), allNotes.map((n) => n.id).toList());
       }
-      if (!mounted) return;
+      if (!mounted) return true;
+      _lastCompletedSyncAt = now;
       state = state.copyWith(
         status: SyncStatus.idle,
         lastSyncedAt: now,
         clearErrorMessage: true,
       );
+      return true;
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted) return false;
       state = state.copyWith(
         status: SyncStatus.error,
         errorMessage: 'Sync failed. Check your connection and try again.',
       );
+      return false;
     }
   }
 
-  Future<void> _doSync() async {
-    final capturedGeneration = _syncGeneration;
+  Future<void> _doSync(int capturedGeneration) async {
     final service = _ref.read(syncServiceProvider);
     if (!service.isSignedIn) return;
 
+    final email = state.accountEmail;
+
     state = state.copyWith(status: SyncStatus.syncing, clearErrorMessage: true);
     try {
-      // Connectivity check is inside try so a platform-channel failure is caught
-      // and surfaces as a sync error rather than an unhandled future exception.
       final checkConnectivity = _ref.read(connectivityCheckerProvider);
       final connectivity = await checkConnectivity();
       if (connectivity.contains(ConnectivityResult.none) &&
@@ -310,50 +490,102 @@ class SyncNotifier extends StateNotifier<SyncState> {
       final reloadNotes = _ref.read(notesReloaderProvider);
       final reindexEmbeddings = _ref.read(embeddingReindexerProvider);
       final deleteNotes = _ref.read(notesDeleterProvider);
+      final getTombstones = _ref.read(tombstonesGetterProvider);
 
       final prefs = await SharedPreferences.getInstance();
-      final knownIds = Set<String>.from(prefs.getStringList(_knownIdsKey) ?? []);
+      final knownIds = Set<String>.from(email != null
+          ? (prefs.getStringList(_knownIdsKey(email)) ?? [])
+          : []);
 
       final remote = await service.download();
       if (remote != null) {
-        final incoming = NoteExportService.instance.decode(remote);
+        final payload = NoteExportService.instance.decodePayload(remote);
+        final incoming = payload.notes;
+        final incomingTombstones = payload.tombstones;
+        final replacedAt = payload.replacedAt;
+
         // Re-read local state after the download so any deletions that occurred
         // while the network call was in flight are reflected in the filter.
-        // This minimises the staleness window to the time between this read and
-        // mergeNotes (effectively zero compared to a network round-trip).
         var currentLocalNotes = await getNotes();
         var currentLocalIds = {for (final n in currentLocalNotes) n.id};
-
-        // Cross-device deletions: notes in knownIds, present locally, but absent
-        // from the remote backup were deleted on another device. An empty backup
-        // is valid — it means the remote cleared all notes intentionally.
-        final incomingIds = {for (final n in incoming) n.id};
         final localNoteById = {for (final n in currentLocalNotes) n.id: n};
+        final incomingIds = {for (final n in incoming) n.id};
+
+        // --- Authoritative replacement ---
+        // If the remote payload carries a replacedAt timestamp, any local note
+        // (or tombstone) older than that timestamp is superseded by the remote.
+        // Notes edited after replacedAt are preserved.
+        if (replacedAt != null) {
+          final replacedAtDt = DateTime.fromMillisecondsSinceEpoch(replacedAt);
+          final authorityDeleteIds = currentLocalIds.where((id) {
+            if (incomingIds.contains(id)) return false;
+            final n = localNoteById[id];
+            if (n == null) return false;
+            return !n.updatedAt.isAfter(replacedAtDt);
+          }).toSet();
+          if (authorityDeleteIds.isNotEmpty) {
+            if (_syncGeneration != capturedGeneration) {
+              if (mounted) state = state.copyWith(status: SyncStatus.idle);
+              return;
+            }
+            await deleteNotes(authorityDeleteIds);
+            currentLocalNotes = currentLocalNotes
+                .where((n) => !authorityDeleteIds.contains(n.id))
+                .toList();
+            currentLocalIds = currentLocalIds.difference(authorityDeleteIds);
+            knownIds.removeAll(authorityDeleteIds);
+            await reloadNotes();
+          }
+        }
+
+        // --- Tombstone-based deletion ---
+        // Notes deleted on another device are signalled by an explicit tombstone.
+        // A local edit that postdates the tombstone's deletedAt survives.
+        final incomingTombstoneIds = {for (final t in incomingTombstones) t.id};
+        final tombstoneDeleteIds = <String>{};
+        for (final tombstone in incomingTombstones) {
+          final local = localNoteById[tombstone.id];
+          if (local == null) continue;
+          final deletedAt =
+              DateTime.fromMillisecondsSinceEpoch(tombstone.deletedAt);
+          if (!local.updatedAt.isAfter(deletedAt)) {
+            tombstoneDeleteIds.add(tombstone.id);
+          }
+        }
+
+        // --- Absence-based deletion (legacy guard) ---
+        // Notes in knownIds, present locally, but absent from the remote backup
+        // were deleted on another device. An empty backup is valid — it means
+        // the remote cleared all notes intentionally.
         final sinceLastSync = state.lastSyncedAt;
         final remoteDeletedIds = knownIds.where((id) {
-          if (!currentLocalIds.contains(id) || incomingIds.contains(id)) return false;
-          // Preserve local edits made after the last sync: we cannot tell
-          // whether the remote deletion or the local edit happened later, so
-          // we keep the edit rather than risk data loss.
+          if (!currentLocalIds.contains(id) || incomingIds.contains(id)) {
+            return false;
+          }
+          // The remote carries a tombstone for this note — the tombstone-based
+          // check already made the correct decision (delete or preserve).
+          // Skip absence-based inference to avoid double-counting.
+          if (incomingTombstoneIds.contains(id)) return false;
+          // Preserve local edits made after the last sync.
           if (sinceLastSync != null) {
-            final localNote = localNoteById[id];
-            if (localNote != null && localNote.updatedAt.isAfter(sinceLastSync)) {
-              return false;
-            }
+            final n = localNoteById[id];
+            if (n != null && n.updatedAt.isAfter(sinceLastSync)) return false;
           }
           return true;
         }).toSet();
-        if (remoteDeletedIds.isNotEmpty) {
+
+        final toDeleteIds = tombstoneDeleteIds.union(remoteDeletedIds);
+        if (toDeleteIds.isNotEmpty) {
           if (_syncGeneration != capturedGeneration) {
             if (mounted) state = state.copyWith(status: SyncStatus.idle);
             return;
           }
-          await deleteNotes(remoteDeletedIds);
+          await deleteNotes(toDeleteIds);
           currentLocalNotes = currentLocalNotes
-              .where((n) => !remoteDeletedIds.contains(n.id))
+              .where((n) => !toDeleteIds.contains(n.id))
               .toList();
-          currentLocalIds = currentLocalIds.difference(remoteDeletedIds);
-          knownIds.removeAll(remoteDeletedIds);
+          currentLocalIds = currentLocalIds.difference(toDeleteIds);
+          knownIds.removeAll(toDeleteIds);
           await reloadNotes();
         }
 
@@ -366,42 +598,69 @@ class SyncNotifier extends StateNotifier<SyncState> {
           return currentLocalIds.contains(n.id);
         }).toList();
         if (toMerge.isNotEmpty) {
-          // Guard against a sign-out that occurred while the download was in flight.
           if (_syncGeneration != capturedGeneration) {
             if (mounted) state = state.copyWith(status: SyncStatus.idle);
             return;
           }
           await mergeNotes(currentLocalNotes, toMerge);
-          // Persist the newly merged IDs immediately so that if the subsequent
-          // upload fails, a later sync still treats those notes as "known" and
-          // respects any local deletion the user makes before the next upload.
+          // Persist the newly merged IDs so a later sync treats them as "known".
           final updatedKnownIds =
               knownIds.union({for (final n in toMerge) n.id});
-          await prefs.setStringList(_knownIdsKey, updatedKnownIds.toList());
+          if (email != null) {
+            await prefs.setStringList(
+                _knownIdsKey(email), updatedKnownIds.toList());
+          }
           await reloadNotes();
           await reindexEmbeddings();
         }
       }
 
-      // Guard before upload so we don't write through another account's DriveApi.
       if (_syncGeneration != capturedGeneration) {
         if (mounted) state = state.copyWith(status: SyncStatus.idle);
         return;
       }
-      final allNotes = await getNotes();
-      final encoded = NoteExportService.instance.encode(allNotes);
-      await service.upload(encoded);
 
-      // Skip persisting if a sign-out happened while the upload was in flight.
-      // Reset status to idle so the UI doesn't stay stuck on "syncing".
+      // Upload with conflict retry (on DriveSyncConflictException, re-download
+      // and retry once so the two-device {N}+X / {N}+Y scenario converges).
+      final allNotes = await getNotes();
+      final tombstones = await getTombstones();
+      final encoded =
+          NoteExportService.instance.encode(allNotes, tombstones: tombstones);
+      try {
+        await service.upload(encoded);
+      } on DriveSyncConflictException {
+        // Another device wrote while we were syncing — re-download, merge, retry.
+        final remote2 = await service.download();
+        if (remote2 != null) {
+          final payload2 = NoteExportService.instance.decodePayload(remote2);
+          if (_syncGeneration != capturedGeneration) {
+            if (mounted) state = state.copyWith(status: SyncStatus.idle);
+            return;
+          }
+          final freshLocal = await getNotes();
+          await mergeNotes(freshLocal, payload2.notes);
+          await reloadNotes();
+        }
+        final retryNotes = await getNotes();
+        final retryTombstones = await getTombstones();
+        await service.upload(NoteExportService.instance
+            .encode(retryNotes, tombstones: retryTombstones));
+        allNotes.clear();
+        allNotes.addAll(retryNotes);
+      }
+
       if (_syncGeneration != capturedGeneration) {
         if (mounted) state = state.copyWith(status: SyncStatus.idle);
         return;
       }
       final now = DateTime.now();
-      await prefs.setInt(_lastSyncKey, now.millisecondsSinceEpoch);
-      await prefs.setStringList(_knownIdsKey, allNotes.map((n) => n.id).toList());
+      if (email != null) {
+        await prefs.setInt(_lastSyncKey(email), now.millisecondsSinceEpoch);
+        await prefs.setStringList(
+            _knownIdsKey(email), allNotes.map((n) => n.id).toList());
+      }
       if (!mounted) return;
+      _lastCompletedSyncAt = now;
       state = state.copyWith(
         status: SyncStatus.idle,
         lastSyncedAt: now,
@@ -420,3 +679,25 @@ class SyncNotifier extends StateNotifier<SyncState> {
 final syncProvider = StateNotifierProvider<SyncNotifier, SyncState>(
   (ref) => SyncNotifier(ref),
 );
+
+// ---------------------------------------------------------------------------
+// Unsupported-platform stub
+// ---------------------------------------------------------------------------
+
+class _UnsupportedDriveSyncService implements DriveSyncService {
+  const _UnsupportedDriveSyncService();
+  @override
+  bool get isSignedIn => false;
+  @override
+  String? get accountEmail => null;
+  @override
+  Future<bool> signIn() async => false;
+  @override
+  Future<bool> signInSilently() async => false;
+  @override
+  Future<void> signOut() async {}
+  @override
+  Future<void> upload(String _) async {}
+  @override
+  Future<String?> download() async => null;
+}

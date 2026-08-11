@@ -59,7 +59,8 @@ void main() {
       expect(restored.isPinned, isFalse);
     });
 
-    test('fromJson tolerates missing optional embeddingPending (false default)', () {
+    test('fromJson tolerates missing optional embeddingPending (false default)',
+        () {
       final map = _note(id: 'ep').toJson()..remove('embeddingPending');
       final restored = Note.fromJson(map);
       expect(restored.embeddingPending, isFalse);
@@ -110,7 +111,8 @@ void main() {
         _note(
           id: 'study-2',
           title: 'Biology notes',
-          content: '## Cell division\n\nMitosis phases:\n1. Prophase\n2. Metaphase',
+          content:
+              '## Cell division\n\nMitosis phases:\n1. Prophase\n2. Metaphase',
           tags: ['biology'],
           keywords: ['mitosis', 'cell'],
           updatedAt: DateTime.utc(2026, 7, 10),
@@ -141,11 +143,17 @@ void main() {
     test('merge does not lose notes created in build N+1 after import', () {
       // Notes already on the device after import
       final afterImport = [
-        _note(id: 'imported', title: 'Imported', content: 'from backup',
+        _note(
+            id: 'imported',
+            title: 'Imported',
+            content: 'from backup',
             updatedAt: DateTime.utc(2026, 7, 1)),
       ];
       // New note created in build N+1 session
-      final newNote = _note(id: 'new-session', title: 'New', content: 'created later',
+      final newNote = _note(
+          id: 'new-session',
+          title: 'New',
+          content: 'created later',
           updatedAt: DateTime.utc(2026, 7, 20));
 
       // Second export: both notes
@@ -156,7 +164,9 @@ void main() {
       expect(restored.any((n) => n.id == 'new-session'), isTrue);
     });
 
-    test('merge correctly resolves conflict between on-device and backup version', () {
+    test(
+        'merge correctly resolves conflict between on-device and backup version',
+        () {
       final deviceVersion = _note(
         id: 'conflict',
         title: 'Edited on device',
@@ -193,7 +203,8 @@ void main() {
     });
 
     test('notes with very long content survive round-trip', () {
-      final longContent = List.generate(1000, (i) => 'Line $i of content.').join('\n');
+      final longContent =
+          List.generate(1000, (i) => 'Line $i of content.').join('\n');
       final note = _note(id: 'long', content: longContent);
       final restored = svc.decode(svc.encode([note]));
       expect(restored.first.content, longContent);

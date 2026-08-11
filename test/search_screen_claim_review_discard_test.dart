@@ -47,7 +47,8 @@ class _RecordingNoteDraftReviewRepository implements NoteDraftReviewRepository {
   Future<Note?> getNoteById(String id) async => null;
 
   @override
-  Future<Note> insertNote({required String title, required String content}) async {
+  Future<Note> insertNote(
+      {required String title, required String content}) async {
     final note = Note(
       id: 'note-${insertedNotes.length}',
       title: title,
@@ -77,7 +78,8 @@ class _GatedNoteDraftReviewRepository implements NoteDraftReviewRepository {
   Future<Note?> getNoteById(String id) async => null;
 
   @override
-  Future<Note> insertNote({required String title, required String content}) async {
+  Future<Note> insertNote(
+      {required String title, required String content}) async {
     await gate.future;
     final note = Note(
       id: 'note-${insertedNotes.length}',
@@ -103,7 +105,8 @@ class _FixedGroundedAnswerProvider implements GroundedAnswerProvider {
 
   _FixedGroundedAnswerProvider(this.answer);
   @override
-  Future<GroundedAnswerProviderOutcome> fetchGroundedAnswer(String question) async =>
+  Future<GroundedAnswerProviderOutcome> fetchGroundedAnswer(
+          String question) async =>
       GroundedAnswerSuccess(answer);
 }
 
@@ -183,7 +186,8 @@ Future<ProviderContainer> _pumpSearchScreen(
         (ref) async => _FakeKnowledgeIngestionService(),
       ),
       noteDraftReviewRepositoryProvider.overrideWithValue(repository),
-      groundedAnswerIngestionServiceProvider.overrideWith((_) async => ingestionService),
+      groundedAnswerIngestionServiceProvider
+          .overrideWith((_) async => ingestionService),
       braveSettingsOverride(const BraveSettings(answersKeyConfigured: true)),
       llmSettingsOverride(LlmProviderConfig.defaults),
       allNotesProvider.overrideWithValue(const <Note>[]),
@@ -242,7 +246,8 @@ GroundedAnswerIngestionService _serviceWithOneNewClaim(
       provider: provider,
       claims: [_claim('n1', 'A brand new claim.')],
       results: [
-        _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+        _result(
+            'n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
       ],
     );
 
@@ -515,7 +520,8 @@ void main() {
         repository: repo,
       );
 
-      expect(find.byKey(const Key('discard-claim-review-button')), findsNothing);
+      expect(
+          find.byKey(const Key('discard-claim-review-button')), findsNothing);
     });
   });
 }

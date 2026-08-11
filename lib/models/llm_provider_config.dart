@@ -157,11 +157,9 @@ class LlmProviderConfig {
       providerKind: kind,
       baseUrl: json['baseUrl'] as String? ?? LlmProviderConfig.defaults.baseUrl,
       model: json['model'] as String? ?? LlmProviderConfig.defaults.model,
-      maxTokens:
-          (json['maxTokens'] as num?)?.toInt() ??
+      maxTokens: (json['maxTokens'] as num?)?.toInt() ??
           LlmProviderConfig.defaults.maxTokens,
-      temperature:
-          (json['temperature'] as num?)?.toDouble() ??
+      temperature: (json['temperature'] as num?)?.toDouble() ??
           LlmProviderConfig.defaults.temperature,
     );
   }

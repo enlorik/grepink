@@ -24,7 +24,8 @@ class _TrackingRepository implements NoteDraftReviewRepository {
   }
 
   @override
-  Future<Note> insertNote({required String title, required String content}) async {
+  Future<Note> insertNote(
+      {required String title, required String content}) async {
     insertCalls++;
     final now = DateTime(2026, 6, 1);
     final note = Note(
@@ -58,8 +59,7 @@ class _FailingRepository implements NoteDraftReviewRepository {
       throw Exception('database unavailable');
 
   @override
-  Future<void> updateNote(Note note) =>
-      throw Exception('database unavailable');
+  Future<void> updateNote(Note note) => throw Exception('database unavailable');
 }
 
 /// Finds the target note successfully but throws when updateNote is called.
@@ -101,14 +101,16 @@ NoteDraft _draft({
     markdownContent: '# Draft\n\nSome content',
     action: action,
     deltas: const [
-      KnowledgeDelta(evidence: _evidence, deltaType: DeltaType.newClaim, reason: 'test'),
+      KnowledgeDelta(
+          evidence: _evidence, deltaType: DeltaType.newClaim, reason: 'test'),
     ],
     localEvidence: const [],
     webEvidence: const [_evidence],
   );
 }
 
-Note _existingNote({String id = 'note-1', String content = 'Existing content'}) {
+Note _existingNote(
+    {String id = 'note-1', String content = 'Existing content'}) {
   final now = DateTime(2026, 6, 1);
   return Note(
     id: id,
@@ -153,7 +155,8 @@ void main() {
         expect(state.errorMessage, isNull);
       });
 
-      test('sets default decision to saveAsNewNote for createNewNote action', () {
+      test('sets default decision to saveAsNewNote for createNewNote action',
+          () {
         final container = _container(_TrackingRepository());
         container
             .read(noteDraftReviewProvider.notifier)
@@ -165,7 +168,8 @@ void main() {
         );
       });
 
-      test('sets default decision to appendToExistingNote for append action', () {
+      test('sets default decision to appendToExistingNote for append action',
+          () {
         final container = _container(_TrackingRepository());
         container
             .read(noteDraftReviewProvider.notifier)
@@ -189,7 +193,8 @@ void main() {
     });
 
     group('saveAsNewNote', () {
-      test('transitions to saving then saved, and returns the created note', () async {
+      test('transitions to saving then saved, and returns the created note',
+          () async {
         final repo = _TrackingRepository();
         final container = _container(repo);
         final notifier = container.read(noteDraftReviewProvider.notifier);
@@ -206,7 +211,8 @@ void main() {
         );
       });
 
-      test('draft is NOT cleared after save — remains accessible for reference', () async {
+      test('draft is NOT cleared after save — remains accessible for reference',
+          () async {
         final repo = _TrackingRepository();
         final container = _container(repo);
         final notifier = container.read(noteDraftReviewProvider.notifier);
@@ -218,7 +224,9 @@ void main() {
         expect(container.read(noteDraftReviewProvider).noteDraft, same(draft));
       });
 
-      test('repository failure surfaces error state instead of silently failing', () async {
+      test(
+          'repository failure surfaces error state instead of silently failing',
+          () async {
         final container = _container(_FailingRepository());
         final notifier = container.read(noteDraftReviewProvider.notifier);
 
@@ -250,12 +258,14 @@ void main() {
     });
 
     group('appendToExistingNote', () {
-      test('requires a non-empty targetNoteId — returns error immediately', () async {
+      test('requires a non-empty targetNoteId — returns error immediately',
+          () async {
         final repo = _TrackingRepository();
         final container = _container(repo);
         final notifier = container.read(noteDraftReviewProvider.notifier);
 
-        notifier.startReview(_draft(action: NoteDraftAction.appendToExistingNote));
+        notifier
+            .startReview(_draft(action: NoteDraftAction.appendToExistingNote));
         final result = await notifier.appendToExistingNote();
 
         expect(result, isNull);
@@ -275,7 +285,8 @@ void main() {
         final container = _container(repo);
         final notifier = container.read(noteDraftReviewProvider.notifier);
 
-        notifier.startReview(_draft(action: NoteDraftAction.appendToExistingNote));
+        notifier
+            .startReview(_draft(action: NoteDraftAction.appendToExistingNote));
         notifier.selectTargetNote('non-existent-note-id');
         final result = await notifier.appendToExistingNote();
 
@@ -291,13 +302,15 @@ void main() {
         );
       });
 
-      test('succeeds and transitions to saved when target note exists', () async {
+      test('succeeds and transitions to saved when target note exists',
+          () async {
         final repo = _TrackingRepository();
         repo.notesById['note-1'] = _existingNote();
         final container = _container(repo);
         final notifier = container.read(noteDraftReviewProvider.notifier);
 
-        notifier.startReview(_draft(action: NoteDraftAction.appendToExistingNote));
+        notifier
+            .startReview(_draft(action: NoteDraftAction.appendToExistingNote));
         notifier.selectTargetNote('note-1');
         final updatedNote = await notifier.appendToExistingNote();
 
@@ -314,7 +327,8 @@ void main() {
         final container = _container(_FailingUpdateRepository(existingNote));
         final notifier = container.read(noteDraftReviewProvider.notifier);
 
-        notifier.startReview(_draft(action: NoteDraftAction.appendToExistingNote));
+        notifier
+            .startReview(_draft(action: NoteDraftAction.appendToExistingNote));
         notifier.selectTargetNote(existingNote.id);
         final result = await notifier.appendToExistingNote();
 
@@ -363,7 +377,8 @@ void main() {
         final container = _container(repo);
         final notifier = container.read(noteDraftReviewProvider.notifier);
 
-        notifier.startReview(_draft(action: NoteDraftAction.appendToExistingNote));
+        notifier
+            .startReview(_draft(action: NoteDraftAction.appendToExistingNote));
         notifier.selectTargetNote('note-1');
         notifier.discard();
 
@@ -397,7 +412,8 @@ void main() {
         expect(state.noteDraft, isNull);
       });
 
-      test('clear() resets to empty state regardless of current status', () async {
+      test('clear() resets to empty state regardless of current status',
+          () async {
         final repo = _TrackingRepository();
         final container = _container(repo);
         final notifier = container.read(noteDraftReviewProvider.notifier);

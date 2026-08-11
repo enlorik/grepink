@@ -72,7 +72,8 @@ class _FixedGroundedAnswerProvider implements GroundedAnswerProvider {
   final GroundedAnswer answer;
   _FixedGroundedAnswerProvider(this.answer);
   @override
-  Future<GroundedAnswerProviderOutcome> fetchGroundedAnswer(String question) async =>
+  Future<GroundedAnswerProviderOutcome> fetchGroundedAnswer(
+          String question) async =>
       GroundedAnswerSuccess(answer);
 }
 
@@ -96,7 +97,7 @@ class _ThrowingGroundedAnswerProvider implements GroundedAnswerProvider {
   _ThrowingGroundedAnswerProvider(this.error);
   @override
   Future<GroundedAnswerProviderOutcome> fetchGroundedAnswer(
-      String question) async =>
+          String question) async =>
       throw error;
 }
 

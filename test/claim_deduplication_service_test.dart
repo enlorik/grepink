@@ -38,8 +38,8 @@ EvidenceItem _evidence({
 void main() {
   group('TextSimilarityClaimDeduplicationService', () {
     test('exact/similar local content classifies as alreadyKnown', () async {
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.9));
 
       final results = await service.classify(
         [_claim()],
@@ -47,13 +47,14 @@ void main() {
       );
 
       expect(results.length, 1);
-      expect(results.first.classification, ClaimNoveltyClassification.alreadyKnown);
+      expect(results.first.classification,
+          ClaimNoveltyClassification.alreadyKnown);
       expect(results.first.matchedLocalEvidence, isNotEmpty);
     });
 
     test('no local match classifies as newClaim', () async {
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.1));
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.1));
 
       final results = await service.classify(
         [_claim()],
@@ -65,8 +66,8 @@ void main() {
     });
 
     test('empty local evidence classifies claim as newClaim', () async {
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.9));
 
       final results = await service.classify([_claim()], const []);
 
@@ -76,43 +77,51 @@ void main() {
     });
 
     test('empty claims list returns empty result', () async {
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.5));
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.5));
 
       final results = await service.classify(const [], [_evidence()]);
 
       expect(results, isEmpty);
     });
 
-    test('local match without source URL + external claim with citation => betterSource',
+    test(
+        'local match without source URL + external claim with citation => betterSource',
         () async {
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.9));
 
       final results = await service.classify(
-        [_claim(citationUrls: ['https://example.com/source'])],
+        [
+          _claim(citationUrls: ['https://example.com/source'])
+        ],
         [_evidence(sourceUrl: null)],
       );
 
-      expect(results.first.classification, ClaimNoveltyClassification.betterSource);
+      expect(results.first.classification,
+          ClaimNoveltyClassification.betterSource);
     });
 
-    test('local match with source URL + external claim with citation => alreadyKnown',
+    test(
+        'local match with source URL + external claim with citation => alreadyKnown',
         () async {
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.9));
 
       final results = await service.classify(
-        [_claim(citationUrls: ['https://example.com/source'])],
+        [
+          _claim(citationUrls: ['https://example.com/source'])
+        ],
         [_evidence(sourceUrl: 'https://local-source.com')],
       );
 
-      expect(results.first.classification, ClaimNoveltyClassification.alreadyKnown);
+      expect(results.first.classification,
+          ClaimNoveltyClassification.alreadyKnown);
     });
 
     test('classification reason is non-empty', () async {
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.8));
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.8));
 
       final results = await service.classify([_claim()], [_evidence()]);
 
@@ -120,8 +129,8 @@ void main() {
     });
 
     test('citation URLs from the claim survive into results', () async {
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.1));
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.1));
       const urls = ['https://example.com/a', 'https://example.com/b'];
 
       final results = await service.classify(
@@ -133,8 +142,8 @@ void main() {
     });
 
     test('result order matches input claim order', () async {
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.5));
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.5));
 
       final claims = [
         _claim(id: 'a', order: 0),
@@ -148,8 +157,8 @@ void main() {
     });
 
     test('result list is unmodifiable', () async {
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.5));
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.5));
 
       final results = await service.classify([_claim()], [_evidence()]);
       final extra = _claim(id: 'extra');
@@ -167,8 +176,8 @@ void main() {
     });
 
     test('classification reason does not contain API key patterns', () async {
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.8));
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.8));
 
       final results = await service.classify([_claim()], [_evidence()]);
 
@@ -179,7 +188,8 @@ void main() {
       }
     });
 
-    test('short claim found verbatim inside a long note classifies as alreadyKnown',
+    test(
+        'short claim found verbatim inside a long note classifies as alreadyKnown',
         () async {
       // Without chunking, comparing "The sky is blue." against the full
       // multi-sentence note body would return 0.0 from the exact-match fake
@@ -195,7 +205,8 @@ void main() {
         [_evidence(content: longNote)],
       );
 
-      expect(results.first.classification, ClaimNoveltyClassification.alreadyKnown);
+      expect(results.first.classification,
+          ClaimNoveltyClassification.alreadyKnown);
     });
 
     test('claim not present in any chunk of a long note classifies as newClaim',
@@ -221,19 +232,23 @@ void main() {
       // "local has no URL — betterSource!" But the citation URL appears in the
       // note body text, meaning the user already has that source. Should be
       // alreadyKnown, not betterSource.
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.9));
 
       const citationUrl = 'https://example.com/source';
       final results = await service.classify(
-        [_claim(citationUrls: [citationUrl])],
+        [
+          _claim(citationUrls: [citationUrl])
+        ],
         [_evidence(content: 'The sky is blue. See $citationUrl for details.')],
       );
 
-      expect(results.first.classification, ClaimNoveltyClassification.alreadyKnown);
+      expect(results.first.classification,
+          ClaimNoveltyClassification.alreadyKnown);
     });
 
-    test('claim found in Markdown bullet list classifies as alreadyKnown', () async {
+    test('claim found in Markdown bullet list classifies as alreadyKnown',
+        () async {
       // Lines in a bullet list do not end with sentence-ending punctuation, so
       // the sentence-boundary splitter alone leaves the whole list as one chunk.
       // The newline splitter handles this: each bullet becomes its own chunk and
@@ -249,10 +264,12 @@ void main() {
         [_evidence(content: bulletNote)],
       );
 
-      expect(results.first.classification, ClaimNoveltyClassification.alreadyKnown);
+      expect(results.first.classification,
+          ClaimNoveltyClassification.alreadyKnown);
     });
 
-    test('claim absent from Markdown bullet list classifies as newClaim', () async {
+    test('claim absent from Markdown bullet list classifies as newClaim',
+        () async {
       final service = TextSimilarityClaimDeduplicationService(
           const ExactMatchFakeTextSimilarityProvider());
 
@@ -268,105 +285,126 @@ void main() {
     });
 
     test('claim with two URLs, both in note content → alreadyKnown', () async {
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.9));
 
       const urlA = 'https://example.com/a';
       const urlB = 'https://example.com/b';
       final results = await service.classify(
-        [_claim(citationUrls: [urlA, urlB])],
+        [
+          _claim(citationUrls: [urlA, urlB])
+        ],
         [_evidence(content: 'The sky is blue. See $urlA and $urlB for more.')],
       );
 
-      expect(results.first.classification, ClaimNoveltyClassification.alreadyKnown);
+      expect(results.first.classification,
+          ClaimNoveltyClassification.alreadyKnown);
     });
 
-    test('claim with two URLs, only one in note content → betterSource', () async {
+    test('claim with two URLs, only one in note content → betterSource',
+        () async {
       // any() suppression would wrongly mark this alreadyKnown because urlA is
       // present. every() is required: urlB is missing, so betterSource fires.
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.9));
 
       const urlA = 'https://example.com/a';
       const urlB = 'https://example.com/b';
       final results = await service.classify(
-        [_claim(citationUrls: [urlA, urlB])],
+        [
+          _claim(citationUrls: [urlA, urlB])
+        ],
         [_evidence(content: 'The sky is blue. See $urlA for more.')],
       );
 
-      expect(results.first.classification, ClaimNoveltyClassification.betterSource);
+      expect(results.first.classification,
+          ClaimNoveltyClassification.betterSource);
     });
 
     test('claim with one URL present in note content → alreadyKnown', () async {
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.9));
 
       const url = 'https://example.com/source';
       final results = await service.classify(
-        [_claim(citationUrls: [url])],
+        [
+          _claim(citationUrls: [url])
+        ],
         [_evidence(content: 'The sky is blue. See $url for more.')],
       );
 
-      expect(results.first.classification, ClaimNoveltyClassification.alreadyKnown);
+      expect(results.first.classification,
+          ClaimNoveltyClassification.alreadyKnown);
     });
 
-    test('claim with one URL absent from note content → betterSource', () async {
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+    test('claim with one URL absent from note content → betterSource',
+        () async {
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.9));
 
       final results = await service.classify(
-        [_claim(citationUrls: ['https://example.com/source'])],
+        [
+          _claim(citationUrls: ['https://example.com/source'])
+        ],
         [_evidence(content: 'The sky is blue.')],
       );
 
-      expect(results.first.classification, ClaimNoveltyClassification.betterSource);
+      expect(results.first.classification,
+          ClaimNoveltyClassification.betterSource);
     });
 
-    test('identical positive claim and note → alreadyKnown, not contradiction', () async {
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+    test('identical positive claim and note → alreadyKnown, not contradiction',
+        () async {
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.9));
 
       final results = await service.classify(
         [_claim(text: 'The sky is blue.')],
         [_evidence(content: 'The sky is blue.')],
       );
 
-      expect(results.first.classification, ClaimNoveltyClassification.alreadyKnown);
+      expect(results.first.classification,
+          ClaimNoveltyClassification.alreadyKnown);
     });
 
-    test('negated claim vs positive note → contradiction, not alreadyKnown', () async {
+    test('negated claim vs positive note → contradiction, not alreadyKnown',
+        () async {
       // High token overlap (4/5 Jaccard) but opposite polarity — must not be
       // silently collapsed into alreadyKnown.
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.9));
 
       final results = await service.classify(
         [_claim(text: 'The sky is not blue.')],
         [_evidence(content: 'The sky is blue.')],
       );
 
-      expect(results.first.classification, ClaimNoveltyClassification.contradiction);
+      expect(results.first.classification,
+          ClaimNoveltyClassification.contradiction);
     });
 
-    test('positive claim vs negated note → contradiction, not alreadyKnown', () async {
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+    test('positive claim vs negated note → contradiction, not alreadyKnown',
+        () async {
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.9));
 
       final results = await service.classify(
         [_claim(text: 'The sky is blue.')],
         [_evidence(content: 'The sky is not blue.')],
       );
 
-      expect(results.first.classification, ClaimNoveltyClassification.contradiction);
+      expect(results.first.classification,
+          ClaimNoveltyClassification.contradiction);
     });
 
-    test('unrelated negated note with low similarity → newClaim, not contradiction',
+    test(
+        'unrelated negated note with low similarity → newClaim, not contradiction',
         () async {
       // Threshold gate must prevent negation logic from running on low-scoring
       // matches — a negative sentence about a completely different topic should
       // never become contradiction just because it contains "not".
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.1));
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.1));
 
       final results = await service.classify(
         [_claim(text: 'The sky is blue.')],
@@ -376,86 +414,98 @@ void main() {
       expect(results.first.classification, ClaimNoveltyClassification.newClaim);
     });
 
-    test("contracted negation isn't vs positive note → contradiction", () async {
+    test("contracted negation isn't vs positive note → contradiction",
+        () async {
       // \b before n't breaks on contractions because the apostrophe is a
       // non-word char — \bn't\b never matches "isn't". The fix drops the
       // leading \b so n't matches inside any contraction.
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.9));
 
       final results = await service.classify(
         [_claim(text: "The sky isn't blue.")],
         [_evidence(content: 'The sky is blue.')],
       );
 
-      expect(results.first.classification, ClaimNoveltyClassification.contradiction);
+      expect(results.first.classification,
+          ClaimNoveltyClassification.contradiction);
     });
 
-    test("contracted negation doesn't vs positive note → contradiction", () async {
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+    test("contracted negation doesn't vs positive note → contradiction",
+        () async {
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.9));
 
       final results = await service.classify(
         [_claim(text: "The sky doesn't look blue.")],
         [_evidence(content: 'The sky looks blue.')],
       );
 
-      expect(results.first.classification, ClaimNoveltyClassification.contradiction);
+      expect(results.first.classification,
+          ClaimNoveltyClassification.contradiction);
     });
 
-    test('non-negated identical claim still classifies as alreadyKnown', () async {
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+    test('non-negated identical claim still classifies as alreadyKnown',
+        () async {
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.9));
 
       final results = await service.classify(
         [_claim(text: 'The sky is blue.')],
         [_evidence(content: 'The sky is blue.')],
       );
 
-      expect(results.first.classification, ClaimNoveltyClassification.alreadyKnown);
+      expect(results.first.classification,
+          ClaimNoveltyClassification.alreadyKnown);
     });
 
-    test('differing numeric values → contradiction, not alreadyKnown', () async {
+    test('differing numeric values → contradiction, not alreadyKnown',
+        () async {
       // "$10 million" vs "$12 million" — high Jaccard overlap because most tokens
       // match, but the key fact differs. Must not be collapsed into alreadyKnown.
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.9));
 
       final results = await service.classify(
         [_claim(text: 'Revenue was \$10 million in 2024.')],
         [_evidence(content: 'Revenue was \$12 million in 2024.')],
       );
 
-      expect(results.first.classification, ClaimNoveltyClassification.contradiction);
+      expect(results.first.classification,
+          ClaimNoveltyClassification.contradiction);
     });
 
-    test('identical numeric values → alreadyKnown, not contradiction', () async {
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+    test('identical numeric values → alreadyKnown, not contradiction',
+        () async {
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.9));
 
       final results = await service.classify(
         [_claim(text: 'Revenue was \$10 million in 2024.')],
         [_evidence(content: 'Revenue was \$10 million in 2024.')],
       );
 
-      expect(results.first.classification, ClaimNoveltyClassification.alreadyKnown);
+      expect(results.first.classification,
+          ClaimNoveltyClassification.alreadyKnown);
     });
 
     test('differing population numbers → contradiction', () async {
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.9));
 
       final results = await service.classify(
         [_claim(text: 'Population was 5 million.')],
         [_evidence(content: 'Population was 6 million.')],
       );
 
-      expect(results.first.classification, ClaimNoveltyClassification.contradiction);
+      expect(results.first.classification,
+          ClaimNoveltyClassification.contradiction);
     });
 
-    test('numeric claim with low similarity → newClaim, not contradiction', () async {
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.1));
+    test('numeric claim with low similarity → newClaim, not contradiction',
+        () async {
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.1));
 
       final results = await service.classify(
         [_claim(text: 'Revenue was \$10 million.')],
@@ -469,96 +519,108 @@ void main() {
         () async {
       // "2024." and "2024" must normalise to the same token so sentence-final
       // punctuation does not falsely trigger a numeric conflict.
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.9));
 
       final results = await service.classify(
         [_claim(text: 'Revenue was \$10 million in 2024.')],
         [_evidence(content: 'Revenue was \$10 million in 2024')],
       );
 
-      expect(results.first.classification, ClaimNoveltyClassification.alreadyKnown);
+      expect(results.first.classification,
+          ClaimNoveltyClassification.alreadyKnown);
     });
 
-    test('decimal percentage preserved across period-terminated and plain forms → alreadyKnown',
+    test(
+        'decimal percentage preserved across period-terminated and plain forms → alreadyKnown',
         () async {
       // "10.5%" must remain "10.5%" after normalisation — the dot is part of the
       // number, not sentence-ending punctuation.
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.9));
 
       final results = await service.classify(
         [_claim(text: 'Growth rate was 10.5%.')],
         [_evidence(content: 'Growth rate was 10.5%.')],
       );
 
-      expect(results.first.classification, ClaimNoveltyClassification.alreadyKnown);
+      expect(results.first.classification,
+          ClaimNoveltyClassification.alreadyKnown);
     });
 
-    test('differing dollar amounts with trailing periods → contradiction', () async {
+    test('differing dollar amounts with trailing periods → contradiction',
+        () async {
       // Even after stripping trailing punctuation the amounts differ (\$10 vs
       // \$12), so this must still fire as contradiction.
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.9));
 
       final results = await service.classify(
         [_claim(text: 'Revenue was \$10 million.')],
         [_evidence(content: 'Revenue was \$12 million.')],
       );
 
-      expect(results.first.classification, ClaimNoveltyClassification.contradiction);
+      expect(results.first.classification,
+          ClaimNoveltyClassification.contradiction);
     });
 
-    test('year with trailing period normalises correctly → alreadyKnown', () async {
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+    test('year with trailing period normalises correctly → alreadyKnown',
+        () async {
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.9));
 
       final results = await service.classify(
         [_claim(text: 'The policy was adopted in 2019.')],
         [_evidence(content: 'The policy was adopted in 2019')],
       );
 
-      expect(results.first.classification, ClaimNoveltyClassification.alreadyKnown);
+      expect(results.first.classification,
+          ClaimNoveltyClassification.alreadyKnown);
     });
 
-    test('claim with extra numeric context vs local note → uncertain, not contradiction',
+    test(
+        'claim with extra numeric context vs local note → uncertain, not contradiction',
         () async {
       // Claim adds a year ("in 2024") that the local note lacks. The numeric
       // token sets are {$10, 2024} vs {$10} — one is a strict superset of the
       // other. This is additional context, not a conflicting value, so the
       // result must be uncertain (not contradiction, not alreadyKnown).
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.9));
 
       final results = await service.classify(
         [_claim(text: 'Revenue was \$10 million in 2024.')],
         [_evidence(content: 'Revenue was \$10 million.')],
       );
 
-      expect(results.first.classification, ClaimNoveltyClassification.uncertain);
+      expect(
+          results.first.classification, ClaimNoveltyClassification.uncertain);
     });
 
-    test('local note with extra numeric context vs claim → uncertain, not contradiction',
+    test(
+        'local note with extra numeric context vs claim → uncertain, not contradiction',
         () async {
       // Symmetric case: local note has the year, claim does not. Still a strict
       // superset relationship — must be uncertain, not contradiction.
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.9));
 
       final results = await service.classify(
         [_claim(text: 'Revenue was \$10 million.')],
         [_evidence(content: 'Revenue was \$10 million in 2024.')],
       );
 
-      expect(results.first.classification, ClaimNoveltyClassification.uncertain);
+      expect(
+          results.first.classification, ClaimNoveltyClassification.uncertain);
     });
 
-    test('signed negative value vs positive value → contradiction, not alreadyKnown',
+    test(
+        'signed negative value vs positive value → contradiction, not alreadyKnown',
         () async {
       // Without sign capture, "-5%" and "5%" both produce token "5%".
       // With the fix the tokens are "-5%" vs "5%" — a genuine conflict.
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.9));
 
       final results = await service.classify(
         [_claim(text: 'Operating margin was -5%.')],
@@ -581,34 +643,37 @@ void main() {
     test('explicit positive sign normalised away → alreadyKnown', () async {
       // "+5%" and "5%" are equivalent; the leading + is stripped during
       // normalisation so the token sets are equal and the claim is alreadyKnown.
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.9));
 
       final results = await service.classify(
         [_claim(text: 'Growth was +5%.')],
         [_evidence(content: 'Growth was 5%.')],
       );
 
-      expect(results.first.classification, ClaimNoveltyClassification.alreadyKnown);
+      expect(results.first.classification,
+          ClaimNoveltyClassification.alreadyKnown);
     });
 
     test('identical negative decimal percentages → alreadyKnown', () async {
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.9));
 
       final results = await service.classify(
         [_claim(text: 'Operating margin was -10.5%.')],
         [_evidence(content: 'Operating margin was -10.5%.')],
       );
 
-      expect(results.first.classification, ClaimNoveltyClassification.alreadyKnown);
+      expect(results.first.classification,
+          ClaimNoveltyClassification.alreadyKnown);
     });
 
-    test('negative currency value vs positive currency value → contradiction or uncertain',
+    test(
+        'negative currency value vs positive currency value → contradiction or uncertain',
         () async {
       // "-\$10" captures the sign, "$10" does not; different tokens → conflict.
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.9));
 
       final results = await service.classify(
         [_claim(text: 'Cash flow was -\$10 million.')],
@@ -628,71 +693,79 @@ void main() {
       );
     });
 
-    test('thousands-comma vs no-comma same value → alreadyKnown, not contradiction',
+    test(
+        'thousands-comma vs no-comma same value → alreadyKnown, not contradiction',
         () async {
       // "$1,200" and "$1200" represent the same amount; thousands-separator
       // commas must be stripped before comparing so formatting differences do
       // not produce a false numeric conflict.
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.9));
 
       final results = await service.classify(
         [_claim(text: 'Revenue was \$1,200 last quarter.')],
         [_evidence(content: 'Revenue was \$1200 last quarter.')],
       );
 
-      expect(results.first.classification, ClaimNoveltyClassification.alreadyKnown);
+      expect(results.first.classification,
+          ClaimNoveltyClassification.alreadyKnown);
     });
 
-    test('thousands-comma values that genuinely differ → contradiction', () async {
+    test('thousands-comma values that genuinely differ → contradiction',
+        () async {
       // After normalisation $1,200 → $1200 and $1,300 → $1300; different values
       // must still fire as contradiction.
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.9));
 
       final results = await service.classify(
         [_claim(text: 'Revenue was \$1,200 last quarter.')],
         [_evidence(content: 'Revenue was \$1,300 last quarter.')],
       );
 
-      expect(results.first.classification, ClaimNoveltyClassification.contradiction);
+      expect(results.first.classification,
+          ClaimNoveltyClassification.contradiction);
     });
 
-    test('large number with grouping commas normalises correctly → alreadyKnown',
+    test(
+        'large number with grouping commas normalises correctly → alreadyKnown',
         () async {
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.9));
 
       final results = await service.classify(
         [_claim(text: 'The population reached 1,000,000.')],
         [_evidence(content: 'The population reached 1000000.')],
       );
 
-      expect(results.first.classification, ClaimNoveltyClassification.alreadyKnown);
+      expect(results.first.classification,
+          ClaimNoveltyClassification.alreadyKnown);
     });
 
-    test('hyphenated date vs slash date same value → alreadyKnown, not contradiction',
+    test(
+        'hyphenated date vs slash date same value → alreadyKnown, not contradiction',
         () async {
       // "2024-05-01" with the old regex produced {2024, -05, -01} while
       // "2024/05/01" produced {2024, 05, 01} — a false contradiction.
       // The lookbehind (?<!\d) prevents hyphens between digit groups from
       // being captured as negative signs.
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.9));
 
       final results = await service.classify(
         [_claim(text: 'The event occurred on 2024-05-01.')],
         [_evidence(content: 'The event occurred on 2024/05/01.')],
       );
 
-      expect(results.first.classification, ClaimNoveltyClassification.alreadyKnown);
+      expect(results.first.classification,
+          ClaimNoveltyClassification.alreadyKnown);
     });
 
     test('hyphenated dates with different months → not alreadyKnown', () async {
       // After normalisation {2024, 05, 01} vs {2024, 06, 01} — month differs,
       // neither set contains the other → contradiction or uncertain.
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.9));
 
       final results = await service.classify(
         [_claim(text: 'The event occurred on 2024-05-01.')],
@@ -705,12 +778,13 @@ void main() {
       );
     });
 
-    test('genuine negative value still distinguished from positive after date fix',
+    test(
+        'genuine negative value still distinguished from positive after date fix',
         () async {
       // The lookbehind must not suppress negatives that are actual signed values
       // (preceded by a space, not a digit). -5% vs 5% must remain a conflict.
-      final service =
-          TextSimilarityClaimDeduplicationService(const FakeTextSimilarityProvider(0.9));
+      final service = TextSimilarityClaimDeduplicationService(
+          const FakeTextSimilarityProvider(0.9));
 
       final results = await service.classify(
         [_claim(text: 'The margin was -5%.')],

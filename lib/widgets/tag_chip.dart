@@ -33,7 +33,8 @@ class TagChip extends StatelessWidget {
         children: [
           Text(
             label,
-            style: AppTextStyles.bodySmall.copyWith(color: AppColors.deepAction),
+            style:
+                AppTextStyles.bodySmall.copyWith(color: AppColors.deepAction),
           ),
           if (isEditable && onDelete != null) ...[
             const SizedBox(width: 2),

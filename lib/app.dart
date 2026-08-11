@@ -63,8 +63,9 @@ class _GrepinkAppState extends ConsumerState<GrepinkApp>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.resumed) {
-      ref.read(syncProvider.notifier).sync();
+      ref.read(syncProvider.notifier).syncOnResume();
     }
   }
 

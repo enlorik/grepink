@@ -72,12 +72,16 @@ class GrepinkBottomSheet extends StatelessWidget {
                 if (showGradientHeader)
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 12),
                     decoration: const BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
-                        colors: [AppColors.backgroundStart, AppColors.backgroundEnd],
+                        colors: [
+                          AppColors.backgroundStart,
+                          AppColors.backgroundEnd
+                        ],
                       ),
                     ),
                     child: Text(title!, style: AppTextStyles.titleLarge),
