@@ -21,7 +21,7 @@ class _FakeService implements DriveSyncService {
   bool silentResult;
   String? remote;
   bool throwOnUpload;
-  bool throwOnDownload;
+  bool throwOnDownload = false;
   int uploadCalls = 0;
   int downloadCalls = 0;
   String? lastUploaded;
@@ -35,9 +35,7 @@ class _FakeService implements DriveSyncService {
     this.silentResult = false,
     this.remote,
     this.throwOnUpload = false,
-    this.throwOnDownload = false,
     this.downloadBlock,
-    this.uploadBlock,
     this.onUpload,
   })  : _signedIn = signedIn,
         _email = signedIn ? email : null;
@@ -499,7 +497,6 @@ void main() {
 
     test('sign-out during sync prevents stale lastSyncedAt prefs write',
         () async {
-      final downloadBlock = Completer<void>();
       final service = _FakeService();
       final container = _makeContainer(service: service);
       addTearDown(container.dispose);

@@ -18,7 +18,7 @@ class DriveSyncException implements Exception {
 // Thrown when another device updated the Drive file since our last download.
 // The sync coordinator should re-download, merge, and retry.
 class DriveSyncConflictException extends DriveSyncException {
-  const DriveSyncConflictException(String message) : super(message);
+  const DriveSyncConflictException(super.message);
 }
 
 abstract class DriveSyncService {
