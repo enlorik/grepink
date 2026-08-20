@@ -7,15 +7,19 @@ import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import '../models/brave_settings.dart';
 import '../models/note.dart';
+import '../models/railway_sync_state.dart';
 import '../providers/brave_settings_provider.dart';
 import '../providers/notes_provider.dart';
+import '../providers/railway_sync_provider.dart';
 import '../providers/settings_provider.dart';
 import '../services/database_service.dart';
 import '../services/brave_evidence_provider.dart';
 import '../services/note_export_service.dart';
+import '../services/railway_settings_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/grepink_bottom_nav.dart';
@@ -32,9 +36,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   late TextEditingController _apiKeyController;
   late TextEditingController _braveSearchApiKeyController;
   late TextEditingController _braveAnswersApiKeyController;
+  late TextEditingController _railwayUrlController;
+  late TextEditingController _railwayTokenController;
   bool _apiKeyVisible = false;
   bool _braveSearchApiKeyVisible = false;
   bool _braveAnswersApiKeyVisible = false;
+  bool _railwayTokenVisible = false;
+  bool _railwayTestingConnection = false;
 
   @override
   void initState() {
@@ -42,6 +50,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _apiKeyController = TextEditingController();
     _braveSearchApiKeyController = TextEditingController();
     _braveAnswersApiKeyController = TextEditingController();
+    _railwayUrlController = TextEditingController();
+    _railwayTokenController = TextEditingController();
+    _loadRailwayConfig();
+  }
+
+  Future<void> _loadRailwayConfig() async {
+    final svc = RailwaySettingsService();
+    final url = await svc.getApiUrl();
+    if (url != null && mounted) _railwayUrlController.text = url;
   }
 
   @override
@@ -49,6 +66,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _apiKeyController.dispose();
     _braveSearchApiKeyController.dispose();
     _braveAnswersApiKeyController.dispose();
+    _railwayUrlController.dispose();
+    _railwayTokenController.dispose();
     super.dispose();
   }
 
@@ -466,6 +485,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
         const SizedBox(height: 8),
 
+        // RAILWAY SYNC
+        _buildRailwaySyncSection(),
+
+        const SizedBox(height: 8),
+
         // MEMORY ENGINE
         _buildSection('MEMORY ENGINE', [
           _buildSettingRow(
@@ -562,6 +586,242 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         ]),
       ],
+    );
+  }
+
+  String _formatLastSynced(DateTime? dt) {
+    if (dt == null) return 'Never';
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    final locale = Localizations.localeOf(context).toString();
+    return DateFormat.yMd(locale).format(dt);
+  }
+
+  String _railwayStatusLabel(RailwaySyncStatus status) {
+    switch (status) {
+      case RailwaySyncStatus.notConfigured:
+        return 'Not configured';
+      case RailwaySyncStatus.idle:
+        return 'Idle';
+      case RailwaySyncStatus.syncing:
+        return 'Syncing…';
+      case RailwaySyncStatus.upToDate:
+        return 'Up to date';
+      case RailwaySyncStatus.pendingChanges:
+        return 'Pending changes';
+      case RailwaySyncStatus.offline:
+        return 'Offline';
+      case RailwaySyncStatus.authFailed:
+        return 'Authentication failed';
+      case RailwaySyncStatus.error:
+        return 'Sync error';
+    }
+  }
+
+  Widget _buildRailwaySyncSection() {
+    final syncState = ref.watch(railwaySyncProvider);
+    final isSyncing = syncState.status == RailwaySyncStatus.syncing;
+    final isConfigured =
+        syncState.status != RailwaySyncStatus.notConfigured;
+
+    return _buildSection('RAILWAY SYNC', [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+        child: Text(
+          'Notes travel over HTTPS but are readable inside your Railway '
+          'PostgreSQL database. This version is not end-to-end encrypted.',
+          style:
+              AppTextStyles.bodySmall.copyWith(color: AppColors.secondaryText),
+        ),
+      ),
+      _buildSettingRow(
+        title: 'Railway API URL',
+        child: TextField(
+          controller: _railwayUrlController,
+          autocorrect: false,
+          enableSuggestions: false,
+          keyboardType: TextInputType.url,
+          style: AppTextStyles.bodyMedium.copyWith(
+            color: AppColors.bodyText,
+            fontFamily: 'monospace',
+          ),
+          decoration: const InputDecoration(
+            hintText: 'https://your-app.railway.app',
+            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            isDense: true,
+          ),
+        ),
+      ),
+      _buildSettingRow(
+        title: 'Sync Token',
+        child: TextField(
+          controller: _railwayTokenController,
+          obscureText: !_railwayTokenVisible,
+          autocorrect: false,
+          enableSuggestions: false,
+          enableIMEPersonalizedLearning: false,
+          style: AppTextStyles.bodyMedium.copyWith(
+            color: AppColors.bodyText,
+            fontFamily: 'monospace',
+          ),
+          decoration: InputDecoration(
+            hintText: 'Paste token here',
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            isDense: true,
+            suffixIcon: IconButton(
+              icon: Icon(
+                _railwayTokenVisible ? Icons.visibility_off : Icons.visibility,
+                size: 18,
+                color: AppColors.secondaryText,
+              ),
+              onPressed: () =>
+                  setState(() => _railwayTokenVisible = !_railwayTokenVisible),
+            ),
+          ),
+        ),
+      ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            FilledButton(
+              onPressed: _railwayTestingConnection
+                  ? null
+                  : () => _testRailwayConnection(),
+              child: _railwayTestingConnection
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Test connection'),
+            ),
+            if (isConfigured)
+              FilledButton(
+                onPressed: isSyncing
+                    ? null
+                    : () => ref
+                        .read(railwaySyncProvider.notifier)
+                        .syncNow(),
+                child: isSyncing
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Sync now'),
+              ),
+            if (isConfigured)
+              OutlinedButton(
+                onPressed: _disconnectRailway,
+                style:
+                    OutlinedButton.styleFrom(foregroundColor: AppColors.error),
+                child: const Text('Disconnect'),
+              ),
+          ],
+        ),
+      ),
+      if (isConfigured)
+        _buildSettingRow(
+          title: 'Status',
+          subtitle: _railwayStatusLabel(syncState.status),
+          trailing: syncState.lastSyncedAt != null
+              ? Text(
+                  _formatLastSynced(syncState.lastSyncedAt),
+                  style: AppTextStyles.bodySmall,
+                )
+              : null,
+        ),
+      if (syncState.conflictPreserved)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: Text(
+            'Conflict copy preserved — a note conflict was resolved by creating a copy.',
+            style:
+                AppTextStyles.bodySmall.copyWith(color: AppColors.warning),
+          ),
+        ),
+      if (syncState.errorMessage != null)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          child: Text(
+            syncState.errorMessage!,
+            style: AppTextStyles.bodySmall.copyWith(color: AppColors.error),
+          ),
+        ),
+    ]);
+  }
+
+  Future<void> _testRailwayConnection() async {
+    final url = _railwayUrlController.text.trim();
+    final token = _railwayTokenController.text.trim();
+    if (url.isEmpty || token.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter Railway URL and token first')),
+      );
+      return;
+    }
+    setState(() => _railwayTestingConnection = true);
+    try {
+      final svc = RailwaySettingsService();
+      await svc.setApiUrl(url);
+      await svc.setToken(token);
+      final ok = await ref
+          .read(railwaySyncProvider.notifier)
+          .testConnection(url, token);
+      if (!mounted) return;
+      if (ok) {
+        await ref.read(railwaySyncProvider.notifier).reconfigure();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Connection OK — configuration saved.')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Connection failed. Check URL and try again.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _railwayTestingConnection = false);
+    }
+  }
+
+  Future<void> _disconnectRailway() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Disconnect Railway sync?', style: AppTextStyles.titleMedium),
+        content: Text(
+          'This removes only the local configuration. Your notes on Railway '
+          'and on this device are not deleted.',
+          style: AppTextStyles.bodyMedium,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Disconnect'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    final svc = RailwaySettingsService();
+    await svc.clearConfig();
+    if (!mounted) return;
+    _railwayUrlController.clear();
+    _railwayTokenController.clear();
+    await ref.read(railwaySyncProvider.notifier).reconfigure();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Railway sync disconnected.')),
     );
   }
 
@@ -750,6 +1010,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await ref.read(notesProvider.notifier).loadNotes();
     // Fire-and-forget: wraps its own exceptions so no unhandled futures escape.
     ref.read(notesProvider.notifier).reindexPendingNotes();
+    ref.read(railwaySyncProvider.notifier).triggerAfterMutation();
     if (!mounted) return;
     messenger.showSnackBar(SnackBar(content: Text(successMessage)));
   }
@@ -782,6 +1043,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     await DatabaseService.instance.clearAll();
     await ref.read(notesProvider.notifier).loadNotes();
+    ref.read(railwaySyncProvider.notifier).triggerAfterMutation();
     if (!mounted) {
       return;
     }
