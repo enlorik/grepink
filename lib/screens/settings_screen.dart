@@ -767,14 +767,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
     setState(() => _railwayTestingConnection = true);
     try {
-      final svc = RailwaySettingsService();
-      await svc.setApiUrl(url);
-      await svc.setToken(token);
       final ok = await ref
           .read(railwaySyncProvider.notifier)
           .testConnection(url, token);
       if (!mounted) return;
       if (ok) {
+        // Save credentials only after a successful test.
+        final svc = RailwaySettingsService();
+        await svc.setApiUrl(url);
+        await svc.setToken(token);
+        if (!mounted) return;
         await ref.read(railwaySyncProvider.notifier).reconfigure();
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
