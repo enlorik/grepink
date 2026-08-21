@@ -241,8 +241,21 @@ class RailwaySyncNotifier extends StateNotifier<RailwaySyncState> {
         }
 
         // Cap each request to 500 mutations to stay within the server limit.
+        // Also filter out any mutation whose payload exceeds the server's field
+        // limits: an oversized note would cause the server to reject the whole
+        // batch with HTTP 400, and no other notes could sync until it is fixed.
+        // Oversized entries remain in the outbox and only block themselves.
         const maxPerRequest = 500;
-        final batch = perNote.values.take(maxPerRequest).toList();
+        final batch = perNote.values
+            .where(_mutationFitsServerLimits)
+            .take(maxPerRequest)
+            .toList();
+
+        if (batch.isEmpty) {
+          // Every pending mutation is oversized — nothing sendable right now.
+          break;
+        }
+
         final mutations = batch.map((e) => e.toMutationJson()).toList();
         final response = await client.sync(url, token, mutations);
 
@@ -443,8 +456,17 @@ class RailwaySyncNotifier extends StateNotifier<RailwaySyncState> {
       }
 
       // Remove the outbox entry for this conflict (resolution is complete).
+      // Also advance the base_revision of any surviving replacement so it
+      // targets the actual server revision rather than the stale base.
       if (sentEntry != null) {
         await db.removeOutboxEntry(sentEntry.seq, sentEntry.mutationId);
+        final queued = queuedByNote[conflict.noteId] ?? [];
+        for (final next in queued) {
+          if (next.mutationId != sentEntry.mutationId) {
+            await db.updateOutboxBaseRevision(next.seq, conflict.serverRevision);
+            break;
+          }
+        }
       }
     }
 
@@ -521,6 +543,17 @@ class RailwaySyncNotifier extends StateNotifier<RailwaySyncState> {
     } catch (_) {
       return null;
     }
+  }
+
+  /// Returns false when an upsert payload exceeds the server's field limits so
+  /// the mutation is held back from the batch instead of rejecting all others.
+  bool _mutationFitsServerLimits(OutboxEntry e) {
+    if (e.operation == 'delete') return true;
+    final payload = jsonDecodeSafe(e.payload);
+    if (payload == null) return false;
+    final title = payload['title'] as String? ?? '';
+    final content = payload['content'] as String? ?? '';
+    return title.length <= 10000 && content.length <= 500000;
   }
 
   Map<String, dynamic>? jsonDecodeSafe(String? s) {

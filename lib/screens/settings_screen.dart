@@ -834,6 +834,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     );
     if (confirm != true || !mounted) return;
+    // Cancel any in-flight sync before clearing credentials so the running
+    // loop cannot apply its response after the configuration is gone.
+    ref.read(railwaySyncProvider.notifier).cancelDrain();
     final svc = RailwaySettingsService();
     await svc.clearConfig();
     if (!mounted) return;
