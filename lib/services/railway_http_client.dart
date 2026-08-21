@@ -138,6 +138,11 @@ class LiveRailwayHttpClient implements RailwayHttpClient {
 
   LiveRailwayHttpClient({http.Client? client}) : _client = client ?? http.Client();
 
+  /// Strips trailing slashes so callers can paste Railway-generated URLs with
+  /// or without a trailing slash without producing double-slash paths.
+  static String _normalize(String baseUrl) =>
+      baseUrl.trimRight().replaceAll(RegExp(r'/+$'), '');
+
   /// Throws [RailwayInsecureEndpointException] when [baseUrl] uses a non-HTTPS
   /// scheme on a non-localhost host. Plain HTTP is allowed only for local
   /// development (localhost / 127.0.0.1 / ::1).
@@ -154,15 +159,16 @@ class LiveRailwayHttpClient implements RailwayHttpClient {
 
   @override
   Future<bool> checkHealth(String baseUrl) async {
-    final uri = Uri.parse('$baseUrl/health');
+    final uri = Uri.parse('${_normalize(baseUrl)}/health');
     final response = await _client.get(uri).timeout(const Duration(seconds: 10));
     return response.statusCode == 200;
   }
 
   @override
   Future<bool> checkStatus(String baseUrl, String token) async {
-    _requireSafeScheme(baseUrl);
-    final uri = Uri.parse('$baseUrl/v1/status');
+    final normalized = _normalize(baseUrl);
+    _requireSafeScheme(normalized);
+    final uri = Uri.parse('$normalized/v1/status');
     final response = await _client
         .get(uri, headers: {'Authorization': 'Bearer $token'})
         .timeout(const Duration(seconds: 10));
@@ -175,8 +181,9 @@ class LiveRailwayHttpClient implements RailwayHttpClient {
     String token,
     List<Map<String, dynamic>> mutations,
   ) async {
-    _requireSafeScheme(baseUrl);
-    final uri = Uri.parse('$baseUrl/v1/sync');
+    final normalized = _normalize(baseUrl);
+    _requireSafeScheme(normalized);
+    final uri = Uri.parse('$normalized/v1/sync');
     final body = jsonEncode({'mutations': mutations});
 
     final response = await _client

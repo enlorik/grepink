@@ -274,6 +274,10 @@ class RailwaySyncNotifier extends StateNotifier<RailwaySyncState> {
         }
       }
 
+      // Skip success finalization if the drain was cancelled mid-flight so the
+      // notConfigured or reconfigured state set by the caller is not overwritten.
+      if (_generation != gen) return true;
+
       final now = DateTime.now();
       await settings.setLastSyncedAt(now);
       if (mounted) {
@@ -507,7 +511,13 @@ class RailwaySyncNotifier extends StateNotifier<RailwaySyncState> {
           embeddingPending: true,
         );
         final currentRev = await db.getRemoteRevision(row.id);
-        if (existing == null || currentRev == null || row.revision > currentRev) {
+        // Use >= rather than > so that a snapshot row at the same revision as
+        // the acknowledged replacement is still applied locally. Without this,
+        // if a stale-conflict overwrote local content with the server's older
+        // version and a replacement was subsequently uploaded and acknowledged,
+        // the final read-only sync would skip restoring the replacement because
+        // the acknowledged revision equals currentRev.
+        if (existing == null || currentRev == null || row.revision >= currentRev) {
           await db.applyRemoteUpsert(remoteNote, row.revision);
           hadChanges = true;
         }

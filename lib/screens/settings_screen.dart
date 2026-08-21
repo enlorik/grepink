@@ -787,15 +787,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         // Save credentials only after a successful test.
         final svc = RailwaySettingsService();
         final previousUrl = await svc.getApiUrl();
-        if (previousUrl != url) {
-          // Cancel any in-flight sync before resetting sync metadata so the
-          // old drain loop cannot apply stale server responses after the reset.
-          ref.read(railwaySyncProvider.notifier).cancelDrain();
-          await DatabaseService.instance.resetSyncState();
-        }
+        // Always cancel the active drain — the running loop may have captured
+        // the old token even when only the token changes without a URL change.
+        ref.read(railwaySyncProvider.notifier).cancelDrain();
+        // Save credentials first so that if the app terminates during the
+        // subsequent sync reset, the next launch targets the correct endpoint
+        // rather than submitting null-base mutations against the old server.
         await svc.setApiUrl(url);
         await svc.setToken(token);
         if (!mounted) return;
+        if (previousUrl != url) {
+          // URL changed: clear remote-version metadata and backfill the outbox
+          // so existing notes are uploaded to the new server from scratch.
+          await DatabaseService.instance.resetSyncState();
+        }
         await ref.read(railwaySyncProvider.notifier).reconfigure();
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
