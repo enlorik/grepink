@@ -167,7 +167,12 @@ class RailwaySyncNotifier extends StateNotifier<RailwaySyncState> {
   void _maybeStartDrain() {
     if (_draining) return;
     _draining = true;
-    _drain().whenComplete(() => _draining = false);
+    _drain().whenComplete(() {
+      _draining = false;
+      // Items queued during a cancelDrain+reconfigure are preserved so they
+      // are not lost. Restart the drain now that _draining is false.
+      if (_queue.isNotEmpty && mounted) _maybeStartDrain();
+    });
   }
 
   Future<void> _drain() async {
@@ -181,9 +186,16 @@ class RailwaySyncNotifier extends StateNotifier<RailwaySyncState> {
 
       item.completer?.complete();
 
-      if (broke || _generation != gen) {
-        // Complete any triggers that arrived during the sync before stopping.
+      if (broke) {
+        // Hard stop on error — flush remaining triggers because they would
+        // hit the same error condition immediately.
         _flushQueue();
+        break;
+      }
+      if (_generation != gen) {
+        // Drain was cancelled; exit WITHOUT flushing so triggers queued
+        // during the cancel (e.g. reconfigure's startup trigger) persist
+        // and are picked up by the whenComplete restart above.
         break;
       }
     }
