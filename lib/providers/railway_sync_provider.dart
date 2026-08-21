@@ -188,8 +188,11 @@ class RailwaySyncNotifier extends StateNotifier<RailwaySyncState> {
 
       if (broke) {
         // Hard stop on error — flush remaining triggers because they would
-        // hit the same error condition immediately.
-        _flushQueue();
+        // hit the same error condition immediately. But if the drain was
+        // cancelled mid-flight (generation changed), skip the flush so
+        // triggers queued during the cancel (e.g. reconfigure's startup
+        // trigger) persist and are picked up by the whenComplete restart.
+        if (_generation == gen) _flushQueue();
         break;
       }
       if (_generation != gen) {
@@ -252,16 +255,22 @@ class RailwaySyncNotifier extends StateNotifier<RailwaySyncState> {
           break;
         }
 
-        // Cap each request to 500 mutations to stay within the server limit.
-        // Also filter out any mutation whose payload exceeds the server's field
-        // limits: an oversized note would cause the server to reject the whole
-        // batch with HTTP 400, and no other notes could sync until it is fixed.
-        // Oversized entries remain in the outbox and only block themselves.
+        // Cap each request to 500 mutations and also limit the aggregate
+        // encoded body size: a batch of ~21 notes near the 500 kB content cap
+        // can exceed the server's 10 MiB body limit even when every individual
+        // mutation passes the per-field checks.
         const maxPerRequest = 500;
-        final batch = perNote.values
-            .where(_mutationFitsServerLimits)
-            .take(maxPerRequest)
-            .toList();
+        const maxBodyBytes = 9 * 1024 * 1024; // 9 MiB — headroom below 10 MiB cap
+        int bodyEstimate = 17; // '{"mutations":[' prefix + ']}' suffix
+        final batch = <OutboxEntry>[];
+        for (final e in perNote.values.where(_mutationFitsServerLimits)) {
+          if (batch.length >= maxPerRequest) break;
+          final encoded = utf8.encode(jsonEncode(e.toMutationJson())).length;
+          final added = batch.isEmpty ? encoded : encoded + 1; // comma separator
+          if (bodyEstimate + added > maxBodyBytes) break;
+          bodyEstimate += added;
+          batch.add(e);
+        }
 
         if (batch.isEmpty) {
           // Every pending mutation is oversized — nothing sendable right now.
@@ -476,10 +485,20 @@ class RailwaySyncNotifier extends StateNotifier<RailwaySyncState> {
         // delete conflict — server has a newer edit that beats our delete.
         // Keep the remote note, surface a warning (state.conflictPreserved).
         if (conflict.serverState != null) {
-          final serverNote =
-              _snapshotToNote(conflict.noteId, conflict.serverState!);
-          if (serverNote != null) {
-            await db.applyRemoteUpsert(serverNote, conflict.serverRevision);
+          // As with upsert conflicts, skip overwriting local content if a
+          // replacement upsert is queued behind the in-flight delete so an
+          // import that followed the delete is not silently discarded.
+          final queuedForNote = queuedByNote[conflict.noteId] ?? [];
+          final hasReplacement = sentEntry != null &&
+              queuedForNote.any(
+                (next) => next.mutationId != sentEntry.mutationId,
+              );
+          if (!hasReplacement) {
+            final serverNote =
+                _snapshotToNote(conflict.noteId, conflict.serverState!);
+            if (serverNote != null) {
+              await db.applyRemoteUpsert(serverNote, conflict.serverRevision);
+            }
           }
           await db.setRemoteRevision(conflict.noteId, conflict.serverRevision);
         }
@@ -583,7 +602,18 @@ class RailwaySyncNotifier extends StateNotifier<RailwaySyncState> {
     if (payload == null) return false;
     final title = payload['title'] as String? ?? '';
     final content = payload['content'] as String? ?? '';
-    return title.length <= 10000 && content.length <= 500000;
+    if (title.length > 10000 || content.length > 500000) return false;
+    final tags = payload['tags'];
+    if (tags is List) {
+      if (tags.length > 100) return false;
+      if (tags.any((t) => t is String && t.length > 200)) return false;
+    }
+    final keywords = payload['keywords'];
+    if (keywords is List) {
+      if (keywords.length > 200) return false;
+      if (keywords.any((k) => k is String && k.length > 200)) return false;
+    }
+    return true;
   }
 
   Map<String, dynamic>? jsonDecodeSafe(String? s) {

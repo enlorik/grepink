@@ -800,17 +800,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         // Always cancel the active drain — the running loop may have captured
         // the old token even when only the token changes without a URL change.
         ref.read(railwaySyncProvider.notifier).cancelDrain();
-        // Save credentials first so that if the app terminates during the
-        // subsequent sync reset, the next launch targets the correct endpoint
-        // rather than submitting null-base mutations against the old server.
-        await svc.setApiUrl(normalizedUrl);
-        await svc.setToken(token);
-        if (!mounted) return;
         if (previousUrl != normalizedUrl) {
-          // URL changed: clear remote-version metadata and backfill the outbox
-          // so existing notes are uploaded to the new server from scratch.
+          // Clear revision metadata and backfill the outbox BEFORE saving the
+          // new URL so that a crash between the two writes leaves the old
+          // endpoint active with a clean-base outbox rather than the new
+          // endpoint carrying stale revision metadata and no outbox entries.
           await DatabaseService.instance.resetSyncState();
         }
+        await svc.setApiUrl(normalizedUrl);
+        await svc.setToken(token);
+        // No mounted check here so reconfigure always runs after the saves;
+        // reconfigure() guards internally with its own mounted check.
         await ref.read(railwaySyncProvider.notifier).reconfigure();
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
