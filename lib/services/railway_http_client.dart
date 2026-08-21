@@ -125,6 +125,7 @@ class SnapshotRow {
 
 abstract class RailwayHttpClient {
   Future<bool> checkHealth(String baseUrl);
+  Future<bool> checkStatus(String baseUrl, String token);
   Future<RailwaySyncResponse> sync(
     String baseUrl,
     String token,
@@ -141,6 +142,15 @@ class LiveRailwayHttpClient implements RailwayHttpClient {
   Future<bool> checkHealth(String baseUrl) async {
     final uri = Uri.parse('$baseUrl/health');
     final response = await _client.get(uri).timeout(const Duration(seconds: 10));
+    return response.statusCode == 200;
+  }
+
+  @override
+  Future<bool> checkStatus(String baseUrl, String token) async {
+    final uri = Uri.parse('$baseUrl/v1/status');
+    final response = await _client
+        .get(uri, headers: {'Authorization': 'Bearer $token'})
+        .timeout(const Duration(seconds: 10));
     return response.statusCode == 200;
   }
 

@@ -120,7 +120,7 @@ class RailwaySyncNotifier extends StateNotifier<RailwaySyncState> {
   Future<bool> testConnection(String baseUrl, String token) async {
     final client = _ref.read(railwayHttpClientProvider);
     try {
-      return await client.checkHealth(baseUrl);
+      return await client.checkStatus(baseUrl, token);
     } catch (_) {
       return false;
     }
@@ -228,12 +228,14 @@ class RailwaySyncNotifier extends StateNotifier<RailwaySyncState> {
           break;
         }
 
-        final mutations =
-            perNote.values.map((e) => e.toMutationJson()).toList();
+        // Cap each request to 500 mutations to stay within the server limit.
+        const maxPerRequest = 500;
+        final batch = perNote.values.take(maxPerRequest).toList();
+        final mutations = batch.map((e) => e.toMutationJson()).toList();
         final response = await client.sync(url, token, mutations);
 
         if (!mounted) break;
-        await _applyResponse(response, perNote.values.toList(), settings);
+        await _applyResponse(response, batch, settings);
 
         // Recheck the outbox — mutations added during the request still need draining.
         final remaining = await DatabaseService.instance.getOutboxEntries();
@@ -324,7 +326,7 @@ class RailwaySyncNotifier extends StateNotifier<RailwaySyncState> {
       await db.setRemoteRevision(ack.noteId, ack.revision);
       final sentEntry = sentById[ack.mutationId];
       if (sentEntry != null) {
-        await db.removeOutboxEntry(sentEntry.seq);
+        await db.removeOutboxEntry(sentEntry.seq, sentEntry.mutationId);
         // Update the next queued mutation for this note to use the new base.
         final queued = queuedByNote[ack.noteId] ?? [];
         for (final next in queued) {
@@ -418,7 +420,7 @@ class RailwaySyncNotifier extends StateNotifier<RailwaySyncState> {
 
       // Remove the outbox entry for this conflict (resolution is complete).
       if (sentEntry != null) {
-        await db.removeOutboxEntry(sentEntry.seq);
+        await db.removeOutboxEntry(sentEntry.seq, sentEntry.mutationId);
       }
     }
 

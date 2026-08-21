@@ -26,6 +26,9 @@ class _FakeHttpClient implements RailwayHttpClient {
   Future<bool> checkHealth(String baseUrl) async => healthResult;
 
   @override
+  Future<bool> checkStatus(String baseUrl, String token) async => healthResult;
+
+  @override
   Future<RailwaySyncResponse> sync(
     String baseUrl,
     String token,
@@ -326,6 +329,10 @@ void main() {
 class _ThrowingHealthClient implements RailwayHttpClient {
   @override
   Future<bool> checkHealth(String baseUrl) async =>
+      throw Exception('no network');
+
+  @override
+  Future<bool> checkStatus(String baseUrl, String token) async =>
       throw Exception('no network');
 
   @override

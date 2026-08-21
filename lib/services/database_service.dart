@@ -366,9 +366,13 @@ class DatabaseService {
     return rows.map(OutboxEntry.fromMap).toList();
   }
 
-  Future<void> removeOutboxEntry(int seq) async {
+  Future<void> removeOutboxEntry(int seq, String mutationId) async {
     final db = await database;
-    await db.delete('sync_outbox', where: 'seq = ?', whereArgs: [seq]);
+    await db.delete(
+      'sync_outbox',
+      where: 'seq = ? AND mutation_id = ?',
+      whereArgs: [seq, mutationId],
+    );
   }
 
   Future<void> updateOutboxBaseRevision(int seq, int newBaseRevision) async {
