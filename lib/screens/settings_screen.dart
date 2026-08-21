@@ -19,6 +19,7 @@ import '../providers/settings_provider.dart';
 import '../services/database_service.dart';
 import '../services/brave_evidence_provider.dart';
 import '../services/note_export_service.dart';
+import '../services/railway_http_client.dart';
 import '../services/railway_settings_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
@@ -767,15 +768,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
     setState(() => _railwayTestingConnection = true);
     try {
-      final ok = await ref
-          .read(railwaySyncProvider.notifier)
-          .testConnection(url, token);
+      final bool ok;
+      try {
+        ok = await ref
+            .read(railwaySyncProvider.notifier)
+            .testConnection(url, token);
+      } on RailwayInsecureEndpointException {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('URL must use HTTPS. Plain HTTP is not allowed.'),
+          ),
+        );
+        return;
+      }
       if (!mounted) return;
       if (ok) {
         // Save credentials only after a successful test.
         final svc = RailwaySettingsService();
         final previousUrl = await svc.getApiUrl();
         if (previousUrl != url) {
+          // Cancel any in-flight sync before resetting sync metadata so the
+          // old drain loop cannot apply stale server responses after the reset.
+          ref.read(railwaySyncProvider.notifier).cancelDrain();
           await DatabaseService.instance.resetSyncState();
         }
         await svc.setApiUrl(url);

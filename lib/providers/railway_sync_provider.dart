@@ -54,6 +54,7 @@ class RailwaySyncNotifier extends StateNotifier<RailwaySyncState> {
 
   final List<_Trigger> _queue = [];
   bool _draining = false;
+  int _generation = 0;
   DateTime? _lastSyncAt;
   static const _resumeThrottle = Duration(seconds: 60);
 
@@ -117,6 +118,11 @@ class RailwaySyncNotifier extends StateNotifier<RailwaySyncState> {
     _enqueueNoWait(_TriggerKind.resume);
   }
 
+  /// Cancels any in-flight drain so that subsequent calls to resetSyncState
+  /// and reconfigure start with a clean slate. The running loop exits at its
+  /// next async boundary without applying stale server responses.
+  void cancelDrain() => _generation++;
+
   Future<bool> testConnection(String baseUrl, String token) async {
     final client = _ref.read(railwayHttpClientProvider);
     try {
@@ -165,16 +171,17 @@ class RailwaySyncNotifier extends StateNotifier<RailwaySyncState> {
   }
 
   Future<void> _drain() async {
-    while (_queue.isNotEmpty && mounted) {
+    final gen = _generation;
+    while (_queue.isNotEmpty && mounted && _generation == gen) {
       // Take the first item, complete and discard any queued behind it.
       final item = _queue.removeAt(0);
       _flushQueue();
 
-      final broke = await _runSyncLoop();
+      final broke = await _runSyncLoop(gen);
 
       item.completer?.complete();
 
-      if (broke) {
+      if (broke || _generation != gen) {
         // Complete any triggers that arrived during the sync before stopping.
         _flushQueue();
         break;
@@ -190,7 +197,10 @@ class RailwaySyncNotifier extends StateNotifier<RailwaySyncState> {
   }
 
   /// Runs the outbox drain loop. Returns true if sync should stop (error).
-  Future<bool> _runSyncLoop() async {
+  /// [gen] is the generation at which this loop was started; if _generation
+  /// changes (cancelDrain was called), the loop exits without applying any
+  /// further server responses to avoid applying stale data after a reset.
+  Future<bool> _runSyncLoop(int gen) async {
     final settings = _ref.read(railwaySettingsServiceProvider);
     final client = _ref.read(railwayHttpClientProvider);
 
@@ -212,8 +222,9 @@ class RailwaySyncNotifier extends StateNotifier<RailwaySyncState> {
 
     try {
       // Drain until the outbox is empty or we hit a break condition.
-      while (mounted) {
+      while (mounted && _generation == gen) {
         final entries = await DatabaseService.instance.getOutboxEntries();
+        if (_generation != gen) break;
 
         // Collect the oldest pending entry per note.
         final perNote = <String, OutboxEntry>{};
@@ -224,6 +235,7 @@ class RailwaySyncNotifier extends StateNotifier<RailwaySyncState> {
         if (perNote.isEmpty) {
           // Outbox empty — do a read-only sync to pull in remote changes.
           final response = await client.sync(url, token, []);
+          if (_generation != gen) break;
           if (mounted) await _applyResponse(response, [], settings);
           break;
         }
@@ -234,14 +246,16 @@ class RailwaySyncNotifier extends StateNotifier<RailwaySyncState> {
         final mutations = batch.map((e) => e.toMutationJson()).toList();
         final response = await client.sync(url, token, mutations);
 
-        if (!mounted) break;
+        if (!mounted || _generation != gen) break;
         await _applyResponse(response, batch, settings);
 
         // Recheck the outbox — mutations added during the request still need draining.
         final remaining = await DatabaseService.instance.getOutboxEntries();
+        if (_generation != gen) break;
         if (remaining.isEmpty) {
           // Pull remote snapshot on final pass.
           final finalResp = await client.sync(url, token, []);
+          if (_generation != gen) break;
           if (mounted) await _applyResponse(finalResp, [], settings);
           break;
         }
@@ -288,6 +302,14 @@ class RailwaySyncNotifier extends StateNotifier<RailwaySyncState> {
         );
       }
       return true;
+    } on RailwayInsecureEndpointException {
+      if (mounted) {
+        state = state.copyWith(
+          status: RailwaySyncStatus.authFailed,
+          errorMessage: 'Endpoint must use HTTPS.',
+        );
+      }
+      return true;
     } catch (_) {
       if (mounted) {
         state = state.copyWith(
@@ -322,6 +344,9 @@ class RailwaySyncNotifier extends StateNotifier<RailwaySyncState> {
     bool hadConflict = false;
 
     // Process acknowledged mutations.
+    // Acknowledgements update outbox and revision metadata only — note content
+    // is unchanged, so hadChanges is not set here. reloadNotes and
+    // reindexEmbeddings are triggered only when actual note content changes.
     for (final ack in response.acknowledged) {
       await db.setRemoteRevision(ack.noteId, ack.revision);
       final sentEntry = sentById[ack.mutationId];
@@ -336,7 +361,6 @@ class RailwaySyncNotifier extends StateNotifier<RailwaySyncState> {
           }
         }
       }
-      hadChanges = true;
     }
 
     // Process conflicts.

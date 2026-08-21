@@ -138,6 +138,20 @@ class LiveRailwayHttpClient implements RailwayHttpClient {
 
   LiveRailwayHttpClient({http.Client? client}) : _client = client ?? http.Client();
 
+  /// Throws [RailwayInsecureEndpointException] when [baseUrl] uses a non-HTTPS
+  /// scheme on a non-localhost host. Plain HTTP is allowed only for local
+  /// development (localhost / 127.0.0.1 / ::1).
+  void _requireSafeScheme(String baseUrl) {
+    final uri = Uri.tryParse(baseUrl);
+    if (uri == null) return;
+    if (uri.scheme == 'https') return;
+    if (uri.scheme == 'http') {
+      final host = uri.host.toLowerCase();
+      if (host == 'localhost' || host == '127.0.0.1' || host == '::1') return;
+    }
+    throw const RailwayInsecureEndpointException();
+  }
+
   @override
   Future<bool> checkHealth(String baseUrl) async {
     final uri = Uri.parse('$baseUrl/health');
@@ -147,6 +161,7 @@ class LiveRailwayHttpClient implements RailwayHttpClient {
 
   @override
   Future<bool> checkStatus(String baseUrl, String token) async {
+    _requireSafeScheme(baseUrl);
     final uri = Uri.parse('$baseUrl/v1/status');
     final response = await _client
         .get(uri, headers: {'Authorization': 'Bearer $token'})
@@ -160,6 +175,7 @@ class LiveRailwayHttpClient implements RailwayHttpClient {
     String token,
     List<Map<String, dynamic>> mutations,
   ) async {
+    _requireSafeScheme(baseUrl);
     final uri = Uri.parse('$baseUrl/v1/sync');
     final body = jsonEncode({'mutations': mutations});
 
@@ -196,6 +212,12 @@ class RailwayAuthException implements Exception {
   const RailwayAuthException();
   @override
   String toString() => 'RailwayAuthException';
+}
+
+class RailwayInsecureEndpointException implements Exception {
+  const RailwayInsecureEndpointException();
+  @override
+  String toString() => 'RailwayInsecureEndpointException';
 }
 
 class RailwayRequestTooLargeException implements Exception {
