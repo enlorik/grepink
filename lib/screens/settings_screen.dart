@@ -786,7 +786,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (ok) {
         // Save credentials only after a successful test.
         final svc = RailwaySettingsService();
-        final previousUrl = await svc.getApiUrl();
+        // Fall back to the last saved endpoint so a reconnection to the same
+        // server after a disconnect does not reset sync metadata and produce
+        // conflict copies for every existing note.
+        final previousUrl = await svc.getApiUrl() ?? await svc.getLastEndpoint();
         // Always cancel the active drain — the running loop may have captured
         // the old token even when only the token changes without a URL change.
         ref.read(railwaySyncProvider.notifier).cancelDrain();

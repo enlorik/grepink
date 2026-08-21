@@ -412,10 +412,24 @@ class RailwaySyncNotifier extends StateNotifier<RailwaySyncState> {
               await db.insertNote(conflictNote);
             }
           }
-          // 2. Apply the remote version to the original note ID.
-          final serverNote = _snapshotToNote(conflict.noteId, conflict.serverState!);
-          if (serverNote != null) {
-            await db.applyRemoteUpsert(serverNote, conflict.serverRevision);
+          // 2. Apply the remote version to the original note ID, but only when
+          // there is no queued replacement in the outbox. If a replacement
+          // exists it means the user edited the note after the in-flight
+          // mutation was sent; overwriting local content now would discard
+          // that edit. The replacement carries the user's current state, will
+          // be uploaded next, and then the snapshot will advance past the
+          // conflict revision naturally.
+          final queuedForNote = queuedByNote[conflict.noteId] ?? [];
+          final hasReplacement = sentEntry != null &&
+              queuedForNote.any(
+                (next) => next.mutationId != sentEntry.mutationId,
+              );
+          if (!hasReplacement) {
+            final serverNote =
+                _snapshotToNote(conflict.noteId, conflict.serverState!);
+            if (serverNote != null) {
+              await db.applyRemoteUpsert(serverNote, conflict.serverRevision);
+            }
           }
           await db.setRemoteRevision(conflict.noteId, conflict.serverRevision);
         } else {
@@ -511,13 +525,7 @@ class RailwaySyncNotifier extends StateNotifier<RailwaySyncState> {
           embeddingPending: true,
         );
         final currentRev = await db.getRemoteRevision(row.id);
-        // Use >= rather than > so that a snapshot row at the same revision as
-        // the acknowledged replacement is still applied locally. Without this,
-        // if a stale-conflict overwrote local content with the server's older
-        // version and a replacement was subsequently uploaded and acknowledged,
-        // the final read-only sync would skip restoring the replacement because
-        // the acknowledged revision equals currentRev.
-        if (existing == null || currentRev == null || row.revision >= currentRev) {
+        if (existing == null || currentRev == null || row.revision > currentRev) {
           await db.applyRemoteUpsert(remoteNote, row.revision);
           hadChanges = true;
         }

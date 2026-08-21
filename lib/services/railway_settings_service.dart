@@ -25,6 +25,10 @@ class _SecureSettingsStorage implements RailwaySettingsStorage {
 class RailwaySettingsService {
   static const _keyApiUrl = 'railway_sync_api_url';
   static const _keyLastSyncedAt = 'railway_sync_last_synced_at';
+  // Survives clearConfig() so a reconnection to the same server can be
+  // distinguished from a connection to a new server without recreating every
+  // note as a conflict copy.
+  static const _keyLastEndpoint = 'railway_sync_last_endpoint';
 
   final RailwaySettingsStorage _storage;
 
@@ -39,6 +43,15 @@ class RailwaySettingsService {
   Future<void> setApiUrl(String url) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyApiUrl, url);
+    await prefs.setString(_keyLastEndpoint, url);
+  }
+
+  /// Returns the most recently saved endpoint URL, even after [clearConfig].
+  /// Used to detect reconnections to the same server without resetting sync
+  /// metadata unnecessarily.
+  Future<String?> getLastEndpoint() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_keyLastEndpoint);
   }
 
   Future<String?> getToken() => _storage.readToken();
