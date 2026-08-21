@@ -284,11 +284,19 @@ class DatabaseService {
     final executor = txn ?? (await database);
     final toWrite =
         note.copyWith(embeddingPending: true, clearEmbedding: true);
-    await executor.insert(
+    // Use UPDATE + INSERT instead of INSERT OR REPLACE. REPLACE internally
+    // deletes and reinserts the row, which assigns a new rowid and can leave
+    // the FTS content-table index inconsistent. UPDATE preserves the rowid so
+    // the notes_au trigger correctly maintains the FTS entry in place.
+    final updated = await executor.update(
       'notes',
       toWrite.toMap(),
-      conflictAlgorithm: ConflictAlgorithm.replace,
+      where: 'id = ?',
+      whereArgs: [note.id],
     );
+    if (updated == 0) {
+      await executor.insert('notes', toWrite.toMap());
+    }
     await executor.insert(
       'note_remote_versions',
       {'note_id': note.id, 'remote_revision': remoteRevision},
