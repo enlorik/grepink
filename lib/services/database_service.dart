@@ -282,8 +282,7 @@ class DatabaseService {
     DatabaseExecutor? txn,
   }) async {
     final executor = txn ?? (await database);
-    final toWrite =
-        note.copyWith(embeddingPending: true, clearEmbedding: true);
+    final toWrite = note.copyWith(embeddingPending: true, clearEmbedding: true);
     // Use UPDATE + INSERT instead of INSERT OR REPLACE. REPLACE internally
     // deletes and reinserts the row, which assigns a new rowid and can leave
     // the FTS content-table index inconsistent. UPDATE preserves the rowid so
@@ -331,41 +330,56 @@ class DatabaseService {
     int? baseRevision,
     required String createdAt,
   }) async {
-    // If a pending outbox entry for this note already exists, update it in place
-    // rather than stacking a second entry. This merges rapid local edits.
-    final existing = await txn.query(
-      'sync_outbox',
-      where: 'note_id = ? AND operation = ?',
-      whereArgs: [noteId, operation],
-      orderBy: 'seq ASC',
-      limit: 1,
-    );
-    if (existing.isNotEmpty && operation == 'upsert') {
-      // Update the existing pending upsert with the latest payload.
-      await txn.update(
+    if (operation == 'upsert') {
+      // Only coalesce into an existing pending upsert if there is no later delete
+      // for this note. If a delete exists with a higher seq, the restore must come
+      // AFTER the delete — coalescing would place it before the delete and lose the
+      // restore on the server.
+      final existingUpsert = await txn.query(
         'sync_outbox',
-        {
-          'mutation_id': mutationId,
-          'payload': payload,
-          'created_at': createdAt,
-        },
-        where: 'seq = ?',
-        whereArgs: [existing.first['seq']],
+        where: 'note_id = ? AND operation = ?',
+        whereArgs: [noteId, 'upsert'],
+        orderBy: 'seq ASC',
+        limit: 1,
       );
-    } else {
-      await txn.insert(
-        'sync_outbox',
-        {
-          'mutation_id': mutationId,
-          'note_id': noteId,
-          'operation': operation,
-          'payload': payload,
-          'base_revision': baseRevision,
-          'created_at': createdAt,
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      if (existingUpsert.isNotEmpty) {
+        final upsertSeq = existingUpsert.first['seq'] as int;
+        final laterDelete = await txn.query(
+          'sync_outbox',
+          where: 'note_id = ? AND operation = ? AND seq > ?',
+          whereArgs: [noteId, 'delete', upsertSeq],
+          limit: 1,
+        );
+        if (laterDelete.isEmpty) {
+          // Safe to coalesce — no delete comes after this upsert.
+          await txn.update(
+            'sync_outbox',
+            {
+              'mutation_id': mutationId,
+              'payload': payload,
+              'created_at': createdAt,
+            },
+            where: 'seq = ?',
+            whereArgs: [upsertSeq],
+          );
+          return;
+        }
+        // A later delete exists — fall through to insert a new upsert after it.
+      }
     }
+
+    await txn.insert(
+      'sync_outbox',
+      {
+        'mutation_id': mutationId,
+        'note_id': noteId,
+        'operation': operation,
+        'payload': payload,
+        'base_revision': baseRevision,
+        'created_at': createdAt,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 
   Future<void> resetSyncState() async {
@@ -517,9 +531,8 @@ class DatabaseService {
             whereArgs: [note.id],
             limit: 1,
           );
-          final base = baseRev.isEmpty
-              ? null
-              : baseRev.first['remote_revision'] as int?;
+          final base =
+              baseRev.isEmpty ? null : baseRev.first['remote_revision'] as int?;
           await _writeOutbox(txn, _uuid.v4(), note.id, 'upsert',
               payload: jsonEncode(_noteToSyncPayload(note)),
               baseRevision: base,
@@ -534,9 +547,8 @@ class DatabaseService {
             whereArgs: [note.id],
             limit: 1,
           );
-          final base = baseRev.isEmpty
-              ? null
-              : baseRev.first['remote_revision'] as int?;
+          final base =
+              baseRev.isEmpty ? null : baseRev.first['remote_revision'] as int?;
           await _writeOutbox(txn, _uuid.v4(), note.id, 'upsert',
               payload: jsonEncode(_noteToSyncPayload(note)),
               baseRevision: base,

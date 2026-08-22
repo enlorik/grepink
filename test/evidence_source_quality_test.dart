@@ -73,7 +73,8 @@ void main() {
         relevanceScore: 0.9,
       );
 
-      final items = [lowerRelevance, higherRelevance]..sort(EvidenceSourceQuality.compare);
+      final items = [lowerRelevance, higherRelevance]
+        ..sort(EvidenceSourceQuality.compare);
 
       expect(items.first.id, 'a-item');
     });

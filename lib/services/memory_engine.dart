@@ -31,7 +31,8 @@ class MemoryEngine {
         ? _runSemantic(query, apiKey)
         : Future.value(<_SemanticResult>[]);
 
-    final results = await Future.wait([ftsResultsFuture, semanticResultsFuture]);
+    final results =
+        await Future.wait([ftsResultsFuture, semanticResultsFuture]);
     final ftsResults = results[0] as List<_FtsResult>;
     final semanticResults = results[1] as List<_SemanticResult>;
 
@@ -87,14 +88,18 @@ class MemoryEngine {
     }
   }
 
-  Future<List<_SemanticResult>> _runSemantic(String query, String apiKey) async {
+  Future<List<_SemanticResult>> _runSemantic(
+      String query, String apiKey) async {
     try {
-      final queryEmbedding = await EmbeddingService.instance.embed(query, apiKey);
-      final allNotes = await DatabaseService.instance.getAllNotesWithEmbeddings();
+      final queryEmbedding =
+          await EmbeddingService.instance.embed(query, apiKey);
+      final allNotes =
+          await DatabaseService.instance.getAllNotesWithEmbeddings();
       final results = <_SemanticResult>[];
       for (final note in allNotes) {
         if (note.embedding != null) {
-          final score = EmbeddingService.instance.cosineSimilarity(queryEmbedding, note.embedding!);
+          final score = EmbeddingService.instance
+              .cosineSimilarity(queryEmbedding, note.embedding!);
           results.add(_SemanticResult(note: note, score: score));
         }
       }
@@ -147,19 +152,25 @@ class MemoryEngine {
     }
 
     scored.sort((a, b) => b.combinedScore.compareTo(a.combinedScore));
-    return scored.take(_maxResults).map((r) => ExcerptResult(
-      note: r.note,
-      excerptText: '',
-      similarityScore: r.combinedScore,
-      keywordHighlights: const [],
-      highlightedWords: const [],
-    )).toList();
+    return scored
+        .take(_maxResults)
+        .map((r) => ExcerptResult(
+              note: r.note,
+              excerptText: '',
+              similarityScore: r.combinedScore,
+              keywordHighlights: const [],
+              highlightedWords: const [],
+            ))
+        .toList();
   }
 
-  List<ExcerptResult> _extractExcerpts(List<ExcerptResult> results, String query) {
+  List<ExcerptResult> _extractExcerpts(
+      List<ExcerptResult> results, String query) {
     return results.map((r) {
-      final excerpt = EmbeddingService.instance.extractExcerpt(r.note.content, query);
-      final highlights = EmbeddingService.instance.extractKeywordHighlights(query, r.note);
+      final excerpt =
+          EmbeddingService.instance.extractExcerpt(r.note.content, query);
+      final highlights =
+          EmbeddingService.instance.extractKeywordHighlights(query, r.note);
       return r.copyWith(
         excerptText: excerpt,
         keywordHighlights: highlights,

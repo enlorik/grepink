@@ -93,7 +93,8 @@ void main() {
       }
     });
 
-    test('long paragraph with some sentence-ending punctuation produces chunks <=500 chars',
+    test(
+        'long paragraph with some sentence-ending punctuation produces chunks <=500 chars',
         () {
       // Build a paragraph where each sentence is 200 chars – longer than half
       // the limit but shorter than the limit itself, forcing sentence-level splits.

@@ -18,7 +18,8 @@ void main() {
     databaseFactory = databaseFactoryFfi;
   });
 
-  test('migration creates sync_outbox and note_remote_versions tables', () async {
+  test('migration creates sync_outbox and note_remote_versions tables',
+      () async {
     final db = await databaseFactoryFfi.openDatabase(
       inMemoryDatabasePath,
       options: OpenDatabaseOptions(
@@ -55,7 +56,8 @@ void main() {
       expect(row['operation'], 'upsert');
       expect(row['base_revision'], isNull);
       expect(row['payload'], isNotNull);
-      final payload = jsonDecode(row['payload'] as String) as Map<String, dynamic>;
+      final payload =
+          jsonDecode(row['payload'] as String) as Map<String, dynamic>;
       expect(payload.containsKey('title'), isTrue);
     }
 
@@ -149,9 +151,11 @@ void main() {
 
     await _runV2Migration(db);
 
-    final rows = await db.query('sync_outbox', where: 'note_id = ?', whereArgs: ['note1']);
+    final rows = await db
+        .query('sync_outbox', where: 'note_id = ?', whereArgs: ['note1']);
     expect(rows.length, 1);
-    final payload = jsonDecode(rows[0]['payload'] as String) as Map<String, dynamic>;
+    final payload =
+        jsonDecode(rows[0]['payload'] as String) as Map<String, dynamic>;
     expect(payload['title'], 'Meeting notes');
     expect(payload['content'], isNotNull);
     expect(payload.containsKey('content'), isTrue);

@@ -136,7 +136,8 @@ abstract class RailwayHttpClient {
 class LiveRailwayHttpClient implements RailwayHttpClient {
   final http.Client _client;
 
-  LiveRailwayHttpClient({http.Client? client}) : _client = client ?? http.Client();
+  LiveRailwayHttpClient({http.Client? client})
+      : _client = client ?? http.Client();
 
   /// Strips trailing slashes so callers can paste Railway-generated URLs with
   /// or without a trailing slash without producing double-slash paths.
@@ -160,7 +161,8 @@ class LiveRailwayHttpClient implements RailwayHttpClient {
   @override
   Future<bool> checkHealth(String baseUrl) async {
     final uri = Uri.parse('${_normalize(baseUrl)}/health');
-    final response = await _client.get(uri).timeout(const Duration(seconds: 10));
+    final response =
+        await _client.get(uri).timeout(const Duration(seconds: 10));
     return response.statusCode == 200;
   }
 
@@ -169,9 +171,9 @@ class LiveRailwayHttpClient implements RailwayHttpClient {
     final normalized = _normalize(baseUrl);
     _requireSafeScheme(normalized);
     final uri = Uri.parse('$normalized/v1/status');
-    final response = await _client
-        .get(uri, headers: {'Authorization': 'Bearer $token'})
-        .timeout(const Duration(seconds: 10));
+    final response = await _client.get(uri, headers: {
+      'Authorization': 'Bearer $token'
+    }).timeout(const Duration(seconds: 10));
     return response.statusCode == 200;
   }
 

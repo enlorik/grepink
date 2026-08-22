@@ -47,10 +47,12 @@ class SelectedClaimsDraftBuilder {
         .where((i) => i.classification == ClaimNoveltyClassification.newClaim)
         .toList();
     final betterItems = saveable
-        .where((i) => i.classification == ClaimNoveltyClassification.betterSource)
+        .where(
+            (i) => i.classification == ClaimNoveltyClassification.betterSource)
         .toList();
     final contradictionItems = saveable
-        .where((i) => i.classification == ClaimNoveltyClassification.contradiction)
+        .where(
+            (i) => i.classification == ClaimNoveltyClassification.contradiction)
         .toList();
 
     // Titles are resolved primarily from the provider-level citations list,
@@ -67,7 +69,8 @@ class SelectedClaimsDraftBuilder {
       usedUrls.addAll(item.citationUrls);
       for (var i = 0; i < item.citationUrls.length; i++) {
         final url = item.citationUrls[i];
-        final itemTitle = i < item.citationTitles.length ? item.citationTitles[i] : '';
+        final itemTitle =
+            i < item.citationTitles.length ? item.citationTitles[i] : '';
         if (itemTitle.isNotEmpty) {
           titleByUrl.putIfAbsent(url, () => itemTitle);
         }

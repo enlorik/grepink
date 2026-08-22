@@ -78,7 +78,8 @@ class _FixedGroundedAnswerProvider implements GroundedAnswerProvider {
 
   _FixedGroundedAnswerProvider(this.answer);
   @override
-  Future<GroundedAnswerProviderOutcome> fetchGroundedAnswer(String question) async =>
+  Future<GroundedAnswerProviderOutcome> fetchGroundedAnswer(
+          String question) async =>
       GroundedAnswerSuccess(answer);
 }
 
@@ -939,9 +940,10 @@ void main() {
           (ref) async => _FakeKnowledgeIngestionService(),
         ),
         noteDraftReviewRepositoryProvider.overrideWithValue(repo),
-        groundedAnswerIngestionServiceProvider.overrideWith((_) async => service),
+        groundedAnswerIngestionServiceProvider
+            .overrideWith((_) async => service),
         braveSettingsOverride(const BraveSettings(answersKeyConfigured: true)),
-      llmSettingsOverride(LlmProviderConfig.defaults),
+        llmSettingsOverride(LlmProviderConfig.defaults),
         allNotesProvider.overrideWithValue([existingB]),
         recentNotesProvider.overrideWithValue(const <Note>[]),
         refreshNotesProvider.overrideWithValue(() async {}),

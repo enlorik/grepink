@@ -115,9 +115,7 @@ void main() {
     group('setModel', () {
       test('updates model in state and persists it', () async {
         await container.read(llmSettingsProvider.future);
-        await container
-            .read(llmSettingsProvider.notifier)
-            .setModel('phi3');
+        await container.read(llmSettingsProvider.notifier).setModel('phi3');
 
         final config = container.read(llmSettingsProvider).valueOrNull!;
         expect(config.model, 'phi3');
@@ -133,9 +131,7 @@ void main() {
     group('setMaxTokens', () {
       test('clamps to valid range', () async {
         await container.read(llmSettingsProvider.future);
-        await container
-            .read(llmSettingsProvider.notifier)
-            .setMaxTokens(99999);
+        await container.read(llmSettingsProvider.notifier).setMaxTokens(99999);
 
         final config = container.read(llmSettingsProvider).valueOrNull!;
         expect(config.maxTokens, LlmProviderConfig.kMaxTokens);
@@ -143,9 +139,7 @@ void main() {
 
       test('persists a valid value', () async {
         await container.read(llmSettingsProvider.future);
-        await container
-            .read(llmSettingsProvider.notifier)
-            .setMaxTokens(512);
+        await container.read(llmSettingsProvider.notifier).setMaxTokens(512);
 
         final config = container.read(llmSettingsProvider).valueOrNull!;
         expect(config.maxTokens, 512);
@@ -155,9 +149,7 @@ void main() {
     group('setTemperature', () {
       test('clamps temperature above max', () async {
         await container.read(llmSettingsProvider.future);
-        await container
-            .read(llmSettingsProvider.notifier)
-            .setTemperature(5.0);
+        await container.read(llmSettingsProvider.notifier).setTemperature(5.0);
 
         final config = container.read(llmSettingsProvider).valueOrNull!;
         expect(config.temperature, LlmProviderConfig.kMaxTemperature);
@@ -165,9 +157,7 @@ void main() {
 
       test('persists a valid temperature', () async {
         await container.read(llmSettingsProvider.future);
-        await container
-            .read(llmSettingsProvider.notifier)
-            .setTemperature(0.8);
+        await container.read(llmSettingsProvider.notifier).setTemperature(0.8);
 
         final config = container.read(llmSettingsProvider).valueOrNull!;
         expect(config.temperature, closeTo(0.8, 0.001));
@@ -234,9 +224,7 @@ void main() {
 
       test('updates apiKeyConfigured to false in state', () async {
         await container.read(llmSettingsProvider.future);
-        await container
-            .read(llmSettingsProvider.notifier)
-            .saveApiKey('sk-abc');
+        await container.read(llmSettingsProvider.notifier).saveApiKey('sk-abc');
         await container.read(llmSettingsProvider.notifier).clearApiKey();
 
         final config = container.read(llmSettingsProvider).valueOrNull!;

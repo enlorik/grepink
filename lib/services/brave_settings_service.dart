@@ -64,8 +64,7 @@ class BraveSettingsService {
     return value != null && value.isNotEmpty;
   }
 
-  Future<String?> loadSearchApiKey() =>
-      _secureStorage.read(key: _searchApiKey);
+  Future<String?> loadSearchApiKey() => _secureStorage.read(key: _searchApiKey);
 
   Future<void> saveAnswersApiKey(String apiKey) async {
     final trimmed = apiKey.trim();

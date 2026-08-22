@@ -66,7 +66,8 @@ class _ExcerptQuoteCardState extends State<ExcerptQuoteCard>
       ),
     );
 
-    final reduce = WidgetsBinding.instance.platformDispatcher.accessibilityFeatures.disableAnimations;
+    final reduce = WidgetsBinding
+        .instance.platformDispatcher.accessibilityFeatures.disableAnimations;
     if (reduce) {
       _controller.value = 1.0;
     } else {
@@ -109,10 +110,14 @@ class _ExcerptQuoteCardState extends State<ExcerptQuoteCard>
           color: AppColors.excerptQuoteBackground,
           borderRadius: BorderRadius.circular(12),
           border: Border(
-            left: const BorderSide(color: AppColors.excerptQuoteBorder, width: 3),
-            top: BorderSide(color: AppColors.excerptQuoteBorder.withValues(alpha: 0.3)),
-            right: BorderSide(color: AppColors.excerptQuoteBorder.withValues(alpha: 0.3)),
-            bottom: BorderSide(color: AppColors.excerptQuoteBorder.withValues(alpha: 0.3)),
+            left:
+                const BorderSide(color: AppColors.excerptQuoteBorder, width: 3),
+            top: BorderSide(
+                color: AppColors.excerptQuoteBorder.withValues(alpha: 0.3)),
+            right: BorderSide(
+                color: AppColors.excerptQuoteBorder.withValues(alpha: 0.3)),
+            bottom: BorderSide(
+                color: AppColors.excerptQuoteBorder.withValues(alpha: 0.3)),
           ),
         ),
         padding: const EdgeInsets.all(16),

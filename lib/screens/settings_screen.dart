@@ -94,7 +94,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 child: Row(
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.arrow_back, color: AppColors.deepAction),
+                      icon: const Icon(Icons.arrow_back,
+                          color: AppColors.deepAction),
                       onPressed: () => context.pop(),
                     ),
                     Text('Settings', style: AppTextStyles.displayMedium),
@@ -104,16 +105,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               Expanded(
                 child: settingsAsync.when(
                   loading: () => const Center(
-                    child: CircularProgressIndicator(color: AppColors.primaryAction),
+                    child: CircularProgressIndicator(
+                        color: AppColors.primaryAction),
                   ),
                   error: (e, _) => Center(child: Text('Error: $e')),
                   data: (settings) => braveSettingsAsync.when(
                     loading: () => const Center(
-                      child: CircularProgressIndicator(color: AppColors.primaryAction),
+                      child: CircularProgressIndicator(
+                          color: AppColors.primaryAction),
                     ),
                     error: (e, _) => Center(child: Text('Error: $e')),
                     data: (braveSettings) {
-                      if (_apiKeyController.text.isEmpty && settings.apiKey.isNotEmpty) {
+                      if (_apiKeyController.text.isEmpty &&
+                          settings.apiKey.isNotEmpty) {
                         _apiKeyController.text = settings.apiKey;
                       }
                       return _buildContent(settings, braveSettings);
@@ -148,12 +152,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: AppColors.warning.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text('v1.1', style: AppTextStyles.bodySmall.copyWith(color: AppColors.deepAction)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text('v1.1',
+                      style: AppTextStyles.bodySmall
+                          .copyWith(color: AppColors.deepAction)),
                 ),
                 const SizedBox(width: 8),
                 const Switch(
@@ -184,15 +191,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                   decoration: InputDecoration(
                     hintText: 'sk-...',
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
                     isDense: true,
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _apiKeyVisible ? Icons.visibility_off : Icons.visibility,
+                        _apiKeyVisible
+                            ? Icons.visibility_off
+                            : Icons.visibility,
                         size: 18,
                         color: AppColors.secondaryText,
                       ),
-                      onPressed: () => setState(() => _apiKeyVisible = !_apiKeyVisible),
+                      onPressed: () =>
+                          setState(() => _apiKeyVisible = !_apiKeyVisible),
                     ),
                   ),
                   onChanged: (v) {
@@ -312,8 +323,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   children: [
                     FilledButton(
                       onPressed: () async {
-                        final apiKey =
-                            _braveSearchApiKeyController.text.trim();
+                        final apiKey = _braveSearchApiKeyController.text.trim();
                         if (apiKey.isEmpty) return;
                         await ref
                             .read(braveSettingsProvider.notifier)
@@ -339,7 +349,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               _braveSearchApiKeyController.clear();
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text('Brave Search API key cleared.'),
+                                  content:
+                                      Text('Brave Search API key cleared.'),
                                 ),
                               );
                             }
@@ -503,7 +514,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   children: [
                     Text('Loose', style: AppTextStyles.bodySmall),
                     Text(settings.similarityThreshold.toStringAsFixed(2),
-                        style: AppTextStyles.bodySmall.copyWith(color: AppColors.deepAction, fontWeight: FontWeight.w600)),
+                        style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.deepAction,
+                            fontWeight: FontWeight.w600)),
                     Text('Strict', style: AppTextStyles.bodySmall),
                   ],
                 ),
@@ -516,8 +529,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   inactiveColor: AppColors.dividerBorder,
                   onChanged: (v) {
                     ref.read(settingsProvider.notifier).setSimilarityThreshold(
-                      double.parse(v.toStringAsFixed(2)),
-                    );
+                          double.parse(v.toStringAsFixed(2)),
+                        );
                   },
                 ),
               ],
@@ -554,12 +567,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         _buildSection('DATA', [
           _buildSettingRow(
             title: 'Export Notes',
-            trailing: const Icon(Icons.upload_outlined, color: AppColors.primaryAction),
+            trailing: const Icon(Icons.upload_outlined,
+                color: AppColors.primaryAction),
             onTap: _exportNotes,
           ),
           _buildSettingRow(
             title: 'Import Notes',
-            trailing: const Icon(Icons.download_outlined, color: AppColors.primaryAction),
+            trailing: const Icon(Icons.download_outlined,
+                color: AppColors.primaryAction),
             onTap: _importNotes,
           ),
           _buildSettingRow(
@@ -624,8 +639,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget _buildRailwaySyncSection() {
     final syncState = ref.watch(railwaySyncProvider);
     final isSyncing = syncState.status == RailwaySyncStatus.syncing;
-    final isConfigured =
-        syncState.status != RailwaySyncStatus.notConfigured;
+    final isConfigured = syncState.status != RailwaySyncStatus.notConfigured;
 
     return _buildSection('RAILWAY SYNC', [
       Padding(
@@ -669,7 +683,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           decoration: InputDecoration(
             hintText: 'Paste token here',
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             isDense: true,
             suffixIcon: IconButton(
               icon: Icon(
@@ -705,9 +720,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               FilledButton(
                 onPressed: isSyncing
                     ? null
-                    : () => ref
-                        .read(railwaySyncProvider.notifier)
-                        .syncNow(),
+                    : () => ref.read(railwaySyncProvider.notifier).syncNow(),
                 child: isSyncing
                     ? const SizedBox(
                         width: 14,
@@ -742,8 +755,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
           child: Text(
             'Conflict copy preserved — a note conflict was resolved by creating a copy.',
-            style:
-                AppTextStyles.bodySmall.copyWith(color: AppColors.warning),
+            style: AppTextStyles.bodySmall.copyWith(color: AppColors.warning),
           ),
         ),
       if (syncState.errorMessage != null)
@@ -818,7 +830,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Connection failed. Check URL and try again.')),
+          const SnackBar(
+              content: Text('Connection failed. Check URL and try again.')),
         );
       }
     } finally {
@@ -830,7 +843,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Disconnect Railway sync?', style: AppTextStyles.titleMedium),
+        title:
+            Text('Disconnect Railway sync?', style: AppTextStyles.titleMedium),
         content: Text(
           'This removes only the local configuration. Your notes on Railway '
           'and on this device are not deleted.',
@@ -929,7 +943,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     try {
       final notes = await DatabaseService.instance.getAllNotes();
       final jsonText = NoteExportService.instance.encode(notes);
-      final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').substring(0, 19);
+      final timestamp = DateTime.now()
+          .toIso8601String()
+          .replaceAll(':', '-')
+          .substring(0, 19);
       final fileName = 'grepink-notes-$timestamp.json';
       final bytes = Uint8List.fromList(utf8.encode(jsonText));
       // Web: passing bytes triggers a browser download.
@@ -1027,15 +1044,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     String? successMessage;
     try {
       if (choice == _ImportChoice.replaceAll) {
-        final pendingNotes = incoming.map(
-          (n) => n.copyWith(embeddingPending: true, clearEmbedding: true),
-        ).toList();
+        final pendingNotes = incoming
+            .map(
+              (n) => n.copyWith(embeddingPending: true, clearEmbedding: true),
+            )
+            .toList();
         await DatabaseService.instance.replaceAll(pendingNotes);
-        successMessage = 'Replaced all notes with ${incoming.length} from backup';
+        successMessage =
+            'Replaced all notes with ${incoming.length} from backup';
       } else {
         // Atomic: either all changes land or none do.
-        final result = await DatabaseService.instance.mergeNotes(existing, incoming);
-        successMessage = 'Import complete — added ${result.added}, updated ${result.updated}, skipped ${result.skipped}';
+        final result =
+            await DatabaseService.instance.mergeNotes(existing, incoming);
+        successMessage =
+            'Import complete — added ${result.added}, updated ${result.updated}, skipped ${result.skipped}';
       }
     } catch (e) {
       if (!mounted) return;
@@ -1070,7 +1092,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Clear All', style: TextStyle(color: AppColors.error)),
+            child: const Text('Clear All',
+                style: TextStyle(color: AppColors.error)),
           ),
         ],
       ),
@@ -1102,7 +1125,8 @@ class _ImportConfirmDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text('Import ${preview.total} notes?', style: AppTextStyles.titleMedium),
+      title: Text('Import ${preview.total} notes?',
+          style: AppTextStyles.titleMedium),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,

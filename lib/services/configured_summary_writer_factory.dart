@@ -33,18 +33,14 @@ class ConfiguredSummaryWriterFactory {
 
   LlmProviderConfig _fallbackConfigFor(LlmProviderConfig invalidConfig) {
     return LlmProviderConfig.defaults.copyWith(
-      maxTokens:
-          invalidConfig.maxTokens.clamp(
-                LlmProviderConfig.kMinTokens,
-                LlmProviderConfig.kMaxTokens,
-              )
-              ,
-      temperature:
-          invalidConfig.temperature.clamp(
-                LlmProviderConfig.kMinTemperature,
-                LlmProviderConfig.kMaxTemperature,
-              )
-              ,
+      maxTokens: invalidConfig.maxTokens.clamp(
+        LlmProviderConfig.kMinTokens,
+        LlmProviderConfig.kMaxTokens,
+      ),
+      temperature: invalidConfig.temperature.clamp(
+        LlmProviderConfig.kMinTemperature,
+        LlmProviderConfig.kMaxTemperature,
+      ),
     );
   }
 }

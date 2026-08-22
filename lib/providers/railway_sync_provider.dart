@@ -79,7 +79,9 @@ class RailwaySyncNotifier extends StateNotifier<RailwaySyncState> {
     final settings = _ref.read(railwaySettingsServiceProvider);
     final configured = await settings.isConfigured();
     if (!configured) {
-      if (mounted) state = const RailwaySyncState(status: RailwaySyncStatus.notConfigured);
+      if (mounted) {
+        state = const RailwaySyncState(status: RailwaySyncStatus.notConfigured);
+      }
       return;
     }
     final lastSync = await settings.getLastSyncedAt();
@@ -111,8 +113,7 @@ class RailwaySyncNotifier extends StateNotifier<RailwaySyncState> {
   void syncOnResume() {
     if (state.status == RailwaySyncStatus.notConfigured) return;
     final now = DateTime.now();
-    if (_lastSyncAt != null &&
-        now.difference(_lastSyncAt!) < _resumeThrottle) {
+    if (_lastSyncAt != null && now.difference(_lastSyncAt!) < _resumeThrottle) {
       return;
     }
     _enqueueNoWait(_TriggerKind.resume);
@@ -260,13 +261,15 @@ class RailwaySyncNotifier extends StateNotifier<RailwaySyncState> {
         // can exceed the server's 10 MiB body limit even when every individual
         // mutation passes the per-field checks.
         const maxPerRequest = 500;
-        const maxBodyBytes = 9 * 1024 * 1024; // 9 MiB — headroom below 10 MiB cap
+        const maxBodyBytes =
+            9 * 1024 * 1024; // 9 MiB — headroom below 10 MiB cap
         int bodyEstimate = 17; // '{"mutations":[' prefix + ']}' suffix
         final batch = <OutboxEntry>[];
         for (final e in perNote.values.where(_mutationFitsServerLimits)) {
           if (batch.length >= maxPerRequest) break;
           final encoded = utf8.encode(jsonEncode(e.toMutationJson())).length;
-          final added = batch.isEmpty ? encoded : encoded + 1; // comma separator
+          final added =
+              batch.isEmpty ? encoded : encoded + 1; // comma separator
           if (bodyEstimate + added > maxBodyBytes) break;
           bodyEstimate += added;
           batch.add(e);
@@ -478,7 +481,8 @@ class RailwaySyncNotifier extends StateNotifier<RailwaySyncState> {
             }
           }
           // Keep the original ID deleted (tombstone wins).
-          await db.applyRemoteTombstone(conflict.noteId, conflict.serverRevision);
+          await db.applyRemoteTombstone(
+              conflict.noteId, conflict.serverRevision);
           await db.setRemoteRevision(conflict.noteId, conflict.serverRevision);
         }
       } else {
@@ -512,7 +516,8 @@ class RailwaySyncNotifier extends StateNotifier<RailwaySyncState> {
         final queued = queuedByNote[conflict.noteId] ?? [];
         for (final next in queued) {
           if (next.mutationId != sentEntry.mutationId) {
-            await db.updateOutboxBaseRevision(next.seq, conflict.serverRevision);
+            await db.updateOutboxBaseRevision(
+                next.seq, conflict.serverRevision);
             break;
           }
         }
@@ -556,7 +561,9 @@ class RailwaySyncNotifier extends StateNotifier<RailwaySyncState> {
           embeddingPending: true,
         );
         final currentRev = await db.getRemoteRevision(row.id);
-        if (existing == null || currentRev == null || row.revision > currentRev) {
+        if (existing == null ||
+            currentRev == null ||
+            row.revision > currentRev) {
           await db.applyRemoteUpsert(remoteNote, row.revision);
           hadChanges = true;
         }

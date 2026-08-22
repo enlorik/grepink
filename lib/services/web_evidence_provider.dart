@@ -19,8 +19,7 @@ class MockWebEvidenceProvider implements WebEvidenceProvider {
         id: 'web_mock_1',
         type: EvidenceType.webSearch,
         title: 'Sample Web Result: $question',
-        content:
-            'This is a mock web search result related to "$question". '
+        content: 'This is a mock web search result related to "$question". '
             'It provides some background context that may or may not already exist in your notes.',
         sourceUrl: 'https://example.com/mock-result-1',
         relevanceScore: 0.75,

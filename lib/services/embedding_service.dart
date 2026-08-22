@@ -25,7 +25,8 @@ class EmbeddingService {
     );
 
     if (response.statusCode != 200) {
-      throw Exception('Embedding API error ${response.statusCode}: ${response.body}');
+      throw Exception(
+          'Embedding API error ${response.statusCode}: ${response.body}');
     }
 
     final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -59,7 +60,11 @@ class EmbeddingService {
       return '${content.substring(0, windowSize)}...';
     }
 
-    final queryWords = query.toLowerCase().split(RegExp(r'\s+')).where((w) => w.length > 2).toList();
+    final queryWords = query
+        .toLowerCase()
+        .split(RegExp(r'\s+'))
+        .where((w) => w.length > 2)
+        .toList();
     if (queryWords.isEmpty) {
       return '${content.substring(0, windowSize)}...';
     }
@@ -90,8 +95,13 @@ class EmbeddingService {
   }
 
   List<String> extractKeywordHighlights(String query, Note note) {
-    final queryWords = query.toLowerCase().split(RegExp(r'\s+')).where((w) => w.length > 2).toList();
-    final allText = '${note.title} ${note.content} ${note.keywords.join(' ')}'.toLowerCase();
+    final queryWords = query
+        .toLowerCase()
+        .split(RegExp(r'\s+'))
+        .where((w) => w.length > 2)
+        .toList();
+    final allText = '${note.title} ${note.content} ${note.keywords.join(' ')}'
+        .toLowerCase();
     return queryWords.where((w) => allText.contains(w)).toList();
   }
 }

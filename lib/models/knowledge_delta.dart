@@ -1,6 +1,12 @@
 import 'evidence_item.dart';
 
-enum DeltaType { duplicate, relatedButNew, newClaim, contradiction, betterSource }
+enum DeltaType {
+  duplicate,
+  relatedButNew,
+  newClaim,
+  contradiction,
+  betterSource
+}
 
 class KnowledgeDelta {
   final EvidenceItem evidence;

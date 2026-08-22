@@ -86,8 +86,8 @@ KnowledgeIngestionServiceImpl _service({
   return KnowledgeIngestionServiceImpl(
     localRetriever: FakeLocalEvidenceRetriever(localItems),
     webProvider: FakeWebEvidenceProvider(webItems),
-    deltaDetector:
-        DeltaDetectorImpl(similarityProvider: FakeTextSimilarityProvider(similarityScore)),
+    deltaDetector: DeltaDetectorImpl(
+        similarityProvider: FakeTextSimilarityProvider(similarityScore)),
     summaryWriter: StructuredSummaryWriter(
       llmProvider: llmProvider ?? RecordingLlmProvider(responseText: '# Draft'),
     ),
@@ -101,7 +101,8 @@ void main() {
     test('local evidence is gathered before web evidence', () async {
       final log = <String>[];
       final service = KnowledgeIngestionServiceImpl(
-        localRetriever: _RecordingRetriever(log, [_localItem('n1', 'existing')]),
+        localRetriever:
+            _RecordingRetriever(log, [_localItem('n1', 'existing')]),
         webProvider: _RecordingWebProvider(log, [_webItem('w1', 'new fact')]),
         deltaDetector: DeltaDetectorImpl(
           similarityProvider: const FakeTextSimilarityProvider(0.2),
@@ -129,8 +130,7 @@ void main() {
     });
 
     test('no local and no web evidence returns doNotSave', () async {
-      final draft =
-          await _service().ingest('completely empty');
+      final draft = await _service().ingest('completely empty');
 
       expect(draft.action, NoteDraftAction.doNotSave);
     });
@@ -181,7 +181,8 @@ void main() {
       expect(await provider.fetch('auth failure'), isEmpty);
     });
 
-    test('BraveEvidenceProvider with empty API key returns [] without network call',
+    test(
+        'BraveEvidenceProvider with empty API key returns [] without network call',
         () async {
       // _ThrowingHttpClient would surface if a network call is made.
       final provider = BraveEvidenceProvider(
@@ -214,7 +215,8 @@ void main() {
     });
   });
 
-  group('Ingestion fallback contract – summary writer sees actual evidence', () {
+  group('Ingestion fallback contract – summary writer sees actual evidence',
+      () {
     test('LLM prompt contains actual local evidence content', () async {
       final llm = RecordingLlmProvider(responseText: '# Draft');
       final service = KnowledgeIngestionServiceImpl(
@@ -295,7 +297,8 @@ void main() {
       final localPos = prompt.indexOf('unique-local-marker-content');
       final webPos = prompt.indexOf('unique-web-marker-content');
       expect(localPos, lessThan(webPos),
-          reason: 'local evidence must appear before web evidence in the prompt');
+          reason:
+              'local evidence must appear before web evidence in the prompt');
     });
   });
 }

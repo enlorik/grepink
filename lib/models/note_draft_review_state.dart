@@ -37,10 +37,10 @@ class NoteDraftReviewState {
     return NoteDraftReviewState(
       noteDraft: clearDraft ? null : (noteDraft ?? this.noteDraft),
       status: status ?? this.status,
-      selectedDecision: clearDecision
-          ? null
-          : (selectedDecision ?? this.selectedDecision),
-      targetNoteId: clearTargetNoteId ? null : (targetNoteId ?? this.targetNoteId),
+      selectedDecision:
+          clearDecision ? null : (selectedDecision ?? this.selectedDecision),
+      targetNoteId:
+          clearTargetNoteId ? null : (targetNoteId ?? this.targetNoteId),
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
     );
   }

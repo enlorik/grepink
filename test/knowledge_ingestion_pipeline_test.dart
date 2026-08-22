@@ -161,7 +161,8 @@ void main() {
       final llmProvider = RecordingLlmProvider();
       final service = _service(
         localItems: [
-          _localItem('n1', 'Existing local note that should appear in the prompt'),
+          _localItem(
+              'n1', 'Existing local note that should appear in the prompt'),
         ],
         webItems: [_webItem('w1', 'Related web evidence')],
         llmProvider: llmProvider,

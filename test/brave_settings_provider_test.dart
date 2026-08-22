@@ -79,7 +79,9 @@ void main() {
 
     test('saveApiKey stores the key only in secure storage', () async {
       await container.read(braveSettingsProvider.future);
-      await container.read(braveSettingsProvider.notifier).saveApiKey('brave-key');
+      await container
+          .read(braveSettingsProvider.notifier)
+          .saveApiKey('brave-key');
 
       expect(secureStorage.data['brave_search_api_key'], 'brave-key');
       for (final key in prefs.getKeys()) {
@@ -94,7 +96,9 @@ void main() {
 
     test('clearApiKey removes the key and updates state', () async {
       await container.read(braveSettingsProvider.future);
-      await container.read(braveSettingsProvider.notifier).saveApiKey('brave-key');
+      await container
+          .read(braveSettingsProvider.notifier)
+          .saveApiKey('brave-key');
 
       await container.read(braveSettingsProvider.notifier).clearApiKey();
 

@@ -16,7 +16,8 @@ class _FakeRepo implements NoteDraftReviewRepository {
   Note? _stored;
 
   @override
-  Future<Note> insertNote({required String title, required String content}) async {
+  Future<Note> insertNote(
+      {required String title, required String content}) async {
     _stored = Note(
       id: 'rt-1',
       title: title,
@@ -37,7 +38,8 @@ class _FakeRepo implements NoteDraftReviewRepository {
   }
 
   @override
-  Future<Note?> getNoteById(String id) async => _stored?.id == id ? _stored : null;
+  Future<Note?> getNoteById(String id) async =>
+      _stored?.id == id ? _stored : null;
 
   Note? get stored => _stored;
 }
@@ -99,7 +101,9 @@ ProviderContainer _container(_FakeRepo repo) {
 
 void main() {
   group('Note JSON round-trip', () {
-    test('content with generated metadata comment is unchanged after toJson/fromJson', () {
+    test(
+        'content with generated metadata comment is unchanged after toJson/fromJson',
+        () {
       const content = '''<!-- grepink-generated-note
 question: What is Dart?
 generated_at: 2026-06-01T12:00:00.000000Z
@@ -134,7 +138,8 @@ Dart is a client-optimised language.
     });
 
     test('plain note content is unchanged after toJson/fromJson', () {
-      const content = '# My research\n\nSome notes I wrote by hand.\n\n- point one\n- point two';
+      const content =
+          '# My research\n\nSome notes I wrote by hand.\n\n- point one\n- point two';
 
       final note = Note(
         id: 'n2',
@@ -157,7 +162,9 @@ Dart is a client-optimised language.
       expect(restored.isPinned, isTrue);
     });
 
-    test('multi-section content with two metadata blocks is unchanged after round-trip', () {
+    test(
+        'multi-section content with two metadata blocks is unchanged after round-trip',
+        () {
       const content = '''<!-- grepink-generated-note
 question: First question
 generated_at: 2026-06-01T10:00:00.000000Z
@@ -198,7 +205,8 @@ Additional content.''';
       final restored = Note.fromJson(jsonDecode(json) as Map<String, dynamic>);
 
       expect(restored.content, equals(content));
-      final metaOccurrences = '<!-- grepink-generated-note'.allMatches(restored.content).length;
+      final metaOccurrences =
+          '<!-- grepink-generated-note'.allMatches(restored.content).length;
       expect(metaOccurrences, 2);
     });
   });
@@ -221,7 +229,8 @@ Additional content.''';
       expect(repo.stored!.content, contains('action: createNewNote'));
     });
 
-    test('first metadata comment is preserved after appending a second draft', () async {
+    test('first metadata comment is preserved after appending a second draft',
+        () async {
       final repo = _FakeRepo();
       final c = _container(repo);
       final notifier = c.read(noteDraftReviewProvider.notifier);
@@ -250,7 +259,8 @@ Additional content.''';
       expect(content, contains('question: What is the Dart event loop?'));
       expect(content, contains('action: createNewNote'));
       expect(content, contains('action: appendToExistingNote'));
-      final metaCount = '<!-- grepink-generated-note'.allMatches(content).length;
+      final metaCount =
+          '<!-- grepink-generated-note'.allMatches(content).length;
       expect(metaCount, 2);
     });
 
@@ -283,7 +293,9 @@ Additional content.''';
       expect(content, contains('---'));
     });
 
-    test('source URL is preserved through saveAsNewNote and subsequent JSON round-trip', () async {
+    test(
+        'source URL is preserved through saveAsNewNote and subsequent JSON round-trip',
+        () async {
       final repo = _FakeRepo();
       final c = _container(repo);
       final notifier = c.read(noteDraftReviewProvider.notifier);
@@ -304,7 +316,8 @@ Additional content.''';
   });
 
   group('Metadata safety', () {
-    test('no API keys or secret-like strings appear in exported content', () async {
+    test('no API keys or secret-like strings appear in exported content',
+        () async {
       final repo = _FakeRepo();
       final c = _container(repo);
       final notifier = c.read(noteDraftReviewProvider.notifier);
@@ -323,7 +336,9 @@ Additional content.''';
       expect(content, isNot(contains('Bearer ')));
     });
 
-    test('question with double dashes is sanitized and metadata comment remains valid', () async {
+    test(
+        'question with double dashes is sanitized and metadata comment remains valid',
+        () async {
       final repo = _FakeRepo();
       final c = _container(repo);
       final notifier = c.read(noteDraftReviewProvider.notifier);

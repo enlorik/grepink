@@ -20,14 +20,21 @@ Future<(BraveSettingsService, FakeSecureStorage)> _makeService() async {
   return (service, secure);
 }
 
-Future<(ProviderContainer, BraveSettingsService, FakeSecureStorage, SharedPreferences)>
-    _makeContainer() async {
+Future<
+    (
+      ProviderContainer,
+      BraveSettingsService,
+      FakeSecureStorage,
+      SharedPreferences
+    )> _makeContainer() async {
   SharedPreferences.setMockInitialValues({});
   final prefs = await SharedPreferences.getInstance();
   final secure = FakeSecureStorage();
   final service = BraveSettingsService(prefs: prefs, secureStorage: secure);
   final container = ProviderContainer(
-    overrides: [braveSettingsServiceProvider.overrideWith((_) async => service)],
+    overrides: [
+      braveSettingsServiceProvider.overrideWith((_) async => service)
+    ],
   );
   return (container, service, secure, prefs);
 }
@@ -74,7 +81,9 @@ void main() {
           reason: 'key-configured flags must not leak into stored JSON');
     });
 
-    test('round-trip through toJsonString/fromJsonString never restores searchKeyConfigured', () {
+    test(
+        'round-trip through toJsonString/fromJsonString never restores searchKeyConfigured',
+        () {
       const original = BraveSettings(
         enabled: true,
         resultCount: 10,
@@ -85,10 +94,12 @@ void main() {
       final restored = BraveSettings.fromJsonString(original.toJsonString());
 
       expect(restored.searchKeyConfigured, isFalse,
-          reason: 'searchKeyConfigured is not stored so it cannot be restored from JSON');
+          reason:
+              'searchKeyConfigured is not stored so it cannot be restored from JSON');
     });
 
-    test('fromJsonString ignores an injected apiKey field without throwing', () {
+    test('fromJsonString ignores an injected apiKey field without throwing',
+        () {
       const injected =
           '{"enabled":true,"resultCount":5,"safeSearch":"moderate","apiKey":"sk-leaked"}';
 
@@ -101,7 +112,8 @@ void main() {
   });
 
   group('BraveSettingsService — key safety', () {
-    test('saveApiKey with empty string deletes the key from secure storage', () async {
+    test('saveApiKey with empty string deletes the key from secure storage',
+        () async {
       final (service, secure) = await _makeService();
       await service.saveApiKey('real-key');
       expect(secure.data.containsKey('brave_search_api_key'), isTrue);
@@ -112,7 +124,8 @@ void main() {
       expect(await service.hasApiKey, isFalse);
     });
 
-    test('saveApiKey with whitespace-only string is treated as empty', () async {
+    test('saveApiKey with whitespace-only string is treated as empty',
+        () async {
       final (service, secure) = await _makeService();
       await service.saveApiKey('   ');
 
@@ -130,7 +143,8 @@ void main() {
       expect(loaded, isNull);
     });
 
-    test('saveSettings never writes the API key value to SharedPreferences', () async {
+    test('saveSettings never writes the API key value to SharedPreferences',
+        () async {
       SharedPreferences.setMockInitialValues({});
       final prefs = await SharedPreferences.getInstance();
       final secure = FakeSecureStorage();
@@ -152,7 +166,9 @@ void main() {
       addTearDown(container.dispose);
 
       await container.read(braveSettingsProvider.future);
-      await container.read(braveSettingsProvider.notifier).saveApiKey('brave-key');
+      await container
+          .read(braveSettingsProvider.notifier)
+          .saveApiKey('brave-key');
       expect(
         container.read(braveSettingsProvider).valueOrNull!.searchKeyConfigured,
         isTrue,
@@ -166,7 +182,8 @@ void main() {
       );
     });
 
-    test('empty API key is treated as no key — provider reads unconfigured', () async {
+    test('empty API key is treated as no key — provider reads unconfigured',
+        () async {
       final (container, _, secure, _) = await _makeContainer();
       addTearDown(container.dispose);
 
@@ -185,7 +202,9 @@ void main() {
       addTearDown(container.dispose);
 
       await container.read(braveSettingsProvider.future);
-      await container.read(braveSettingsProvider.notifier).saveApiKey('my-api-key');
+      await container
+          .read(braveSettingsProvider.notifier)
+          .saveApiKey('my-api-key');
       await container.read(braveSettingsProvider.notifier).setEnabled(true);
 
       final raw = prefs.getString('brave_settings') ?? '';
@@ -195,7 +214,8 @@ void main() {
   });
 
   group('BraveEvidenceProvider — empty key safety', () {
-    test('returns empty list when API key is empty without making network calls',
+    test(
+        'returns empty list when API key is empty without making network calls',
         () async {
       final provider = BraveEvidenceProvider(apiKey: '');
       final results = await provider.fetch('What is photosynthesis?');
