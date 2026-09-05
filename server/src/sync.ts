@@ -60,17 +60,17 @@ function parseTags(raw: string): string[] {
 }
 
 function noteToPayload(row: DbNote): NotePayload | null {
-  if (row.deleted || !row.title || !row.content || !row.created_at || !row.updated_at) {
+  if (row.deleted) {
     return null;
   }
   return {
-    title: row.title,
-    content: row.content,
+    title: row.title ?? '',
+    content: row.content ?? '',
     tags: parseTags(row.tags),
     keywords: parseTags(row.keywords),
     isPinned: row.is_pinned,
-    createdAt: row.created_at.toISOString(),
-    updatedAt: row.updated_at.toISOString(),
+    createdAt: row.created_at?.toISOString() ?? new Date().toISOString(),
+    updatedAt: row.updated_at?.toISOString() ?? new Date().toISOString(),
   };
 }
 

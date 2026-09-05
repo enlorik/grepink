@@ -774,6 +774,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (ok) {
         // Save credentials only after a successful test.
         final svc = RailwaySettingsService();
+        final previousUrl = await svc.getApiUrl();
+        if (previousUrl != url) {
+          await DatabaseService.instance.resetSyncState();
+        }
         await svc.setApiUrl(url);
         await svc.setToken(token);
         if (!mounted) return;

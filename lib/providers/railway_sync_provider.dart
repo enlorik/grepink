@@ -330,7 +330,7 @@ class RailwaySyncNotifier extends StateNotifier<RailwaySyncState> {
         // Update the next queued mutation for this note to use the new base.
         final queued = queuedByNote[ack.noteId] ?? [];
         for (final next in queued) {
-          if (next.seq != sentEntry.seq) {
+          if (next.mutationId != sentEntry.mutationId) {
             await db.updateOutboxBaseRevision(next.seq, ack.revision);
             break;
           }

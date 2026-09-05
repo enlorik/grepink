@@ -360,6 +360,13 @@ class DatabaseService {
     }
   }
 
+  Future<void> resetSyncState() async {
+    final db = await database;
+    await db.delete('note_remote_versions');
+    await db.delete('sync_outbox');
+    await _backfillOutbox(db);
+  }
+
   Future<List<OutboxEntry>> getOutboxEntries() async {
     final db = await database;
     final rows = await db.query('sync_outbox', orderBy: 'seq ASC');
