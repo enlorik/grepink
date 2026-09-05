@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB"
   version="3.0" toolsVersion="21507" targetRuntime="AppleCocoa"
-  propertyAccessControl="none" useAutolayout="YES" launchScreen="YES"
+  propertyAccessControl="none" useAutolayout="YES"
   useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES"
   initialViewController="BYZ-38-t0r">
   <device id="retina6_12" orientation="portrait" appearance="light"/>
@@ -15,7 +15,8 @@
     <!--View Controller-->
     <scene sceneID="tne-QT-ifu">
       <objects>
-        <viewController id="BYZ-38-t0r" xmi:id="sceneID:BYZ-38-t0r"
+        <viewController id="BYZ-38-t0r" customClass="FlutterViewController"
+          customModule="Flutter" customModuleProvider="target"
           sceneMemberID="viewController">
           <layoutGuides>
             <viewControllerLayoutGuide type="top" id="y3c-jy-aDJ"/>

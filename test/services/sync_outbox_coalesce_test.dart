@@ -58,26 +58,32 @@ void main() {
     // The in-flight entry is still in the outbox (not yet removed).
     await svc.updateNote(_note(noteId, title: 'Edited'));
 
-    // The edit should NOT have coalesced into the in-flight entry because we
-    // check for a later delete — there is none, so it DOES coalesce (same seq).
-    // But the payload must now reflect the edit.
+    // The edit coalesces into the existing entry (no later delete exists),
+    // updating the payload and assigning a NEW mutation_id.
     final afterEdit = await svc.getOutboxEntries();
     expect(afterEdit.length, 1);
-    final editedEntry = afterEdit.first;
-    expect(editedEntry.seq, inFlightSeq);
-    final payload = jsonDecode(editedEntry.payload!) as Map<String, dynamic>;
-    expect(payload['title'], 'Edited');
+    expect(afterEdit.first.seq, inFlightSeq);
+    expect(afterEdit.first.mutationId, isNot(inFlightMid),
+        reason: 'coalesce replaces mutation_id with a new UUID');
+    final editedPayload =
+        jsonDecode(afterEdit.first.payload!) as Map<String, dynamic>;
+    expect(editedPayload['title'], 'Edited');
 
-    // Simulate the upload completing: remove the in-flight entry.
+    // Simulate a stale server ack for the ORIGINAL mutation_id.
+    // Because the mutation_id was replaced during coalesce, removeOutboxEntry
+    // matches zero rows — the entry survives the stale ack.
     await svc.removeOutboxEntry(inFlightSeq, inFlightMid);
 
-    // The edit is still queued as a new outbox entry (the coalesced one was
-    // removed along with the in-flight ack, so we add a fresh one).
-    // In this scenario the coalesced entry was removed — the test verifies
-    // that the edit payload was captured before removal. This is the key
-    // assertion: if coalescing updated the payload, the edit was not lost.
-    expect(editedEntry.noteId, noteId);
-    expect(payload['title'], 'Edited');
+    // Re-read the DB: the coalesced entry must still be there because the
+    // stale ack did not match the new mutation_id.
+    final afterStaleAck = await svc.getOutboxEntries();
+    expect(afterStaleAck.length, 1,
+        reason: 'edit must survive stale server ack');
+    expect(afterStaleAck.first.seq, inFlightSeq);
+    final survivingPayload =
+        jsonDecode(afterStaleAck.first.payload!) as Map<String, dynamic>;
+    expect(survivingPayload['title'], 'Edited',
+        reason: 'edited payload must still be queued after stale ack');
   });
 
   // -------------------------------------------------------------------------
@@ -95,6 +101,7 @@ void main() {
     expect(afterInsert.length, 1);
     expect(afterInsert.first.operation, 'upsert');
     final upsertSeq = afterInsert.first.seq;
+    final upsertMid = afterInsert.first.mutationId;
 
     // 2. Delete note offline → outbox: [upsert(seq=1), delete(seq=2)]
     await svc.deleteNote(noteId);
@@ -128,13 +135,35 @@ void main() {
         jsonDecode(afterRestore[2].payload!) as Map<String, dynamic>;
     expect(restorePayload['title'], 'Restored');
 
-    // 4. Drain the outbox in order against a fake server and verify the note
-    //    ends up present (last operation wins).
-    //
-    //    We simulate a drain by removing entries one by one and tracking what
-    //    a server would do when it receives them in seq order.
+    // 4. Stale upload acknowledgment: the original upsert(seq=1) is acked by the
+    //    server even though offline mutations have already queued after it.
+    //    After the ack the outbox must still contain: [delete(seq=2), upsert(seq=3)].
+    await svc.removeOutboxEntry(upsertSeq, upsertMid);
+
+    final afterStaleAck = await svc.getOutboxEntries();
+    expect(afterStaleAck.length, 2,
+        reason: 'stale ack must only remove the acked entry');
+    expect(afterStaleAck[0].operation, 'delete');
+    expect(afterStaleAck[0].seq, deleteSeq);
+    expect(afterStaleAck[1].operation, 'upsert');
+    expect(afterStaleAck[1].seq, restoreSeq);
+
+    // 5. Re-read the database: the restored note must still exist in the notes
+    //    table and the newer queued upsert must carry the right payload.
+    final restoredNote = await svc.getNoteById(noteId);
+    expect(restoredNote, isNotNull,
+        reason: 'restored note must still be in the notes table after stale ack');
+    expect(restoredNote!.title, 'Restored');
+
+    final restoreEntryPayload =
+        jsonDecode(afterStaleAck[1].payload!) as Map<String, dynamic>;
+    expect(restoreEntryPayload['title'], 'Restored',
+        reason: 'queued upsert must still carry the restored title');
+
+    // 6. Drain the remaining outbox in order and verify the server converges to
+    //    the note being present.
     String? serverState; // null = deleted / never existed
-    for (final entry in afterRestore) {
+    for (final entry in afterStaleAck) {
       if (entry.operation == 'upsert') {
         serverState = (jsonDecode(entry.payload!)
             as Map<String, dynamic>)['title'] as String?;
