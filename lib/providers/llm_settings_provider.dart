@@ -14,7 +14,8 @@ import '../services/llm_settings_service.dart';
 /// ```dart
 /// llmSettingsServiceProvider.overrideWith((ref) async => fakeService)
 /// ```
-final llmSettingsServiceProvider = FutureProvider<LlmSettingsService>((ref) async {
+final llmSettingsServiceProvider =
+    FutureProvider<LlmSettingsService>((ref) async {
   final prefs = await SharedPreferences.getInstance();
   return LlmSettingsService(prefs: prefs);
 });

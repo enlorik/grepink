@@ -74,8 +74,7 @@ class StructuredSummaryWriter implements SummaryWriter {
     );
   }
 
-  static const String _systemPrompt =
-      'You write durable Grepink note drafts. '
+  static const String _systemPrompt = 'You write durable Grepink note drafts. '
       'Grepink is notes-first, not chat-first. '
       'Save only durable knowledge that should be kept in notes. '
       'Do not repeat duplicate information already present in existing notes. '
@@ -138,7 +137,8 @@ class StructuredSummaryWriter implements SummaryWriter {
     buffer.writeln();
     buffer.writeln('## Output requirements');
     buffer.writeln('- Include a section for existing-note overlap.');
-    buffer.writeln('- Include a section for new knowledge or state that there is none.');
+    buffer.writeln(
+        '- Include a section for new knowledge or state that there is none.');
     buffer.writeln('- Include a section for better sources/citations.');
     buffer.writeln('- Include a final "Suggested markdown to save" section.');
     buffer.writeln(

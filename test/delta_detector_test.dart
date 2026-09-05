@@ -47,14 +47,13 @@ void main() {
       expect(deltas.first.deltaType, DeltaType.duplicate);
     });
 
-    test('near-identical text (Jaccard ≈ 0.905 ≥ 0.88) is classified as duplicate',
+    test(
+        'near-identical text (Jaccard ≈ 0.905 ≥ 0.88) is classified as duplicate',
         () async {
       // 20-word base; nearCopy replaces the last word → Jaccard = 19/21 ≈ 0.905.
-      const base =
-          'one two three four five six seven eight nine ten '
+      const base = 'one two three four five six seven eight nine ten '
           'eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty';
-      const nearCopy =
-          'one two three four five six seven eight nine ten '
+      const nearCopy = 'one two three four five six seven eight nine ten '
           'eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twentyone';
       final local = [_localItem('n1', base)];
       final incoming = [_item('w1', nearCopy)];
@@ -65,8 +64,7 @@ void main() {
     });
 
     test('unrelated content is classified as newClaim', () async {
-      const localText =
-          'flutter dart mobile development widget tree rendering';
+      const localText = 'flutter dart mobile development widget tree rendering';
       const incomingText =
           'quantum physics photon entanglement superposition collapse';
       final local = [_localItem('n1', localText)];
@@ -78,8 +76,7 @@ void main() {
     });
 
     test('new claim when no local evidence exists', () async {
-      final deltas =
-          await detector.detect([], [_item('w1', 'Some web fact.')]);
+      final deltas = await detector.detect([], [_item('w1', 'Some web fact.')]);
 
       expect(deltas.first.deltaType, DeltaType.newClaim);
     });
@@ -122,10 +119,12 @@ void main() {
 
     test('same meaning with different words (score 0.91) becomes duplicate',
         () async {
-      final detector =
-          DeltaDetectorImpl(similarityProvider: const FakeTextSimilarityProvider(0.91));
+      final detector = DeltaDetectorImpl(
+          similarityProvider: const FakeTextSimilarityProvider(0.91));
       final local = [localNote('n1', 'Original phrasing of a concept.')];
-      final incoming = [webItem('w1', 'Completely different words, same idea.')];
+      final incoming = [
+        webItem('w1', 'Completely different words, same idea.')
+      ];
 
       final deltas = await detector.detect(local, incoming);
 
@@ -135,8 +134,8 @@ void main() {
 
     test('same topic but new detail (score 0.75) becomes relatedButNew',
         () async {
-      final detector =
-          DeltaDetectorImpl(similarityProvider: const FakeTextSimilarityProvider(0.75));
+      final detector = DeltaDetectorImpl(
+          similarityProvider: const FakeTextSimilarityProvider(0.75));
       final local = [localNote('n1', 'Topic overview.')];
       final incoming = [webItem('w1', 'Topic overview with one new detail.')];
 
@@ -147,8 +146,8 @@ void main() {
     });
 
     test('unrelated item (score 0.20) becomes newClaim', () async {
-      final detector =
-          DeltaDetectorImpl(similarityProvider: const FakeTextSimilarityProvider(0.20));
+      final detector = DeltaDetectorImpl(
+          similarityProvider: const FakeTextSimilarityProvider(0.20));
       final local = [localNote('n1', 'Flutter widgets.')];
       final incoming = [webItem('w1', 'Quantum entanglement.')];
 
@@ -161,8 +160,8 @@ void main() {
     test(
         'betterSource: incoming has sourceUrl, matching local note has none, '
         'score 0.91 → betterSource', () async {
-      final detector =
-          DeltaDetectorImpl(similarityProvider: const FakeTextSimilarityProvider(0.91));
+      final detector = DeltaDetectorImpl(
+          similarityProvider: const FakeTextSimilarityProvider(0.91));
       final local = [localNote('n1', 'Some claim without a source.')];
       final incoming = [
         webItem('w1', 'Same claim with a source.',
@@ -178,8 +177,8 @@ void main() {
     test(
         'duplicate (not betterSource) when both incoming and local have no sourceUrl',
         () async {
-      final detector =
-          DeltaDetectorImpl(similarityProvider: const FakeTextSimilarityProvider(0.92));
+      final detector = DeltaDetectorImpl(
+          similarityProvider: const FakeTextSimilarityProvider(0.92));
       final local = [localNote('n1', 'Claim without source.')];
       final incoming = [webItem('w1', 'Same claim, no source either.')];
 
@@ -188,8 +187,7 @@ void main() {
       expect(deltas.first.deltaType, DeltaType.duplicate);
     });
 
-    test(
-        'betterSource on exact text match: incoming has url, local has none',
+    test('betterSource on exact text match: incoming has url, local has none',
         () async {
       const sharedText = 'The speed of light is approximately 299,792 km/s.';
       final detector = DeltaDetectorImpl();
@@ -223,11 +221,12 @@ void main() {
       const longNoteContent = '$intro\n\n$relevantParagraph';
 
       // The fake score of 0.91 simulates embedding similarity finding the right paragraph.
-      final detector =
-          DeltaDetectorImpl(similarityProvider: const FakeTextSimilarityProvider(0.91));
+      final detector = DeltaDetectorImpl(
+          similarityProvider: const FakeTextSimilarityProvider(0.91));
       final local = [_localItem('n1', longNoteContent)];
       final incoming = [
-        _item('w1', 'Plants use sunlight to make glucose through photosynthesis.')
+        _item(
+            'w1', 'Plants use sunlight to make glucose through photosynthesis.')
       ];
 
       final deltas = await detector.detect(local, incoming);

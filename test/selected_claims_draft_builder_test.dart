@@ -9,7 +9,8 @@ import 'package:grepink/services/selected_claims_draft_builder.dart';
 ClaimReviewItem _item({
   String id = 'item-1',
   String text = 'A claim.',
-  ClaimNoveltyClassification classification = ClaimNoveltyClassification.newClaim,
+  ClaimNoveltyClassification classification =
+      ClaimNoveltyClassification.newClaim,
   List<String> citationUrls = const [],
   List<String> citationTitles = const [],
   bool canBeSaved = true,
@@ -90,7 +91,9 @@ void main() {
       const url = 'https://example.com/a';
       final result = builder.build(
         question: 'q',
-        selected: [_item(citationUrls: [url])],
+        selected: [
+          _item(citationUrls: [url])
+        ],
         providerName: 'test',
         citations: [_citation('c1', url, 'Example')],
       );
@@ -113,9 +116,7 @@ void main() {
 
       // URL appears once in each claim inline link + once in Sources = multiple,
       // but the Sources section should list it only once.
-      final sourcesSection = result.markdownContent
-          .split('## Sources')
-          .last;
+      final sourcesSection = result.markdownContent.split('## Sources').last;
       final sourcesOccurrences = url.allMatches(sourcesSection).length;
       expect(sourcesOccurrences, 1);
       expect(result.sourceCount, 1);
@@ -133,7 +134,9 @@ void main() {
       expect(result.markdownContent, isEmpty);
     });
 
-    test('markdown does not include raw full answer content beyond selected claims', () {
+    test(
+        'markdown does not include raw full answer content beyond selected claims',
+        () {
       final result = builder.build(
         question: 'What is gravity?',
         selected: [_item(text: 'Gravity pulls objects.')],
@@ -159,11 +162,15 @@ void main() {
       expect(result.markdownContent, isNot(contains('api_key')));
     });
 
-    test('output is valid when citation title is missing (URL used as fallback)', () {
+    test(
+        'output is valid when citation title is missing (URL used as fallback)',
+        () {
       const url = 'https://no-title.com';
       final result = builder.build(
         question: 'q',
-        selected: [_item(citationUrls: [url])],
+        selected: [
+          _item(citationUrls: [url])
+        ],
         providerName: 'test',
         citations: [_citation('c1', url, '')],
       );
@@ -214,7 +221,8 @@ void main() {
 
     // ─── Claim-level citation title fallback ──────────────────────────────────
 
-    test('claim-level title is used when URL is absent from provider citations', () {
+    test('claim-level title is used when URL is absent from provider citations',
+        () {
       const url = 'https://claim-only.example.com';
       const claimTitle = 'Claim Only Source';
       final result = builder.build(
@@ -281,14 +289,24 @@ void main() {
       expect(result.markdownContent, contains('$url2 — $url2'));
     });
 
-    test('duplicate URLs across claims remain listed once in Sources with claim title', () {
+    test(
+        'duplicate URLs across claims remain listed once in Sources with claim title',
+        () {
       const url = 'https://shared-claim.example.com';
       const claimTitle = 'Shared Claim Source';
       final result = builder.build(
         question: 'q',
         selected: [
-          _item(id: 'i1', text: 'Claim one.', citationUrls: [url], citationTitles: [claimTitle]),
-          _item(id: 'i2', text: 'Claim two.', citationUrls: [url], citationTitles: [claimTitle]),
+          _item(
+              id: 'i1',
+              text: 'Claim one.',
+              citationUrls: [url],
+              citationTitles: [claimTitle]),
+          _item(
+              id: 'i2',
+              text: 'Claim two.',
+              citationUrls: [url],
+              citationTitles: [claimTitle]),
         ],
         providerName: 'test',
         citations: const [],

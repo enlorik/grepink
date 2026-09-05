@@ -68,41 +68,52 @@ void main() {
     });
 
     test('snippet is optional and null by default', () {
-      const c = GroundedAnswerCitation(id: 'z', title: 'T', url: 'https://x.com');
+      const c =
+          GroundedAnswerCitation(id: 'z', title: 'T', url: 'https://x.com');
       expect(c.snippet, isNull);
     });
 
     test('position is preserved when set', () {
-      const c = GroundedAnswerCitation(id: 'p', title: 'T', url: 'https://x.com', position: 3);
+      const c = GroundedAnswerCitation(
+          id: 'p', title: 'T', url: 'https://x.com', position: 3);
       expect(c.position, 3);
     });
 
     test('position is null by default', () {
-      const c = GroundedAnswerCitation(id: 'p', title: 'T', url: 'https://x.com');
+      const c =
+          GroundedAnswerCitation(id: 'p', title: 'T', url: 'https://x.com');
       expect(c.position, isNull);
     });
 
     test('equality is keyed on id and url, not position', () {
-      const a = GroundedAnswerCitation(id: 'c1', title: 'T', url: 'https://x.com', position: 1);
-      const b = GroundedAnswerCitation(id: 'c1', title: 'T', url: 'https://x.com', position: 99);
+      const a = GroundedAnswerCitation(
+          id: 'c1', title: 'T', url: 'https://x.com', position: 1);
+      const b = GroundedAnswerCitation(
+          id: 'c1', title: 'T', url: 'https://x.com', position: 99);
       expect(a, equals(b));
     });
 
     test('equality by id and url ignores title differences', () {
-      const a = GroundedAnswerCitation(id: 'c1', title: 'T', url: 'https://x.com');
-      const b = GroundedAnswerCitation(id: 'c1', title: 'Other', url: 'https://x.com');
+      const a =
+          GroundedAnswerCitation(id: 'c1', title: 'T', url: 'https://x.com');
+      const b = GroundedAnswerCitation(
+          id: 'c1', title: 'Other', url: 'https://x.com');
       expect(a, equals(b));
     });
 
     test('different id => not equal', () {
-      const a = GroundedAnswerCitation(id: 'c1', title: 'T', url: 'https://x.com');
-      const b = GroundedAnswerCitation(id: 'c2', title: 'T', url: 'https://x.com');
+      const a =
+          GroundedAnswerCitation(id: 'c1', title: 'T', url: 'https://x.com');
+      const b =
+          GroundedAnswerCitation(id: 'c2', title: 'T', url: 'https://x.com');
       expect(a, isNot(equals(b)));
     });
 
     test('different url => not equal', () {
-      const a = GroundedAnswerCitation(id: 'c1', title: 'T', url: 'https://x.com/a');
-      const b = GroundedAnswerCitation(id: 'c1', title: 'T', url: 'https://x.com/b');
+      const a =
+          GroundedAnswerCitation(id: 'c1', title: 'T', url: 'https://x.com/a');
+      const b =
+          GroundedAnswerCitation(id: 'c1', title: 'T', url: 'https://x.com/b');
       expect(a, isNot(equals(b)));
     });
   });
@@ -154,9 +165,11 @@ void main() {
       final a = _answer(citations: source);
       source.add(_citation(id: 'c2'));
       expect(a.citations.length, 1,
-          reason: 'mutating the source list must not affect the stored citations');
+          reason:
+              'mutating the source list must not affect the stored citations');
       expect(() => a.citations.add(_citation(id: 'c3')), throwsUnsupportedError,
-          reason: 'citations returned by GroundedAnswer must not allow mutation');
+          reason:
+              'citations returned by GroundedAnswer must not allow mutation');
     });
 
     test('equal when all fields match', () {
@@ -246,7 +259,8 @@ void main() {
       );
     });
 
-    test('whitespace-only question returns GroundedAnswerNotConfigured', () async {
+    test('whitespace-only question returns GroundedAnswerNotConfigured',
+        () async {
       final provider = FakeGroundedAnswerProvider(_answer());
       expect(
         await provider.fetchGroundedAnswer('   '),
@@ -254,7 +268,9 @@ void main() {
       );
     });
 
-    test('valid question returns GroundedAnswerSuccess with the injected answer', () async {
+    test(
+        'valid question returns GroundedAnswerSuccess with the injected answer',
+        () async {
       final injected = _answer(question: 'What is Dart?');
       final provider = FakeGroundedAnswerProvider(injected);
       final result = await provider.fetchGroundedAnswer('What is Dart?');
@@ -262,7 +278,8 @@ void main() {
       expect((result as GroundedAnswerSuccess).answer, same(injected));
     });
 
-    test('provider configured to return null gives GroundedAnswerNotConfigured', () async {
+    test('provider configured to return null gives GroundedAnswerNotConfigured',
+        () async {
       final provider = FakeGroundedAnswerProvider(null);
       expect(
         await provider.fetchGroundedAnswer('some question'),
@@ -270,7 +287,9 @@ void main() {
       );
     });
 
-    test('NullGroundedAnswerProvider always returns GroundedAnswerNotConfigured', () async {
+    test(
+        'NullGroundedAnswerProvider always returns GroundedAnswerNotConfigured',
+        () async {
       const provider = NullGroundedAnswerProvider();
       expect(
         await provider.fetchGroundedAnswer('anything'),

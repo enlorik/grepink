@@ -187,7 +187,8 @@ void main() {
       final service = _PendingKnowledgeIngestionService();
       final container = ProviderContainer(
         overrides: [
-          knowledgeIngestionServiceProvider.overrideWith((ref) async => service),
+          knowledgeIngestionServiceProvider
+              .overrideWith((ref) async => service),
         ],
       );
       addTearDown(container.dispose);
@@ -223,7 +224,8 @@ void main() {
       final service = _PendingKnowledgeIngestionService();
       final container = ProviderContainer(
         overrides: [
-          knowledgeIngestionServiceProvider.overrideWith((ref) async => service),
+          knowledgeIngestionServiceProvider
+              .overrideWith((ref) async => service),
         ],
       );
       addTearDown(container.dispose);

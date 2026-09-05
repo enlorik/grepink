@@ -160,7 +160,8 @@ void main() {
       expect(provider.requests, hasLength(1));
     });
 
-    test('source URLs appear in generated prompt or fallback markdown', () async {
+    test('source URLs appear in generated prompt or fallback markdown',
+        () async {
       final provider = MockLlmProvider(responseText: '');
       final writer = StructuredSummaryWriter(llmProvider: provider);
       final web = [
@@ -179,7 +180,8 @@ void main() {
         deltas: deltas,
       );
 
-      expect(provider.requests.single.userPrompt, contains('https://example.com/source'));
+      expect(provider.requests.single.userPrompt,
+          contains('https://example.com/source'));
       expect(draft.markdownContent, contains('https://example.com/source'));
     });
   });

@@ -55,7 +55,10 @@ class TextChunker {
   }
 
   List<String> _splitIntoParagraphs(String text) {
-    return text.split(RegExp(r'\n\s*\n')).where((p) => p.trim().isNotEmpty).toList();
+    return text
+        .split(RegExp(r'\n\s*\n'))
+        .where((p) => p.trim().isNotEmpty)
+        .toList();
   }
 
   List<String> _splitLongSegment(String segment) {
@@ -67,7 +70,8 @@ class TextChunker {
     final buffer = StringBuffer();
 
     for (final sentence in sentences) {
-      if (buffer.length + sentence.length > _maxChunkLength && buffer.isNotEmpty) {
+      if (buffer.length + sentence.length > _maxChunkLength &&
+          buffer.isNotEmpty) {
         chunks.add(buffer.toString().trim());
         buffer.clear();
       }

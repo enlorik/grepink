@@ -164,7 +164,8 @@ void main() {
       final networkProvider = OpenAICompatibleLlmProvider(
         baseUrl: 'https://api.openai.com/v1',
         model: 'gpt-test',
-        httpClient: _FakeHttpClient((_) async => throw Exception('network down')),
+        httpClient:
+            _FakeHttpClient((_) async => throw Exception('network down')),
       );
       final non200Provider = OpenAICompatibleLlmProvider(
         baseUrl: 'https://api.openai.com/v1',

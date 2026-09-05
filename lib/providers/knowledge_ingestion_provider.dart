@@ -28,7 +28,8 @@ final configuredKnowledgeWebEvidenceProvider =
     return ref.watch(knowledgeWebEvidenceProvider);
   }
 
-  final braveSettingsService = await ref.watch(braveSettingsServiceProvider.future);
+  final braveSettingsService =
+      await ref.watch(braveSettingsServiceProvider.future);
   final apiKey = await braveSettingsService.loadApiKey();
   if (apiKey == null || apiKey.trim().isEmpty) {
     return ref.watch(knowledgeWebEvidenceProvider);
@@ -52,7 +53,8 @@ final configuredSummaryWriterFactoryProvider =
 });
 
 final summaryWriterProvider = FutureProvider<SummaryWriter>((ref) async {
-  final factory = await ref.watch(configuredSummaryWriterFactoryProvider.future);
+  final factory =
+      await ref.watch(configuredSummaryWriterFactoryProvider.future);
   return factory.create();
 });
 
@@ -69,11 +71,13 @@ final knowledgeIngestionServiceProvider =
   );
 });
 
-class KnowledgeIngestionNotifier extends StateNotifier<KnowledgeIngestionState> {
+class KnowledgeIngestionNotifier
+    extends StateNotifier<KnowledgeIngestionState> {
   final Ref _ref;
   int _requestSequence = 0;
 
-  KnowledgeIngestionNotifier(this._ref) : super(const KnowledgeIngestionState());
+  KnowledgeIngestionNotifier(this._ref)
+      : super(const KnowledgeIngestionState());
 
   Future<void> ingest(String question) async {
     final trimmedQuestion = question.trim();
@@ -119,7 +123,7 @@ class KnowledgeIngestionNotifier extends StateNotifier<KnowledgeIngestionState> 
   }
 }
 
-final knowledgeIngestionProvider = StateNotifierProvider<
-    KnowledgeIngestionNotifier, KnowledgeIngestionState>(
+final knowledgeIngestionProvider =
+    StateNotifierProvider<KnowledgeIngestionNotifier, KnowledgeIngestionState>(
   (ref) => KnowledgeIngestionNotifier(ref),
 );

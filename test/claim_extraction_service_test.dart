@@ -89,7 +89,8 @@ void main() {
       final claims = service.extract(answer);
 
       for (final claim in claims) {
-        expect(claim.citationUrls, containsAll(['https://example.com/a', 'https://example.com/b']));
+        expect(claim.citationUrls,
+            containsAll(['https://example.com/a', 'https://example.com/b']));
         expect(claim.citationTitles, containsAll(['Source A', 'Source B']));
       }
     });
@@ -162,7 +163,9 @@ void main() {
       expect(ids.length, claims.length);
     });
 
-    test('claim IDs are stable across multiple extract calls for the same input', () {
+    test(
+        'claim IDs are stable across multiple extract calls for the same input',
+        () {
       final answer = _answer(
         question: 'What is gravity?',
         answerText: 'Gravity pulls objects. It acts at a distance.',
@@ -175,7 +178,9 @@ void main() {
           equals(second.map((c) => c.id).toList()));
     });
 
-    test('same question and text but different generatedAt produces different IDs', () {
+    test(
+        'same question and text but different generatedAt produces different IDs',
+        () {
       final t1 = DateTime(2024, 1, 1, 10, 0, 0);
       final t2 = DateTime(2024, 1, 1, 10, 0, 1);
       final answer1 = _answer(
@@ -237,7 +242,8 @@ void main() {
       //   sentence 1: start=0, end=10, text="Claim one."
       //   sentence 2: start=11, end=21, text="Claim two."
 
-      test('sentence within citation range gets only that citation, citationUncertain false',
+      test(
+          'sentence within citation range gets only that citation, citationUncertain false',
           () {
         final answer = _answer(
           answerText: 'Claim one. Claim two.',

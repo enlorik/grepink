@@ -73,7 +73,8 @@ void main() {
           temperature: 0.5,
         );
 
-        final restored = LlmProviderConfig.fromJsonString(config.toJsonString());
+        final restored =
+            LlmProviderConfig.fromJsonString(config.toJsonString());
 
         expect(restored.baseUrl, config.baseUrl);
         expect(restored.model, config.model);

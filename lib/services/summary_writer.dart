@@ -75,8 +75,7 @@ class MockSummaryWriter implements SummaryWriter {
     buffer.writeln();
     buffer.writeln('**Question:** $question');
     buffer.writeln();
-    buffer.writeln(
-        'No durable new knowledge was found for this query. '
+    buffer.writeln('No durable new knowledge was found for this query. '
         'The incoming evidence was either empty, already covered by existing notes, '
         'or did not meet the threshold for a new insight.');
     buffer.writeln();

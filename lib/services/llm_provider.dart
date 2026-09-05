@@ -23,10 +23,9 @@ class LlmResponse {
     required this.providerName,
     required this.model,
     Map<String, Object?>? rawMetadata,
-  }) : rawMetadata =
-            rawMetadata == null
-                ? null
-                : Map<String, Object?>.unmodifiable(rawMetadata);
+  }) : rawMetadata = rawMetadata == null
+            ? null
+            : Map<String, Object?>.unmodifiable(rawMetadata);
 
   factory LlmResponse.empty({
     required String providerName,

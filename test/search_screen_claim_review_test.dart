@@ -43,7 +43,8 @@ class _FakeNoteDraftReviewRepository implements NoteDraftReviewRepository {
   Future<Note?> getNoteById(String id) async => null;
 
   @override
-  Future<Note> insertNote({required String title, required String content}) async {
+  Future<Note> insertNote(
+      {required String title, required String content}) async {
     throw UnimplementedError();
   }
 
@@ -149,7 +150,8 @@ Future<ProviderContainer> _pumpSearchScreen(
       noteDraftReviewRepositoryProvider.overrideWithValue(
         _FakeNoteDraftReviewRepository(),
       ),
-      groundedAnswerIngestionServiceProvider.overrideWith((_) async => ingestionService),
+      groundedAnswerIngestionServiceProvider
+          .overrideWith((_) async => ingestionService),
       braveSettingsOverride(const BraveSettings(answersKeyConfigured: true)),
       llmSettingsOverride(LlmProviderConfig.defaults),
       allNotesProvider.overrideWithValue(const <Note>[]),
@@ -184,7 +186,8 @@ Future<void> _askQuestion(WidgetTester tester, String question) async {
 
 void main() {
   group('SearchScreen claim review flow', () {
-    testWidgets('asking a question invokes the grounded-answer ingestion service',
+    testWidgets(
+        'asking a question invokes the grounded-answer ingestion service',
         (tester) async {
       final provider = _CountingGroundedAnswerProvider(
         GroundedAnswer(
@@ -210,7 +213,8 @@ void main() {
       expect(provider.calls, 1);
     });
 
-    testWidgets('grouped claims are rendered under their labels', (tester) async {
+    testWidgets('grouped claims are rendered under their labels',
+        (tester) async {
       final provider = _CountingGroundedAnswerProvider(
         GroundedAnswer(
           question: 'q',
@@ -230,12 +234,14 @@ void main() {
           _claim('k1', 'An already known claim.'),
         ],
         results: [
-          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+          _result(
+              'n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
           _result('b1', 'A claim with a better source.',
               ClaimNoveltyClassification.betterSource),
           _result('c1', 'A contradicting claim.',
               ClaimNoveltyClassification.contradiction),
-          _result('u1', 'An uncertain claim.', ClaimNoveltyClassification.uncertain),
+          _result('u1', 'An uncertain claim.',
+              ClaimNoveltyClassification.uncertain),
           _result('k1', 'An already known claim.',
               ClaimNoveltyClassification.alreadyKnown),
         ],
@@ -246,7 +252,8 @@ void main() {
 
       expect(find.text('New claims (1)'), findsOneWidget);
       expect(find.text('Better sources (1)'), findsOneWidget);
-      expect(find.text('Possible contradictions to review (1)'), findsOneWidget);
+      expect(
+          find.text('Possible contradictions to review (1)'), findsOneWidget);
       expect(find.text('Uncertain (1)'), findsOneWidget);
       expect(find.text('Already in notes (1)'), findsOneWidget);
 
@@ -279,17 +286,20 @@ void main() {
           _claim('k1', 'An already known claim.'),
         ],
         results: [
-          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+          _result(
+              'n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
           _result('b1', 'A claim with a better source.',
               ClaimNoveltyClassification.betterSource),
           _result('c1', 'A contradicting claim.',
               ClaimNoveltyClassification.contradiction),
-          _result('u1', 'An uncertain claim.', ClaimNoveltyClassification.uncertain),
+          _result('u1', 'An uncertain claim.',
+              ClaimNoveltyClassification.uncertain),
           _result('k1', 'An already known claim.',
               ClaimNoveltyClassification.alreadyKnown),
         ],
       );
-      final container = await _pumpSearchScreen(tester, ingestionService: service);
+      final container =
+          await _pumpSearchScreen(tester, ingestionService: service);
       await _askQuestion(tester, 'question');
 
       final selection = container.read(claimReviewProvider).selection!;
@@ -298,7 +308,8 @@ void main() {
       expect(selection.selectedIds, isNot(contains('u1')));
       expect(selection.selectedIds, isNot(contains('k1')));
 
-      CheckboxListTile tileFor(String claimId) => tester.widget<CheckboxListTile>(
+      CheckboxListTile tileFor(String claimId) =>
+          tester.widget<CheckboxListTile>(
             find.descendant(
               of: find.byKey(Key('claim-review-item-$claimId')),
               matching: find.byType(CheckboxListTile),
@@ -326,10 +337,12 @@ void main() {
         provider: provider,
         claims: [_claim('n1', 'A brand new claim.')],
         results: [
-          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+          _result(
+              'n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
         ],
       );
-      final container = await _pumpSearchScreen(tester, ingestionService: service);
+      final container =
+          await _pumpSearchScreen(tester, ingestionService: service);
       await _askQuestion(tester, 'question');
 
       expect(container.read(claimReviewProvider).selection!.selectedIds,
@@ -347,7 +360,8 @@ void main() {
           isNot(contains('n1')));
     });
 
-    testWidgets('citation urls are shown for a claim with sources', (tester) async {
+    testWidgets('citation urls are shown for a claim with sources',
+        (tester) async {
       final provider = _CountingGroundedAnswerProvider(
         GroundedAnswer(
           question: 'q',
@@ -363,7 +377,10 @@ void main() {
           _claim(
             'n1',
             'A brand new claim.',
-            citationUrls: const ['https://example.com/a', 'https://example.com/b'],
+            citationUrls: const [
+              'https://example.com/a',
+              'https://example.com/b'
+            ],
             citationTitles: const ['Example A', ''],
           ),
         ],
@@ -372,7 +389,10 @@ void main() {
             'n1',
             'A brand new claim.',
             ClaimNoveltyClassification.newClaim,
-            citationUrls: const ['https://example.com/a', 'https://example.com/b'],
+            citationUrls: const [
+              'https://example.com/a',
+              'https://example.com/b'
+            ],
             citationTitles: const ['Example A', ''],
           ),
         ],
@@ -395,7 +415,8 @@ void main() {
         localEvidence: _EmptyLocalEvidenceRetriever(),
       );
 
-      final container = await _pumpSearchScreen(tester, ingestionService: service);
+      final container =
+          await _pumpSearchScreen(tester, ingestionService: service);
       await _askQuestion(tester, 'What is photosynthesis?');
 
       final state = container.read(claimReviewProvider);
@@ -420,7 +441,8 @@ void main() {
         provider: provider,
         claims: [_claim('n1', 'A brand new claim.')],
         results: [
-          _result('n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
+          _result(
+              'n1', 'A brand new claim.', ClaimNoveltyClassification.newClaim),
         ],
       );
 
@@ -431,7 +453,8 @@ void main() {
       await _askQuestion(tester, 'question');
 
       // Claim review groups must be visible after the ask completes.
-      expect(find.byKey(const Key('claim-review-groups-panel')), findsOneWidget);
+      expect(
+          find.byKey(const Key('claim-review-groups-panel')), findsOneWidget);
       expect(container.read(claimReviewProvider).hasReviewItems, isTrue);
 
       // Tap "Discard review" on the claim review panel.

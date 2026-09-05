@@ -142,7 +142,11 @@ void main() {
 
     test('blank description is skipped', () async {
       final provider = _provider((_) async => _braveResponse([
-            {'title': 'Blank desc', 'url': 'https://a.com', 'description': '   '},
+            {
+              'title': 'Blank desc',
+              'url': 'https://a.com',
+              'description': '   '
+            },
           ]));
 
       final results = await provider.fetch('q');
@@ -162,7 +166,11 @@ void main() {
 
     test('blank url is skipped', () async {
       final provider = _provider((_) async => _braveResponse([
-            {'title': 'Blank URL', 'url': '   ', 'description': 'Some description'},
+            {
+              'title': 'Blank URL',
+              'url': '   ',
+              'description': 'Some description'
+            },
           ]));
 
       final results = await provider.fetch('q');
@@ -190,11 +198,20 @@ void main() {
       expect(results, isEmpty);
     });
 
-    test('only valid entries are returned when mixed with invalid ones', () async {
+    test('only valid entries are returned when mixed with invalid ones',
+        () async {
       final provider = _provider((_) async => _braveResponse([
-            {'title': 'Valid', 'url': 'https://a.com', 'description': 'good desc'},
+            {
+              'title': 'Valid',
+              'url': 'https://a.com',
+              'description': 'good desc'
+            },
             {'title': 'No URL', 'description': 'missing url'},
-            {'title': 'Also Valid', 'url': 'https://b.com', 'description': 'also good'},
+            {
+              'title': 'Also Valid',
+              'url': 'https://b.com',
+              'description': 'also good'
+            },
           ]));
 
       final results = await provider.fetch('q');
@@ -207,7 +224,11 @@ void main() {
     test('relevanceScore is assigned in descending order', () async {
       final provider = _provider((_) async => _braveResponse([
             {'title': 'First', 'url': 'https://a.com', 'description': 'desc a'},
-            {'title': 'Second', 'url': 'https://b.com', 'description': 'desc b'},
+            {
+              'title': 'Second',
+              'url': 'https://b.com',
+              'description': 'desc b'
+            },
             {'title': 'Third', 'url': 'https://c.com', 'description': 'desc c'},
           ]));
 
@@ -216,10 +237,8 @@ void main() {
       expect(results[0].relevanceScore, closeTo(1.0, 0.001));
       expect(results[1].relevanceScore, closeTo(0.9, 0.001));
       expect(results[2].relevanceScore, closeTo(0.8, 0.001));
-      expect(results[0].relevanceScore,
-          greaterThan(results[1].relevanceScore));
-      expect(results[1].relevanceScore,
-          greaterThan(results[2].relevanceScore));
+      expect(results[0].relevanceScore, greaterThan(results[1].relevanceScore));
+      expect(results[1].relevanceScore, greaterThan(results[2].relevanceScore));
     });
   });
 
@@ -239,10 +258,9 @@ void main() {
     test('sends count as query parameter', () async {
       Uri? capturedUri;
       final provider = _provider((req) async {
-            capturedUri = req.url;
-            return _braveResponse([]);
-          },
-          count: 3);
+        capturedUri = req.url;
+        return _braveResponse([]);
+      }, count: 3);
 
       await provider.fetch('test');
 
@@ -252,10 +270,9 @@ void main() {
     test('clamps count to maximum of 20', () async {
       Uri? capturedUri;
       final provider = _provider((req) async {
-            capturedUri = req.url;
-            return _braveResponse([]);
-          },
-          count: 99);
+        capturedUri = req.url;
+        return _braveResponse([]);
+      }, count: 99);
 
       await provider.fetch('test');
 
@@ -265,10 +282,9 @@ void main() {
     test('sends country when configured', () async {
       Uri? capturedUri;
       final provider = _provider((req) async {
-            capturedUri = req.url;
-            return _braveResponse([]);
-          },
-          country: 'US');
+        capturedUri = req.url;
+        return _braveResponse([]);
+      }, country: 'US');
 
       await provider.fetch('test');
 
@@ -290,10 +306,9 @@ void main() {
     test('sends safesearch parameter', () async {
       Uri? capturedUri;
       final provider = _provider((req) async {
-            capturedUri = req.url;
-            return _braveResponse([]);
-          },
-          safeSearch: BraveSafeSearch.strict);
+        capturedUri = req.url;
+        return _braveResponse([]);
+      }, safeSearch: BraveSafeSearch.strict);
 
       await provider.fetch('test');
 

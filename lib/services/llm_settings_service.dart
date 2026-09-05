@@ -54,8 +54,7 @@ class LlmSettingsService {
     required SharedPreferences prefs,
     SecureKeyValueStore? secureStorage,
   })  : _prefs = prefs,
-        _secureStorage =
-            secureStorage ?? const FlutterSecureStorageAdapter();
+        _secureStorage = secureStorage ?? const FlutterSecureStorageAdapter();
 
   // -------------------------------------------------------------------------
   // Config (non-sensitive)

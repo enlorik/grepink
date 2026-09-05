@@ -80,7 +80,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
 
   bool get _hasChanges {
     if (_originalNote == null) {
-      return _titleController.text.isNotEmpty || _contentController.text.isNotEmpty;
+      return _titleController.text.isNotEmpty ||
+          _contentController.text.isNotEmpty;
     }
     return _titleController.text != _originalNote!.title ||
         _contentController.text != _originalNote!.content ||
@@ -91,9 +92,37 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     final text = '$title $content'.toLowerCase();
     final words = text.split(RegExp(r'[\s\n\r\t,.!?;:]+'));
     final stopWords = {
-      'the', 'a', 'an', 'is', 'in', 'on', 'at', 'to', 'for', 'of', 'and',
-      'or', 'but', 'with', 'it', 'this', 'that', 'was', 'are', 'be', 'i',
-      'we', 'you', 'he', 'she', 'they', 'my', 'your', 'his', 'her', 'its',
+      'the',
+      'a',
+      'an',
+      'is',
+      'in',
+      'on',
+      'at',
+      'to',
+      'for',
+      'of',
+      'and',
+      'or',
+      'but',
+      'with',
+      'it',
+      'this',
+      'that',
+      'was',
+      'are',
+      'be',
+      'i',
+      'we',
+      'you',
+      'he',
+      'she',
+      'they',
+      'my',
+      'your',
+      'his',
+      'her',
+      'its',
     };
     final freq = <String, int>{};
     for (final w in words) {
@@ -101,7 +130,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         freq[w] = (freq[w] ?? 0) + 1;
       }
     }
-    final sorted = freq.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    final sorted = freq.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
     return sorted.take(10).map((e) => e.key).toList();
   }
 
@@ -118,11 +148,11 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     try {
       if (widget.noteId == null) {
         await ref.read(notesProvider.notifier).addNote(
-          title: title,
-          content: content,
-          tags: _tags,
-          keywords: _keywords,
-        );
+              title: title,
+              content: content,
+              tags: _tags,
+              keywords: _keywords,
+            );
       } else if (_originalNote != null) {
         final updated = _originalNote!.copyWith(
           title: title.isEmpty ? 'Untitled' : title,
@@ -157,7 +187,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('Unsaved changes', style: AppTextStyles.titleMedium),
-        content: Text('What would you like to do?', style: AppTextStyles.bodyMedium),
+        content:
+            Text('What would you like to do?', style: AppTextStyles.bodyMedium),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, 'discard'),
@@ -279,7 +310,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       style: AppTextStyles.displayMedium,
       decoration: InputDecoration(
         hintText: 'Title',
-        hintStyle: AppTextStyles.displayMedium.copyWith(color: AppColors.placeholderText),
+        hintStyle: AppTextStyles.displayMedium
+            .copyWith(color: AppColors.placeholderText),
         border: InputBorder.none,
         enabledBorder: InputBorder.none,
         focusedBorder: InputBorder.none,
@@ -299,7 +331,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       style: AppTextStyles.bodyLarge,
       decoration: InputDecoration(
         hintText: 'Write your thoughts...',
-        hintStyle: AppTextStyles.bodyLarge.copyWith(color: AppColors.placeholderText),
+        hintStyle:
+            AppTextStyles.bodyLarge.copyWith(color: AppColors.placeholderText),
         border: InputBorder.none,
         enabledBorder: InputBorder.none,
         focusedBorder: InputBorder.none,
@@ -324,31 +357,37 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           runSpacing: 8,
           children: [
             ..._tags.map((tag) => TagChip(
-              label: tag,
-              isEditable: true,
-              onDelete: () => setState(() => _tags.remove(tag)),
-            )),
+                  label: tag,
+                  isEditable: true,
+                  onDelete: () => setState(() => _tags.remove(tag)),
+                )),
             SizedBox(
               width: 120,
               height: 32,
               child: TextField(
                 controller: _tagController,
-                style: AppTextStyles.bodySmall.copyWith(color: AppColors.deepAction),
+                style: AppTextStyles.bodySmall
+                    .copyWith(color: AppColors.deepAction),
                 decoration: InputDecoration(
                   hintText: 'Add tag...',
-                  hintStyle: AppTextStyles.bodySmall.copyWith(color: AppColors.placeholderText),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  hintStyle: AppTextStyles.bodySmall
+                      .copyWith(color: AppColors.placeholderText),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(20),
-                    borderSide: const BorderSide(color: AppColors.dividerBorder),
+                    borderSide:
+                        const BorderSide(color: AppColors.dividerBorder),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(20),
-                    borderSide: const BorderSide(color: AppColors.dividerBorder),
+                    borderSide:
+                        const BorderSide(color: AppColors.dividerBorder),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(20),
-                    borderSide: const BorderSide(color: AppColors.primaryAccent),
+                    borderSide:
+                        const BorderSide(color: AppColors.primaryAccent),
                   ),
                   isDense: true,
                   filled: true,
@@ -373,18 +412,24 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         Wrap(
           spacing: 6,
           runSpacing: 6,
-          children: _keywords.map((kw) => Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-             decoration: BoxDecoration(
-               color: AppColors.keywordHighlight.withValues(alpha: 0.2),
-               borderRadius: BorderRadius.circular(20),
-               border: Border.all(color: AppColors.keywordHighlight.withValues(alpha: 0.5)),
-             ),
-            child: Text(
-              kw,
-              style: AppTextStyles.bodySmall.copyWith(color: AppColors.deepAction),
-            ),
-          )).toList(),
+          children: _keywords
+              .map((kw) => Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.keywordHighlight.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                          color: AppColors.keywordHighlight
+                              .withValues(alpha: 0.5)),
+                    ),
+                    child: Text(
+                      kw,
+                      style: AppTextStyles.bodySmall
+                          .copyWith(color: AppColors.deepAction),
+                    ),
+                  ))
+              .toList(),
         ),
       ],
     );

@@ -10,7 +10,8 @@ import 'package:grepink/services/claim_review_mapper.dart';
 ClaimDeduplicationResult _result({
   String id = 'claim-1',
   String text = 'Some claim.',
-  ClaimNoveltyClassification classification = ClaimNoveltyClassification.newClaim,
+  ClaimNoveltyClassification classification =
+      ClaimNoveltyClassification.newClaim,
   List<String> citationUrls = const [],
   List<EvidenceItem> matchedLocal = const [],
   String reason = 'test reason',
@@ -65,7 +66,9 @@ void main() {
   group('ClaimReviewMapper.toGroups', () {
     test('new claims are selected by default', () {
       final groups = mapper.toGroups(_ingestion(
-        newClaims: [_result(id: 'n1', classification: ClaimNoveltyClassification.newClaim)],
+        newClaims: [
+          _result(id: 'n1', classification: ClaimNoveltyClassification.newClaim)
+        ],
       ));
 
       final newGroup = groups.firstWhere(
@@ -75,7 +78,10 @@ void main() {
 
     test('already-known claims are not selected by default', () {
       final groups = mapper.toGroups(_ingestion(
-        knownClaims: [_result(id: 'k1', classification: ClaimNoveltyClassification.alreadyKnown)],
+        knownClaims: [
+          _result(
+              id: 'k1', classification: ClaimNoveltyClassification.alreadyKnown)
+        ],
       ));
 
       final knownGroup = groups.firstWhere(
@@ -83,7 +89,9 @@ void main() {
       expect(knownGroup.items.first.selectedByDefault, isFalse);
     });
 
-    test('better-source claims are selected by default and preserve citation URLs', () {
+    test(
+        'better-source claims are selected by default and preserve citation URLs',
+        () {
       final urls = ['https://better-source.com'];
       final groups = mapper.toGroups(_ingestion(
         betterSourceClaims: [
@@ -104,7 +112,9 @@ void main() {
     test('contradiction claims are not selected by default', () {
       final groups = mapper.toGroups(_ingestion(
         contradictionClaims: [
-          _result(id: 'c1', classification: ClaimNoveltyClassification.contradiction),
+          _result(
+              id: 'c1',
+              classification: ClaimNoveltyClassification.contradiction),
         ],
       ));
 
@@ -113,13 +123,28 @@ void main() {
       expect(group.items.first.selectedByDefault, isFalse);
     });
 
-    test('group order is stable: new → better → contradiction → uncertain → known', () {
+    test(
+        'group order is stable: new → better → contradiction → uncertain → known',
+        () {
       final groups = mapper.toGroups(_ingestion(
-        newClaims: [_result(id: 'n', classification: ClaimNoveltyClassification.newClaim)],
-        betterSourceClaims: [_result(id: 'b', classification: ClaimNoveltyClassification.betterSource)],
-        contradictionClaims: [_result(id: 'c', classification: ClaimNoveltyClassification.contradiction)],
-        uncertainClaims: [_result(id: 'u', classification: ClaimNoveltyClassification.uncertain)],
-        knownClaims: [_result(id: 'k', classification: ClaimNoveltyClassification.alreadyKnown)],
+        newClaims: [
+          _result(id: 'n', classification: ClaimNoveltyClassification.newClaim)
+        ],
+        betterSourceClaims: [
+          _result(
+              id: 'b', classification: ClaimNoveltyClassification.betterSource)
+        ],
+        contradictionClaims: [
+          _result(
+              id: 'c', classification: ClaimNoveltyClassification.contradiction)
+        ],
+        uncertainClaims: [
+          _result(id: 'u', classification: ClaimNoveltyClassification.uncertain)
+        ],
+        knownClaims: [
+          _result(
+              id: 'k', classification: ClaimNoveltyClassification.alreadyKnown)
+        ],
       ));
 
       expect(groups.map((g) => g.classification).toList(), [
@@ -151,7 +176,8 @@ void main() {
       ));
 
       final item = groups
-          .firstWhere((g) => g.classification == ClaimNoveltyClassification.alreadyKnown)
+          .firstWhere((g) =>
+              g.classification == ClaimNoveltyClassification.alreadyKnown)
           .items
           .first;
       expect(item.matchedLocalEvidenceIds, contains('local-ev-1'));
@@ -170,7 +196,8 @@ void main() {
       ));
 
       final item = groups
-          .firstWhere((g) => g.classification == ClaimNoveltyClassification.alreadyKnown)
+          .firstWhere((g) =>
+              g.classification == ClaimNoveltyClassification.alreadyKnown)
           .items
           .first;
       expect(item.matchedLocalEvidenceTitles, contains('My existing note'));
@@ -189,14 +216,16 @@ void main() {
       ));
 
       final item = groups
-          .firstWhere((g) => g.classification == ClaimNoveltyClassification.alreadyKnown)
+          .firstWhere((g) =>
+              g.classification == ClaimNoveltyClassification.alreadyKnown)
           .items
           .first;
       expect(item.matchedLocalEvidenceTitles, hasLength(1));
       expect(item.matchedLocalEvidenceTitles.first, isEmpty);
     });
 
-    test('IDs and titles are index-aligned from the same evidence sequence', () {
+    test('IDs and titles are index-aligned from the same evidence sequence',
+        () {
       final ev1 = _evidence('ev-a', title: 'Note A');
       final ev2 = _evidence('ev-b', title: 'Note B');
       final groups = mapper.toGroups(_ingestion(
@@ -210,7 +239,8 @@ void main() {
       ));
 
       final item = groups
-          .firstWhere((g) => g.classification == ClaimNoveltyClassification.alreadyKnown)
+          .firstWhere((g) =>
+              g.classification == ClaimNoveltyClassification.alreadyKnown)
           .items
           .first;
       expect(item.matchedLocalEvidenceIds, equals(['ev-a', 'ev-b']));
@@ -230,7 +260,8 @@ void main() {
       ));
 
       final item = groups
-          .firstWhere((g) => g.classification == ClaimNoveltyClassification.newClaim)
+          .firstWhere(
+              (g) => g.classification == ClaimNoveltyClassification.newClaim)
           .items
           .first;
       expect(item.citationUrls, containsAll(urls));
@@ -251,13 +282,17 @@ void main() {
   });
 
   group('ClaimReviewSelectionState', () {
-    test('selected saveable items returns only saveable and selected claims', () {
+    test('selected saveable items returns only saveable and selected claims',
+        () {
       final ingestion = _ingestion(
         newClaims: [
-          _result(id: 'new1', classification: ClaimNoveltyClassification.newClaim),
+          _result(
+              id: 'new1', classification: ClaimNoveltyClassification.newClaim),
         ],
         knownClaims: [
-          _result(id: 'known1', classification: ClaimNoveltyClassification.alreadyKnown),
+          _result(
+              id: 'known1',
+              classification: ClaimNoveltyClassification.alreadyKnown),
         ],
       );
 
@@ -271,7 +306,9 @@ void main() {
     test('toggle adds a non-selected item', () {
       final ingestion = _ingestion(
         knownClaims: [
-          _result(id: 'k1', classification: ClaimNoveltyClassification.alreadyKnown),
+          _result(
+              id: 'k1',
+              classification: ClaimNoveltyClassification.alreadyKnown),
         ],
       );
 
@@ -285,7 +322,8 @@ void main() {
     test('toggle removes an already-selected item', () {
       final ingestion = _ingestion(
         newClaims: [
-          _result(id: 'n1', classification: ClaimNoveltyClassification.newClaim),
+          _result(
+              id: 'n1', classification: ClaimNoveltyClassification.newClaim),
         ],
       );
 

@@ -17,7 +17,8 @@ class _FakeNoteDraftReviewRepository implements NoteDraftReviewRepository {
   Future<Note?> getNoteById(String id) async => notesById[id];
 
   @override
-  Future<Note> insertNote({required String title, required String content}) async {
+  Future<Note> insertNote(
+      {required String title, required String content}) async {
     insertedNotes++;
     final now = DateTime(2026, 5, 18);
     final note = Note(
@@ -200,7 +201,8 @@ void main() {
       expect(updatedNote.content, contains('question: Append this'));
       expect(updatedNote.content, contains('action: appendToExistingNote'));
       expect(updatedNote.content, contains('source_count: 1'));
-      expect(updatedNote.content, contains('## Update from question: Append this'));
+      expect(updatedNote.content,
+          contains('## Update from question: Append this'));
       expect(updatedNote.content, contains('https://example.com/source'));
       expect(
         container.read(noteDraftReviewProvider).status,
@@ -208,7 +210,8 @@ void main() {
       );
     });
 
-    test('generated note metadata does not include secret-like fields', () async {
+    test('generated note metadata does not include secret-like fields',
+        () async {
       final repository = _FakeNoteDraftReviewRepository();
       final container = ProviderContainer(
         overrides: [

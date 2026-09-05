@@ -18,7 +18,8 @@ class LocalEvidenceRetrieverImpl implements LocalEvidenceRetriever {
         final title = (row['title'] as String?) ?? '';
         final content = (row['content'] as String?) ?? '';
         final rank = (row['fts_rank'] as num?)?.toDouble() ?? 0.0;
-        final normalizedScore = rank < 0 ? ((-rank) / 10.0).clamp(0.0, 1.0) : 0.0;
+        final normalizedScore =
+            rank < 0 ? ((-rank) / 10.0).clamp(0.0, 1.0) : 0.0;
         return EvidenceItem(
           id: 'local_$id',
           type: EvidenceType.localNote,

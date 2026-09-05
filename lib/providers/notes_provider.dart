@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 import '../models/note.dart';
 import '../services/database_service.dart';
 import '../services/embedding_service.dart';
+import 'railway_sync_provider.dart';
 import 'settings_provider.dart';
 
 class NotesNotifier extends StateNotifier<AsyncValue<List<Note>>> {
@@ -42,6 +43,7 @@ class NotesNotifier extends StateNotifier<AsyncValue<List<Note>>> {
     await DatabaseService.instance.insertNote(note);
     await loadNotes();
     _triggerEmbedding(note);
+    _ref.read(railwaySyncProvider.notifier).triggerAfterMutation();
     return note;
   }
 
@@ -54,19 +56,23 @@ class NotesNotifier extends StateNotifier<AsyncValue<List<Note>>> {
     await DatabaseService.instance.updateNote(updated);
     await loadNotes();
     _triggerEmbedding(updated);
+    _ref.read(railwaySyncProvider.notifier).triggerAfterMutation();
   }
 
   Future<void> deleteNote(String id) async {
     await DatabaseService.instance.deleteNote(id);
     await loadNotes();
+    _ref.read(railwaySyncProvider.notifier).triggerAfterMutation();
   }
 
   Future<void> togglePin(String id) async {
     final notes = state.valueOrNull ?? [];
     final note = notes.firstWhere((n) => n.id == id);
-    final updated = note.copyWith(isPinned: !note.isPinned, updatedAt: DateTime.now());
+    final updated =
+        note.copyWith(isPinned: !note.isPinned, updatedAt: DateTime.now());
     await DatabaseService.instance.updateNote(updated);
     await loadNotes();
+    _ref.read(railwaySyncProvider.notifier).triggerAfterMutation();
   }
 
   Future<void> reindexEmbeddings() async {
@@ -77,7 +83,8 @@ class NotesNotifier extends StateNotifier<AsyncValue<List<Note>>> {
     final notes = state.valueOrNull ?? [];
     for (final note in notes) {
       try {
-        final embedding = await EmbeddingService.instance.embedNote(note, apiKey);
+        final embedding =
+            await EmbeddingService.instance.embedNote(note, apiKey);
         await DatabaseService.instance.updateEmbedding(note.id, embedding);
       } catch (_) {
         // Continue with next note
@@ -86,18 +93,18 @@ class NotesNotifier extends StateNotifier<AsyncValue<List<Note>>> {
     await loadNotes();
   }
 
-  /// Embeds only notes that have embeddingPending=true. Called after import so
-  /// restored notes appear in semantic search without a full manual reindex.
   Future<void> reindexPendingNotes() async {
     try {
       final settings = await _ref.read(settingsProvider.future);
       final apiKey = settings.apiKey;
       if (apiKey.isEmpty) return;
 
-      final pending = await DatabaseService.instance.getNotesWithPendingEmbeddings();
+      final pending =
+          await DatabaseService.instance.getNotesWithPendingEmbeddings();
       for (final note in pending) {
         try {
-          final embedding = await EmbeddingService.instance.embedNote(note, apiKey);
+          final embedding =
+              await EmbeddingService.instance.embedNote(note, apiKey);
           await DatabaseService.instance.updateEmbedding(note.id, embedding);
         } catch (_) {}
       }
@@ -119,7 +126,8 @@ class NotesNotifier extends StateNotifier<AsyncValue<List<Note>>> {
   }
 }
 
-final notesProvider = StateNotifierProvider<NotesNotifier, AsyncValue<List<Note>>>(
+final notesProvider =
+    StateNotifierProvider<NotesNotifier, AsyncValue<List<Note>>>(
   (ref) => NotesNotifier(ref),
 );
 

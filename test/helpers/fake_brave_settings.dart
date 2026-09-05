@@ -12,6 +12,5 @@ class _FixedBraveSettingsNotifier extends BraveSettingsNotifier {
   Future<BraveSettings> build() async => _settings;
 }
 
-Override braveSettingsOverride(BraveSettings settings) =>
-    braveSettingsProvider.overrideWith(
-        () => _FixedBraveSettingsNotifier(settings));
+Override braveSettingsOverride(BraveSettings settings) => braveSettingsProvider
+    .overrideWith(() => _FixedBraveSettingsNotifier(settings));
