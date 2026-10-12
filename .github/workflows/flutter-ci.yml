@@ -103,6 +103,9 @@ jobs:
       - name: Build Windows
         run: flutter build windows --release
 
+      - name: Test desktop database persistence on Windows
+        run: flutter test test/services/desktop_database_path_test.dart
+
       - name: Save Windows test app
         uses: actions/upload-artifact@v4
         with:
