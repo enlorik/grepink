@@ -77,10 +77,14 @@ void main() {
         options: OpenDatabaseOptions(singleInstance: false),
       );
       try {
+      await keeper.execute('PRAGMA journal_mode=WAL');
         await keeper.execute('PRAGMA wal_autocheckpoint=0');
         await service.insertNote(note('legacy-note'));
         await service.setRemoteRevision('legacy-note', 17);
         final originalMutation = (await service.getOutboxEntries()).single;
+      // Join the WAL with a real read so this connection keeps it alive after
+      // DatabaseService closes its original connection for the migration.
+      await keeper.rawQuery('SELECT COUNT(*) FROM notes');
         await service.closeForTesting();
         expect(await File('$legacyPath-wal').length(), greaterThan(0));
         DatabaseService.testDatabasePath = null;
