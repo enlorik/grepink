@@ -779,6 +779,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       return;
     }
     setState(() => _railwayTestingConnection = true);
+    var setupStep = 'test the connection';
     try {
       final bool ok;
       try {
@@ -807,22 +808,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         // conflict copies for every existing note.
         final rawPrevious =
             await svc.getApiUrl() ?? await svc.getLastEndpoint();
-        final previousUrl =
-            rawPrevious?.trimRight().replaceAll(RegExp(r'/+$'), '');
+        final previousUrl = rawPrevious?.trimRight().replaceAll(
+          RegExp(r'/+$'),
+          '',
+        );
         // Always cancel the active drain — the running loop may have captured
         // the old token even when only the token changes without a URL change.
         ref.read(railwaySyncProvider.notifier).cancelDrain();
         if (previousUrl != normalizedUrl) {
+          setupStep = 'prepare the local sync database';
           // Clear revision metadata and backfill the outbox BEFORE saving the
           // new URL so that a crash between the two writes leaves the old
           // endpoint active with a clean-base outbox rather than the new
           // endpoint carrying stale revision metadata and no outbox entries.
           await DatabaseService.instance.resetSyncState();
         }
+        setupStep = 'save the sync settings';
         await svc.setApiUrl(normalizedUrl);
         await svc.setToken(token);
         // No mounted check here so reconfigure always runs after the saves;
         // reconfigure() guards internally with its own mounted check.
+        setupStep = 'start sync';
         await ref.read(railwaySyncProvider.notifier).reconfigure();
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -831,7 +837,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('Connection failed. Check URL and try again.')),
+            content: Text('Connection failed. Check URL and try again.'),
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not $setupStep on this device.')),
         );
       }
     } finally {
