@@ -161,3 +161,66 @@ jobs:
       - name: Build server
         working-directory: server
         run: npm run build
+
+  publish-release:
+    name: Publish Windows and Android downloads
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [analyze-and-test, compile-android, compile-ios, compile-windows, server]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download tested Windows app
+        uses: actions/download-artifact@v4
+        with:
+          name: grepink-windows-x64
+          path: downloads/windows
+
+      - name: Download tested Android app
+        uses: actions/download-artifact@v4
+        with:
+          name: grepink-android-debug
+          path: downloads/android
+
+      - name: Package and publish GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag="preview-${GITHUB_RUN_NUMBER}"
+          # Published previews are immutable; rerunning CI must not replace them.
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists."
+            exit 0
+          fi
+          test -f downloads/windows/grepink.exe
+          test -f downloads/windows/flutter_windows.dll
+          test -f downloads/windows/sqlite3.dll
+          test -f downloads/windows/data/app.so
+          test -f downloads/android/app-debug.apk
+          mkdir -p release
+          (cd downloads/windows && zip -q -r ../../release/Grepink-Windows-x64.zip .)
+          cp downloads/android/app-debug.apk release/Grepink-Android-debug.apk
+          (cd release && sha256sum Grepink-Windows-x64.zip Grepink-Android-debug.apk > SHA256SUMS.txt)
+          cat > release/NOTES.md <<EOF
+          Automatically published after all Flutter tests, server tests, and Android, iOS, and Windows builds passed.
+
+          **Windows:** download **Grepink-Windows-x64.zip**, extract the entire ZIP into a folder, and open **grepink.exe**.
+
+          **Android:** download **Grepink-Android-debug.apk** to your phone and install it; this is a debug preview, not a signed production release.
+
+          iPhone installation still requires a signed iOS build; source-code archives are not installable apps.
+
+          Source commit: ${GITHUB_SHA}
+          EOF
+          gh release create "$tag" \
+            release/Grepink-Windows-x64.zip \
+            release/Grepink-Android-debug.apk \
+            release/SHA256SUMS.txt \
+            --target "$GITHUB_SHA" \
+            --title "Grepink preview ${GITHUB_RUN_NUMBER} — Windows and Android" \
+            --notes-file release/NOTES.md \
+            --prerelease
