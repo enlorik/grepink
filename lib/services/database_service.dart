@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
@@ -66,10 +68,14 @@ class DatabaseService {
   static final DatabaseService instance = DatabaseService._();
 
   Database? _db;
+  Future<Database>? _opening;
 
   // Override the database path in tests (e.g. inMemoryDatabasePath).
   @visibleForTesting
   static String? testDatabasePath;
+
+  @visibleForTesting
+  static String? testApplicationSupportPath;
 
   // Close the current database so the next [database] call reopens it fresh.
   // Use in test tearDown to achieve isolation between tests.
@@ -77,21 +83,62 @@ class DatabaseService {
   Future<void> closeForTesting() async {
     await _db?.close();
     _db = null;
+    _opening = null;
   }
 
   Future<Database> get database async {
-    _db ??= await _initDatabase();
-    return _db!;
+    if (_db != null) return _db!;
+    // Startup and sync setup can both request the database at once.
+    _opening ??= _initDatabase();
+    try {
+      return _db = await _opening!;
+    } catch (_) {
+      _opening = null;
+      rethrow;
+    }
+  }
+
+  Future<String> _databasePath() async {
+    if (testDatabasePath != null) return testDatabasePath!;
+    final legacyPath = p.join(await getDatabasesPath(), 'grepink.db');
+    if (!Platform.isWindows && !Platform.isLinux) return legacyPath;
+
+    // The FFI default is relative to the process working directory, which
+    // can be read-only for a downloaded desktop app.
+    final support = Directory(
+      testApplicationSupportPath ??
+          (await getApplicationSupportDirectory()).path,
+    );
+    await support.create(recursive: true);
+    final path = p.join(support.path, 'grepink.db');
+    if (p.equals(path, legacyPath) || await File(path).exists()) return path;
+
+    if (await File(legacyPath).exists()) {
+      // SQLite snapshots include committed WAL changes; copying only the .db
+      // file could lose notes. Keep the original as a recovery copy, and only
+      // publish the new file after the snapshot has completed successfully.
+      final staging = File('$path.migrating');
+      if (await staging.exists()) await staging.delete();
+      final legacy = await openDatabase(
+        legacyPath,
+        readOnly: true,
+        singleInstance: false,
+      );
+      try {
+        await legacy.execute('VACUUM INTO ?', [staging.path]);
+      } catch (_) {
+        if (await staging.exists()) await staging.delete();
+        rethrow;
+      } finally {
+        await legacy.close();
+      }
+      await staging.rename(path);
+    }
+    return path;
   }
 
   Future<Database> _initDatabase() async {
-    final String path;
-    if (testDatabasePath != null) {
-      path = testDatabasePath!;
-    } else {
-      final dbPath = await getDatabasesPath();
-      path = p.join(dbPath, 'grepink.db');
-    }
+    final path = await _databasePath();
     return openDatabase(
       path,
       version: 2,
