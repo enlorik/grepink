@@ -526,6 +526,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           const SizedBox(height: 16),
           ClaimReviewGroupsPanel(
             groups: claimReviewState.groups,
+            citations: claimReviewState.citations,
             selectedIds: claimReviewState.selection!.selectedIds,
             onToggle: _toggleClaim,
             providerLabel:
