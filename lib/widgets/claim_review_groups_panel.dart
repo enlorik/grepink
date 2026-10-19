@@ -1,9 +1,13 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../models/claim_deduplication_result.dart';
 import '../models/claim_review_item.dart';
+import '../models/grounded_answer.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
+import 'claim_source_preview.dart';
 
 /// Above this many items, the "Already in your notes" section starts
 /// collapsed so a long list of known claims doesn't push the useful
@@ -13,12 +17,13 @@ const int _alreadyKnownCollapseThreshold = 3;
 /// Displays grouped claim review results and lets the user toggle which
 /// claims are selected. This panel never saves or persists anything itself —
 /// it only reflects and mutates [selectedIds] via [onToggle].
-class ClaimReviewGroupsPanel extends StatelessWidget {
+class ClaimReviewGroupsPanel extends StatefulWidget {
   final List<ClaimReviewGroup> groups;
   final Set<String> selectedIds;
   final ValueChanged<String> onToggle;
   // Safe, already-normalized provider label — null means no label is shown.
   final String? providerLabel;
+  final List<GroundedAnswerCitation> citations;
 
   const ClaimReviewGroupsPanel({
     super.key,
@@ -26,10 +31,37 @@ class ClaimReviewGroupsPanel extends StatelessWidget {
     required this.selectedIds,
     required this.onToggle,
     this.providerLabel,
+    this.citations = const [],
   });
 
   @override
+  State<ClaimReviewGroupsPanel> createState() => _ClaimReviewGroupsPanelState();
+}
+
+class _ClaimReviewGroupsPanelState extends State<ClaimReviewGroupsPanel> {
+  final _previewController = OverlayPortalController();
+  String? _activeId;
+  bool _pinned = false;
+
+  void _activate(ClaimReviewItem item) {
+    if (_activeId != item.id) setState(() => _activeId = item.id);
+  }
+
+  void _togglePreview() {
+    setState(() => _pinned = !_pinned);
+    if (_pinned) {
+      _previewController.show();
+    } else {
+      _previewController.hide();
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final groups = widget.groups;
+    final selectedIds = widget.selectedIds;
+    final onToggle = widget.onToggle;
+    final providerLabel = widget.providerLabel;
     final visibleGroups =
         groups.where((group) => group.items.isNotEmpty).toList();
 
@@ -37,37 +69,86 @@ class ClaimReviewGroupsPanel extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    return Container(
-      key: const Key('claim-review-groups-panel'),
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.dividerBorder),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Claim review', style: AppTextStyles.titleLarge),
-          if (providerLabel != null) ...[
-            const SizedBox(height: 2),
-            Text(
-              key: const Key('claim-review-provider-label'),
-              'Answered via $providerLabel',
-              style: AppTextStyles.bodySmall,
+    final active = groups
+        .expand((g) => g.items)
+        .where((i) => i.id == _activeId)
+        .firstOrNull;
+    return OverlayPortal(
+      controller: _previewController,
+      overlayChildBuilder: (context) {
+        final size = MediaQuery.sizeOf(context);
+        return Positioned(
+          right: 16,
+          bottom: 80,
+          width: math.min(380.0, size.width - 32),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: math.max(120.0, size.height * 0.55),
             ),
-          ],
-          const SizedBox(height: 12),
-          for (final group in visibleGroups) ...[
-            _ClaimReviewGroupSection(
-              group: group,
-              selectedIds: selectedIds,
-              onToggle: onToggle,
+            child: SingleChildScrollView(
+              child: ClaimSourcePreviewPane(
+                item: active,
+                citations: widget.citations,
+                onClose: _togglePreview,
+              ),
             ),
-            const SizedBox(height: 16),
+          ),
+        );
+      },
+      child: Container(
+        key: const Key('claim-review-groups-panel'),
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.dividerBorder),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              spacing: 12,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text('Claim review', style: AppTextStyles.titleLarge),
+                TextButton.icon(
+                  key: const Key('pin-source-preview'),
+                  onPressed: _togglePreview,
+                  icon: Icon(
+                    _pinned ? Icons.push_pin : Icons.push_pin_outlined,
+                  ),
+                  label: Text(
+                    _pinned ? 'Close source pane' : 'Keep sources open',
+                  ),
+                ),
+              ],
+            ),
+            if (providerLabel != null) ...[
+              const SizedBox(height: 2),
+              Text(
+                key: const Key('claim-review-provider-label'),
+                'Answered via $providerLabel',
+                style: AppTextStyles.bodySmall,
+              ),
+            ],
+            const SizedBox(height: 12),
+            for (final group in visibleGroups) ...[
+              _ClaimReviewGroupSection(
+                group: group,
+                selectedIds: selectedIds,
+                onToggle: onToggle,
+                citations: widget.citations,
+                onPreview: _activate,
+                onOpenSources: (item) {
+                  _activate(item);
+                  if (!_pinned) _togglePreview();
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -75,11 +156,17 @@ class ClaimReviewGroupsPanel extends StatelessWidget {
 
 class _ClaimReviewGroupSection extends StatelessWidget {
   final ClaimReviewGroup group;
+  final List<GroundedAnswerCitation> citations;
+  final ValueChanged<ClaimReviewItem> onPreview;
+  final ValueChanged<ClaimReviewItem> onOpenSources;
   final Set<String> selectedIds;
   final ValueChanged<String> onToggle;
 
   const _ClaimReviewGroupSection({
     required this.group,
+    required this.citations,
+    required this.onPreview,
+    required this.onOpenSources,
     required this.selectedIds,
     required this.onToggle,
   });
@@ -109,6 +196,9 @@ class _ClaimReviewGroupSection extends StatelessWidget {
         key: ValueKey(sectionKey),
         group: group,
         headerText: headerText,
+        citations: citations,
+        onPreview: onPreview,
+        onOpenSources: onOpenSources,
       );
     }
 
@@ -155,6 +245,9 @@ class _ClaimReviewGroupSection extends StatelessWidget {
           _ClaimReviewItemTile(
             key: Key('claim-review-item-${item.id}'),
             item: item,
+            citations: citations,
+            onPreview: onPreview,
+            onOpenSources: onOpenSources,
             selected: selectedIds.contains(item.id),
             onToggle: () => onToggle(item.id),
           ),
@@ -168,11 +261,17 @@ class _ClaimReviewGroupSection extends StatelessWidget {
 /// the actionable groups below the fold; the user can still expand it.
 class _AlreadyKnownGroupSection extends StatelessWidget {
   final ClaimReviewGroup group;
+  final List<GroundedAnswerCitation> citations;
+  final ValueChanged<ClaimReviewItem> onPreview;
+  final ValueChanged<ClaimReviewItem> onOpenSources;
   final String headerText;
 
   const _AlreadyKnownGroupSection({
     super.key,
     required this.group,
+    required this.citations,
+    required this.onPreview,
+    required this.onOpenSources,
     required this.headerText,
   });
 
@@ -202,6 +301,9 @@ class _AlreadyKnownGroupSection extends StatelessWidget {
               _ClaimReviewItemTile(
                 key: Key('claim-review-item-${item.id}'),
                 item: item,
+                citations: citations,
+                onPreview: onPreview,
+                onOpenSources: onOpenSources,
                 selected: false,
                 onToggle: () {},
               ),
@@ -214,12 +316,18 @@ class _AlreadyKnownGroupSection extends StatelessWidget {
 
 class _ClaimReviewItemTile extends StatelessWidget {
   final ClaimReviewItem item;
+  final List<GroundedAnswerCitation> citations;
+  final ValueChanged<ClaimReviewItem> onPreview;
+  final ValueChanged<ClaimReviewItem> onOpenSources;
   final bool selected;
   final VoidCallback onToggle;
 
   const _ClaimReviewItemTile({
     super.key,
     required this.item,
+    required this.citations,
+    required this.onPreview,
+    required this.onOpenSources,
     required this.selected,
     required this.onToggle,
   });
@@ -228,19 +336,6 @@ class _ClaimReviewItemTile extends StatelessWidget {
     final lines = <Widget>[];
     if (item.reason.trim().isNotEmpty) {
       lines.add(Text(item.reason, style: AppTextStyles.bodySmall));
-    }
-    for (var i = 0; i < item.citationUrls.length; i++) {
-      final url = item.citationUrls[i];
-      final title =
-          i < item.citationTitles.length ? item.citationTitles[i] : '';
-      lines.add(
-        Text(
-          title.trim().isEmpty ? url : '$title ($url)',
-          key: Key('claim-review-source-${item.id}-$i'),
-          style: AppTextStyles.bodySmall,
-          overflow: TextOverflow.ellipsis,
-        ),
-      );
     }
     // Only alreadyKnown and betterSource results have confirmed local matches.
     // For newClaim and others the dedup service may return a low-similarity
@@ -270,7 +365,29 @@ class _ClaimReviewItemTile extends StatelessWidget {
     }
     if (lines.isEmpty) return null;
     return Column(
-        crossAxisAlignment: CrossAxisAlignment.start, children: lines);
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: lines,
+    );
+  }
+
+  Widget _buildSources() {
+    final sources = claimSourcePreviews(item, citations);
+    if (sources.isNotEmpty) {
+      final first = sources.first;
+      return Tooltip(
+        message:
+            '${first.title}\n${first.excerpt ?? "Source excerpt unavailable."}',
+        child: TextButton.icon(
+          key: Key('claim-review-sources-${item.id}'),
+          onPressed: () => onOpenSources(item),
+          icon: const Icon(Icons.source_outlined, size: 16),
+          label: Text(
+            '${sources.length} ${sources.length == 1 ? "source" : "sources"}',
+          ),
+        ),
+      );
+    }
+    return const SizedBox.shrink();
   }
 
   @override
@@ -283,14 +400,31 @@ class _ClaimReviewItemTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.dividerBorder),
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: CheckboxListTile(
-          value: selected,
-          onChanged: item.canBeSaved ? (_) => onToggle() : null,
-          controlAffinity: ListTileControlAffinity.leading,
-          title: Text(item.text, style: AppTextStyles.bodyMedium),
-          subtitle: _buildSubtitle(),
+      child: MouseRegion(
+        onEnter: (_) => onPreview(item),
+        child: Focus(
+          onFocusChange: (focused) {
+            if (focused) onPreview(item);
+          },
+          child: Material(
+            color: Colors.transparent,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                CheckboxListTile(
+                  value: selected,
+                  onChanged: item.canBeSaved ? (_) => onToggle() : null,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  title: Text(item.text, style: AppTextStyles.bodyMedium),
+                  subtitle: _buildSubtitle(),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(left: 60),
+                  child: _buildSources(),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
