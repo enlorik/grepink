@@ -46,6 +46,7 @@ class _ClaimReviewGroupsPanelState extends State<ClaimReviewGroupsPanel> {
   String? _activeId;
   bool _pinned = false;
   bool _continuous = true;
+  bool _previewVisible = false;
   final _sourceScroll = ScrollController();
   Timer? _hideTimer;
   String? _dismissedId;
@@ -57,11 +58,21 @@ class _ClaimReviewGroupsPanelState extends State<ClaimReviewGroupsPanel> {
     super.dispose();
   }
 
+  void _showPreview() {
+    _previewController.show();
+    if (!_previewVisible) setState(() => _previewVisible = true);
+  }
+
+  void _hidePreview() {
+    _previewController.hide();
+    if (_previewVisible) setState(() => _previewVisible = false);
+  }
+
   void _leave() {
     _hideTimer?.cancel();
     if (!_pinned) {
       _hideTimer = Timer(const Duration(milliseconds: 250), () {
-        if (mounted && !_pinned) _previewController.hide();
+        if (mounted && !_pinned) _hidePreview();
       });
     }
   }
@@ -70,7 +81,7 @@ class _ClaimReviewGroupsPanelState extends State<ClaimReviewGroupsPanel> {
     _hideTimer?.cancel();
     final changed = _activeId != item.id;
     _activate(item);
-    if (_dismissedId != item.id) _previewController.show();
+    if (_dismissedId != item.id) _showPreview();
     if (changed) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && _sourceScroll.hasClients) _sourceScroll.jumpTo(0);
@@ -84,7 +95,7 @@ class _ClaimReviewGroupsPanelState extends State<ClaimReviewGroupsPanel> {
       _pinned = false;
       _dismissedId = _activeId;
     });
-    _previewController.hide();
+    _hidePreview();
   }
 
   void _scrollSource(PointerSignalEvent event) {
@@ -178,9 +189,9 @@ class _ClaimReviewGroupsPanelState extends State<ClaimReviewGroupsPanel> {
     _hideTimer?.cancel();
     setState(() => _pinned = !_pinned);
     if (_pinned) {
-      _previewController.show();
+      _showPreview();
     } else {
-      _previewController.hide();
+      _hidePreview();
     }
   }
 
@@ -333,9 +344,16 @@ class _ClaimReviewGroupsPanelState extends State<ClaimReviewGroupsPanel> {
                                   child: _readingView(items, active)),
                               if (docked) ...[
                                 const SizedBox(width: gutter),
-                                const SizedBox(
-                                    width: sourceWidth,
-                                    child: _SourceWorkspacePlaceholder()),
+                                SizedBox(
+                                  width: sourceWidth,
+                                  child: Visibility(
+                                    visible: !_previewVisible,
+                                    maintainSize: true,
+                                    maintainState: true,
+                                    maintainAnimation: true,
+                                    child: const _SourceWorkspacePlaceholder(),
+                                  ),
+                                ),
                               ],
                             ])
                       : Column(
@@ -387,7 +405,8 @@ class _SourceWorkspacePlaceholder extends StatelessWidget {
               Text('Sources',
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
               SizedBox(height: 6),
-              Text('Hover a sentence to read its sources here.',
+              Text(
+                  'Hover a sentence or use its Sources button to read references here.',
                   style: TextStyle(
                       fontSize: 14,
                       height: 1.5,
