@@ -67,6 +67,10 @@ Future<void> pumpPanel(
       ),
     ),
   );
+  if (find.text('Detailed list').evaluate().isNotEmpty) {
+    await tester.tap(find.byKey(const Key('claim-review-view-toggle')));
+    await tester.pumpAndSettle();
+  }
 }
 
 void main() {
