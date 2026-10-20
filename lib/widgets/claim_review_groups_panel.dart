@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show MatrixUtils;
 import 'package:flutter/gestures.dart';
 
 import '../models/claim_deduplication_result.dart';
