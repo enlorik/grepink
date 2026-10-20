@@ -77,3 +77,33 @@ HTML-escaped AST as display text. This glued headings/lists together, exposed
 Long runs of sentence claims receive paragraph breaks at claim boundaries; the
 original saved claim text is unchanged. Missing upstream Markdown cannot be
 reconstructed reliably, so this repair preserves structure present in the claims.
+
+
+## Reading workspace UX repair
+
+The Windows screenshot showed a large internal gap because the article had a
+740-pixel cap while the preview was positioned against the viewport edge.
+The page had no shared grid tying those two regions together.
+
+Research and choice:
+- [Material supporting-pane guidance](https://developer.android.com/develop/ui/compose/layouts/adaptive/canonical-layouts#supporting_pane) places related secondary content beside the primary document on wide screens and adapts it on compact screens.
+- [Flutter anchored overlay layout](https://api.flutter.dev/flutter/widgets/OverlayPortal/OverlayPortal.overlayChildLayoutBuilder.html) supplies layout-time position/size information so the preview follows the workspace while scrolling and resizing.
+- Choose a centered reading workspace with an adjacent supporting source pane; stretching prose across the whole window would recreate the previous long-line problem, while a viewport-edge popup would retain the gap.
+
+Delivery checklist:
+- [x] Center the workspace with a maximum width of 1136 logical pixels.
+- [x] Keep article width at most 740, source width 340, and their gutter 24.
+- [x] Align the source pane to the reading body and clamp it inside the viewport during scrolling.
+- [x] Show a quiet Sources prompt before a sentence is hovered.
+- [x] Use an outlined companion pane instead of a heavy floating shadow on desktop.
+- [x] Keep the compact popup when content width is below 960 or text scaling is above 1.5.
+- [x] Preserve hover matching, pin/close, ignore/restore, source wheel scrolling and citation URLs.
+- [x] Test pane geometry, scroll clamping, open-pane window resizing and narrow fallback.
+- [ ] Inspect the rendered CI layout preview before publishing the beta.
+- [ ] Verify the new beta on the actual Windows device and a touch device.
+
+The CI-only preview uses the real review widgets with a representative Rust
+fixture and locally loaded Inter/monospace fonts; font preparation happens before
+network-free tests. It is a layout QA image, not a screenshot of the user's
+running Windows application. No production provider request, note, setting or
+sync behavior changes. The declared Flutter floor matches the existing lockfile.
