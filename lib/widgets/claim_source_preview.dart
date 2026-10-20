@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 
 import '../models/claim_review_item.dart';
 import '../models/grounded_answer.dart';
@@ -22,17 +23,78 @@ class ClaimSourcePreview {
     }
     // Only provider-supplied source text is used for browser highlighting.
     final anchor = uri.fragment.split(':~:').first;
-    return '${uri.removeFragment()}#$anchor:~:text=${Uri.encodeComponent(excerpt!)}';
+    return '${uri.removeFragment()}#$anchor:~:text=${Uri.encodeComponent(sourcePlainText(excerpt!))}';
   }
 }
 
+/// Render provider Markdown without fetching images or opening embedded links.
+/// Claims remain non-selectable so the enclosing checkbox owns its tap target.
+class ClaimFormattedText extends StatelessWidget {
+  final String data;
+  final bool selectable;
+  final TextStyle? style;
+
+  const ClaimFormattedText({
+    super.key,
+    required this.data,
+    this.selectable = false,
+    this.style,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (!RegExp(r'[*_`#>~\[\]\n|]').hasMatch(data)) {
+      return selectable
+          ? SelectableText(data, style: style)
+          : Text(data, style: style);
+    }
+    return MarkdownBody(
+      data: data,
+      selectable: selectable,
+      styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+        p: (style ?? Theme.of(context).textTheme.bodyMedium)
+            ?.copyWith(height: 1.5),
+        blockSpacing: 8,
+      ),
+      imageBuilder: (uri, title, alt) => Text(alt ?? 'Image'),
+    );
+  }
+}
+
+/// Plain prose keeps its short preview; structured excerpts retain line breaks.
 String sourceExcerpt(String text) {
-  final compact = text.replaceAll(RegExp(r'\s+'), ' ').trim();
+  final normalized = text.replaceAll('\r\n', '\n').trim();
+  if (normalized.contains('\n')) {
+    if (normalized.length <= 1600) return normalized;
+    final boundary = normalized.lastIndexOf('\n', 1600);
+    var clipped = normalized.substring(0, boundary > 0 ? boundary : 1600);
+    // Keep a truncated fenced code block from swallowing the ellipsis.
+    if (RegExp(r'^```', multiLine: true).allMatches(clipped).length.isOdd) {
+      clipped += '\n```';
+    }
+    if (RegExp(r'^~~~', multiLine: true).allMatches(clipped).length.isOdd) {
+      clipped += '\n~~~';
+    }
+    return '$clipped\n\n…';
+  }
+  final compact = normalized.replaceAll(RegExp(r'\s+'), ' ');
   final sentences = compact.split(RegExp(r'(?<=[.!?])\s+')).take(2).join(' ');
   return sentences.length <= 360
       ? sentences
       : '${sentences.substring(0, 357)}...';
 }
+
+/// Browser text fragments match visible page words, not Markdown delimiters.
+String sourcePlainText(String text) => text
+    .replaceAllMapped(RegExp(r'!?\[([^\]]+)\]\([^)]*\)'), (m) => m[1]!)
+    .replaceAll(
+        RegExp(r'^\s{0,3}(?:#{1,6}\s+|>\s*|[-+*]\s+|\d+[.)]\s+)',
+            multiLine: true),
+        '')
+    .replaceAll(RegExp(r'^\s*(?:```|~~~).*$', multiLine: true), '')
+    .replaceAll(RegExp(r'[*_`~]'), '')
+    .replaceAll(RegExp(r'\s+'), ' ')
+    .trim();
 
 List<ClaimSourcePreview> claimSourcePreviews(
   ClaimReviewItem item,
@@ -113,7 +175,7 @@ class ClaimSourcePreviewPane extends StatelessWidget {
             if (item == null)
               const Text('Hover a claim or tap its Sources button.'),
             if (item != null) ...[
-              Text(item!.text, maxLines: 3, overflow: TextOverflow.ellipsis),
+              ClaimFormattedText(data: item!.text, selectable: true),
               const Divider(),
               if (sources.isEmpty)
                 const Text('No source was supplied for this claim.'),
@@ -122,10 +184,12 @@ class ClaimSourcePreviewPane extends StatelessWidget {
                   sources[i].title,
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
-                Text(Uri.tryParse(sources[i].url)?.host ?? 'Source'),
+                if (sources[i].title != Uri.tryParse(sources[i].url)?.host)
+                  Text(Uri.tryParse(sources[i].url)?.host ?? 'Source'),
                 const SizedBox(height: 4),
-                SelectableText(
-                  sources[i].excerpt ??
+                ClaimFormattedText(
+                  selectable: true,
+                  data: sources[i].excerpt ??
                       'The provider did not supply a source excerpt.',
                 ),
                 TextButton.icon(
