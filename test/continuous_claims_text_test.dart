@@ -1,11 +1,16 @@
+import 'dart:io';
+import 'dart:ui' as ui;
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:grepink/models/claim_deduplication_result.dart';
 import 'package:grepink/models/claim_review_item.dart';
 import 'package:grepink/models/grounded_answer.dart';
 import 'package:grepink/widgets/claim_review_groups_panel.dart';
+import 'package:grepink/theme/app_colors.dart';
 
 ClaimReviewItem claim(String id, String text, int order,
         {bool saveable = true}) =>
@@ -46,37 +51,42 @@ Future<void> pumpReview(
   List<GroundedAnswerCitation> citations = const [],
   ScrollController? pageScroll,
   ValueChanged<Set<String>>? onSelection,
+  GlobalKey? captureKey,
+  ThemeData? theme,
 }) async {
   var selected = claims.where((c) => c.canBeSaved).map((c) => c.id).toSet();
-  await tester.pumpWidget(MaterialApp(
-      home: Scaffold(
-          body: StatefulBuilder(
-    builder: (context, setState) => SingleChildScrollView(
-      controller: pageScroll,
-      child: Column(children: [
-        ClaimReviewGroupsPanel(
-          groups: [
-            ClaimReviewGroup(
-                label: 'New claims',
-                classification: ClaimNoveltyClassification.newClaim,
-                items: claims.where((c) => c.canBeSaved).toList()),
-            ClaimReviewGroup(
-                label: 'Already in notes',
-                classification: ClaimNoveltyClassification.alreadyKnown,
-                items: claims.where((c) => !c.canBeSaved).toList()),
-          ],
-          selectedIds: selected,
-          citations: citations,
-          onToggle: (id) => setState(() {
-            selected = {...selected};
-            if (!selected.remove(id)) selected.add(id);
-            onSelection?.call(selected);
-          }),
-        ),
-        const SizedBox(height: 1500)
-      ]),
-    ),
-  ))));
+  await tester.pumpWidget(RepaintBoundary(
+      key: captureKey,
+      child: MaterialApp(
+          theme: theme,
+          home: Scaffold(
+              body: StatefulBuilder(
+            builder: (context, setState) => SingleChildScrollView(
+              controller: pageScroll,
+              child: Column(children: [
+                ClaimReviewGroupsPanel(
+                  groups: [
+                    ClaimReviewGroup(
+                        label: 'New claims',
+                        classification: ClaimNoveltyClassification.newClaim,
+                        items: claims.where((c) => c.canBeSaved).toList()),
+                    ClaimReviewGroup(
+                        label: 'Already in notes',
+                        classification: ClaimNoveltyClassification.alreadyKnown,
+                        items: claims.where((c) => !c.canBeSaved).toList()),
+                  ],
+                  selectedIds: selected,
+                  citations: citations,
+                  onToggle: (id) => setState(() {
+                    selected = {...selected};
+                    if (!selected.remove(id)) selected.add(id);
+                    onSelection?.call(selected);
+                  }),
+                ),
+                const SizedBox(height: 1500)
+              ]),
+            ),
+          )))));
   await tester.pumpAndSettle();
 }
 
@@ -180,6 +190,128 @@ void main() {
     expect(find.text('3.'), findsOneWidget);
     expect(find.text('4.'), findsOneWidget);
     expect(find.byType(Table), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'wide workspace places sources beside text and survives resize and page scroll',
+      (tester) async {
+    tester.view.physicalSize = const Size(1600, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final capture = GlobalKey();
+    final output = Platform.environment['GREPINK_LAYOUT_PREVIEW'];
+    if (output != null) {
+      await tester.runAsync(() async {
+        for (final entry in {
+          'Inter': 'GREPINK_PREVIEW_FONT',
+          'monospace': 'GREPINK_PREVIEW_MONO'
+        }.entries) {
+          final bytes =
+              await File(Platform.environment[entry.value]!).readAsBytes();
+          await (FontLoader(entry.key)
+                ..addFont(Future.value(ByteData.sublistView(bytes))))
+              .load();
+        }
+      });
+    }
+    final page = ScrollController();
+    addTearDown(page.dispose);
+    await pumpReview(
+        tester,
+        [
+          claim(
+              'intro',
+              'Rust is a **statically typed** language: every value has a type known at compile time.',
+              0),
+          claim(
+              'scalars',
+              '## Scalar types\n\n- **Integers**: signed and unsigned whole numbers.\n- **Floating-point**: decimal values, including `f32` and `f64`.\n- **Booleans**: `true` or `false`.\n- **Characters**: a single Unicode value.',
+              1),
+          claim(
+              'compound',
+              '## Compound types\n\nTuples group values with different types; arrays contain values of the same type.\n\n```rust\nlet name: &str = "Grepink";\nlet pair = (42, true);\n```',
+              2),
+        ],
+        pageScroll: page,
+        captureKey: capture,
+        theme: ThemeData(
+            useMaterial3: true,
+            fontFamily: 'Inter',
+            scaffoldBackgroundColor: AppColors.backgroundStart,
+            colorScheme: const ColorScheme.light(
+                primary: AppColors.primaryAction,
+                surface: AppColors.surface,
+                onSurface: AppColors.bodyText)),
+        citations: const [
+          GroundedAnswerCitation(
+              id: 'intro',
+              title: 'The Rust Programming Language',
+              url: 'https://example.com/intro',
+              snippet:
+                  '## Data types\n\nRust is a statically typed language, which means that it must know the types of all variables at compile time.\n\n### Scalar types\n\nA scalar type represents a single value. Rust has four primary scalar types: integers, floating-point numbers, Booleans, and characters.')
+        ]);
+    final workspace =
+        tester.getRect(find.byKey(const Key('claim-review-groups-panel')));
+    expect(workspace.width, 1136);
+    expect(workspace.center.dx, closeTo(800, 1));
+    expect(
+        find.byKey(const Key('source-workspace-placeholder')), findsOneWidget);
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer(location: Offset.zero);
+    addTearDown(mouse.removePointer);
+    await mouse.moveTo(wordPosition(tester, 'Rust'));
+    await tester.pumpAndSettle();
+    final article =
+        tester.getRect(find.byKey(const Key('continuous-claims-text')));
+    final source =
+        tester.getRect(find.byKey(const Key('source-preview-scroll')));
+    expect(source.left - article.right, closeTo(24, 1));
+    expect(source.right, lessThanOrEqualTo(workspace.right));
+    expect(source.top, lessThan(article.top + 1));
+    expect(
+        tester
+            .widget<Material>(find.byKey(const Key('source-preview-pane')))
+            .elevation,
+        0);
+    await tester.tap(find.byKey(const Key('pin-source-preview')));
+    await tester.pumpAndSettle();
+    if (output != null) {
+      final boundary =
+          capture.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+      await tester.runAsync(() async {
+        final image = await boundary.toImage(pixelRatio: 1);
+        final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+        final file = File(output);
+        await file.parent.create(recursive: true);
+        await file.writeAsBytes(bytes!.buffer.asUint8List());
+        image.dispose();
+      });
+    }
+    page.jumpTo(240);
+    await tester.pumpAndSettle();
+    final sticky =
+        tester.getRect(find.byKey(const Key('source-preview-scroll')));
+    expect(sticky.top, greaterThanOrEqualTo(96));
+    expect(sticky.bottom, lessThanOrEqualTo(920));
+    tester.view.physicalSize = const Size(600, 1000);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('docked-source-preview')), findsNothing);
+    expect(find.byKey(const Key('compact-source-preview')), findsOneWidget);
+    expect(find.byKey(const Key('source-workspace-placeholder')), findsNothing);
+    final compact =
+        tester.getRect(find.byKey(const Key('source-preview-scroll')));
+    expect(compact.left, greaterThanOrEqualTo(0));
+    expect(compact.right, lessThanOrEqualTo(600));
+    tester.view.physicalSize = const Size(1600, 1000);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('docked-source-preview')), findsOneWidget);
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('docked-source-preview')), findsNothing);
+    expect(find.byKey(const Key('compact-source-preview')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
