@@ -25,3 +25,18 @@
 - [ ] Extend the same source-reading controls to saved-note reading and draft previews without changing their editable source Markdown.
 
 The first delivery previews source metadata already returned by the provider, not a screenshot or full webpage. It does not fetch arbitrary URLs when the mouse moves. Browser text highlighting depends on browser support and an exact match in the page; a link is not evidence that a matching passage was found. Provider citation associations may cover the whole answer rather than a particular claim, so the pane must not assert that every listed source proves that claim. The original Markdown and source URLs remain available when editing or exporting notes.
+
+## Readable formatting follow-up
+
+- [x] Render claim Markdown (bold, emphasis, code, headings and lists).
+- [x] Render source excerpts with the same Markdown renderer, including tables.
+- [x] Preserve provider line breaks in structured excerpts; bound long previews.
+- [x] Use visible words rather than Markdown markers in copied text-fragment links.
+- [x] Keep checkbox selection working and prevent remote Markdown image requests.
+- [ ] Verify formatting and popup sizing on the Windows build.
+- [ ] Original website layout: deferred to the embedded-browser follow-up above.
+
+Formatting changes only presentation; saved claims and citation URLs remain intact.
+Plain prose retains the two-sentence preview; structured snippets can show up to
+1,600 characters to retain list/table layout. The preview cannot recover formatting
+that the provider already removed.
