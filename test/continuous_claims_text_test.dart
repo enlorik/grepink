@@ -166,6 +166,16 @@ void main() {
             target.getPositionForOffset(target.globalToLocal(listPoint));
         final span = target.text.getSpanForPosition(position);
         debugPrint('ARTICLE SPAN ${target.text.toPlainText()} $position $span');
+        final recognizer =
+            (span as TextSpan).recognizer as TapGestureRecognizer;
+        final callback = recognizer.onTap;
+        debugPrint('ARTICLE CALLBACK ${callback != null}');
+        recognizer.onTapDown = (_) => debugPrint('ARTICLE DOWN');
+        recognizer.onTapCancel = () => debugPrint('ARTICLE CANCEL');
+        recognizer.onTap = () {
+          debugPrint('ARTICLE TAP CALLBACK');
+          callback?.call();
+        };
       }
     }
     await tester.tapAt(listPoint);
