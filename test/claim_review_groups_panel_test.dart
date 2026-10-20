@@ -65,6 +65,10 @@ Future<void> _pumpPanel(
       ),
     ),
   );
+  if (find.text('Detailed list').evaluate().isNotEmpty) {
+    await tester.tap(find.byKey(const Key('claim-review-view-toggle')));
+    await tester.pumpAndSettle();
+  }
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
