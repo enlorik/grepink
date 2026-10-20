@@ -1,6 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:grepink/models/claim_deduplication_result.dart';
 import 'package:grepink/models/claim_review_item.dart';
 import 'package:grepink/models/grounded_answer.dart';
@@ -125,6 +126,86 @@ void main() {
   test('excerpts are limited to two sentences and bounded length', () {
     expect(sourceExcerpt('One. Two. Three.'), 'One. Two.');
     expect(sourceExcerpt('x' * 1000).length, 360);
+  });
+
+  test('structured excerpts retain headings, lists and tables', () {
+    const markdown = '## Types\n\n- **Integer**\n- `float`\n\n'
+        '| Type | Size |\n| --- | --- |\n| int | 32 |';
+    expect(sourceExcerpt(markdown), markdown);
+    expect(
+        sourcePlainText(
+            '## **Types**\n\n- `int` and [float](https://example.com)'),
+        'Types int and float');
+    const source = ClaimSourcePreview(
+        'https://example.com', 'Types', '**Integer** and `float`.');
+    expect(Uri.decodeComponent(Uri.parse(source.pageLink).fragment),
+        ':~:text=Integer and float.');
+    final clipped = sourceExcerpt('```dart\n${'long line\n' * 300}');
+    expect(clipped, endsWith('```\n\n…'));
+  });
+
+  testWidgets('Markdown claim keeps selection working and renders styled spans',
+      (tester) async {
+    final toggles = <String>[];
+    const claim = ClaimReviewItem(
+      id: 'styled',
+      text: '**Bold claim** with `code` and *emphasis*',
+      classification: ClaimNoveltyClassification.newClaim,
+      citationUrls: ['https://example.com/a'],
+      citationTitles: [],
+      selectedByDefault: true,
+      reason: '',
+      matchedLocalEvidenceIds: [],
+      canBeSaved: true,
+    );
+    await pumpPanel(tester, [claim], toggle: toggles.add);
+    final tile = find.byKey(const Key('claim-review-item-styled'));
+    expect(find.descendant(of: tile, matching: find.byType(MarkdownBody)),
+        findsOneWidget);
+    final spans = tester
+        .widgetList<RichText>(
+            find.descendant(of: tile, matching: find.byType(RichText)))
+        .map((widget) => widget.text.toPlainText())
+        .join(' ');
+    expect(spans, contains('Bold claim'));
+    expect(spans, isNot(contains('**')));
+    await tester
+        .tap(find.descendant(of: tile, matching: find.byType(Checkbox)));
+    await tester.pump();
+    expect(toggles, ['styled']);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'source pane renders headings, tables and code without fetching images',
+      (tester) async {
+    const snippet = '## Types\n\n**Bold** and *italic* with `code`.\n\n'
+        '- First\n- Second\n\n'
+        '| Type | Size |\n| --- | --- |\n| int | 32 |\n\n'
+        '![Illustration](https://example.com/image.png)';
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: SizedBox(
+      width: 380,
+      child: SingleChildScrollView(
+          child: ClaimSourcePreviewPane(
+        item: item('one', ['https://example.com/a']),
+        citations: const [
+          GroundedAnswerCitation(
+              id: 'a',
+              title: 'Page',
+              url: 'https://example.com/a',
+              snippet: snippet)
+        ],
+        onClose: () {},
+      )),
+    ))));
+    await tester.pumpAndSettle();
+    expect(find.byType(MarkdownBody), findsOneWidget);
+    expect(find.byType(Table), findsOneWidget);
+    expect(find.byType(Image), findsNothing);
+    expect(find.text('Illustration'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets(
