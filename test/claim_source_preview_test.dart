@@ -146,10 +146,13 @@ void main() {
 
   testWidgets('Markdown claim keeps selection working and renders styled spans',
       (tester) async {
+    final semantics = tester.ensureSemantics();
+    addTearDown(semantics.dispose);
     final toggles = <String>[];
     const claim = ClaimReviewItem(
       id: 'styled',
-      text: '**Bold claim** with `code` and *emphasis*',
+      text:
+          '**Bold claim** with `code`, *emphasis* and [source](https://example.com)',
       classification: ClaimNoveltyClassification.newClaim,
       citationUrls: ['https://example.com/a'],
       citationTitles: [],
