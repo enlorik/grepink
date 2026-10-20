@@ -161,10 +161,6 @@ class ClaimSourcePreviewPane extends StatelessWidget {
       color: Theme.of(context).colorScheme.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: docked
-            ? BorderSide(
-                color: Theme.of(context).colorScheme.primary.withAlpha(60))
-            : BorderSide.none,
       ),
       clipBehavior: Clip.antiAlias,
       child: Padding(
