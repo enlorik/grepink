@@ -335,7 +335,8 @@ class _ClaimReviewItemTile extends StatelessWidget {
   Widget? _buildSubtitle() {
     final lines = <Widget>[];
     if (item.reason.trim().isNotEmpty) {
-      lines.add(Text(item.reason, style: AppTextStyles.bodySmall));
+      lines.add(ClaimFormattedText(
+          data: item.reason, style: AppTextStyles.bodySmall));
     }
     // Only alreadyKnown and betterSource results have confirmed local matches.
     // For newClaim and others the dedup service may return a low-similarity
@@ -376,7 +377,7 @@ class _ClaimReviewItemTile extends StatelessWidget {
       final first = sources.first;
       return Tooltip(
         message:
-            '${first.title}\n${first.excerpt ?? "Source excerpt unavailable."}',
+            '${first.title}\n${first.excerpt == null ? "Source excerpt unavailable." : sourcePlainText(first.excerpt!)}',
         child: TextButton.icon(
           key: Key('claim-review-sources-${item.id}'),
           onPressed: () => onOpenSources(item),
@@ -415,7 +416,8 @@ class _ClaimReviewItemTile extends StatelessWidget {
                   value: selected,
                   onChanged: item.canBeSaved ? (_) => onToggle() : null,
                   controlAffinity: ListTileControlAffinity.leading,
-                  title: Text(item.text, style: AppTextStyles.bodyMedium),
+                  title: ClaimFormattedText(
+                      data: item.text, style: AppTextStyles.bodyMedium),
                   subtitle: _buildSubtitle(),
                 ),
                 Padding(
