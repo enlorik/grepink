@@ -33,8 +33,10 @@ Offset wordPosition(WidgetTester tester, String word) {
   final render = element.renderObject! as RenderParagraph;
   final start = render.text.toPlainText().indexOf(word);
   expect(start, greaterThanOrEqualTo(0));
+  // Click inside a glyph; the midpoint of an even-length word can lie
+  // exactly between glyph hit regions.
   final boxes = render.getBoxesForSelection(
-      TextSelection(baseOffset: start, extentOffset: start + word.length));
+      TextSelection(baseOffset: start, extentOffset: start + 1));
   return render.localToGlobal(boxes.first.toRect().center);
 }
 
@@ -155,30 +157,7 @@ void main() {
     expect(
         tester.getSize(find.byKey(const Key('continuous-claims-text'))).width,
         lessThanOrEqualTo(740));
-    final listPoint = wordPosition(tester, 'Integers');
-    final hits = tester.hitTestOnBinding(listPoint).path;
-    debugPrint(
-        'ARTICLE TAP $listPoint ${hits.map((e) => e.target.runtimeType).toList()}');
-    for (final hit in hits) {
-      if (hit.target is RenderParagraph) {
-        final target = hit.target as RenderParagraph;
-        final position =
-            target.getPositionForOffset(target.globalToLocal(listPoint));
-        final span = target.text.getSpanForPosition(position);
-        debugPrint('ARTICLE SPAN ${target.text.toPlainText()} $position $span');
-        final recognizer =
-            (span as TextSpan).recognizer as TapGestureRecognizer;
-        final callback = recognizer.onTap;
-        debugPrint('ARTICLE CALLBACK ${callback != null}');
-        recognizer.onTapDown = (_) => debugPrint('ARTICLE DOWN');
-        recognizer.onTapCancel = () => debugPrint('ARTICLE CANCEL');
-        recognizer.onTap = () {
-          debugPrint('ARTICLE TAP CALLBACK');
-          callback?.call();
-        };
-      }
-    }
-    await tester.tapAt(listPoint);
+    await tester.tapAt(wordPosition(tester, 'Integers'));
     await tester.pumpAndSettle();
     expect(selection, isNotNull);
     expect(selection, isNot(contains('list')));
