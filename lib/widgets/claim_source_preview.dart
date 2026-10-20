@@ -43,7 +43,8 @@ class ClaimFormattedText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!RegExp(r'[*_`#>~\[\]\n|]').hasMatch(data)) {
+    if (!RegExp(r'[*_`#>~\[\]\n|]|^\s*(?:[-+]\s|\d+[.)]\s|---+\s*$)')
+        .hasMatch(data)) {
       return selectable
           ? SelectableText(data, style: style)
           : Text(data, style: style);
