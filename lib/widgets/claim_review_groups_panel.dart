@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show MatrixUtils;
 import 'package:flutter/gestures.dart';
 
 import '../models/claim_deduplication_result.dart';
@@ -209,103 +210,191 @@ class _ClaimReviewGroupsPanelState extends State<ClaimReviewGroupsPanel> {
         .expand((g) => g.items)
         .where((i) => i.id == _activeId)
         .firstOrNull;
-    return OverlayPortal(
-      controller: _previewController,
-      overlayChildBuilder: (context) {
-        final size = MediaQuery.sizeOf(context);
-        return Positioned(
-          right: 16,
-          bottom: 80,
-          width: math.min(380.0, size.width - 32),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: math.max(120.0, size.height * 0.45),
-            ),
-            child: MouseRegion(
-              onEnter: (_) => _hideTimer?.cancel(),
-              onExit: (_) => _leave(),
-              child: SingleChildScrollView(
-                key: const Key('source-preview-scroll'),
-                controller: _sourceScroll,
-                child: ClaimSourcePreviewPane(
-                  item: active,
-                  citations: widget.citations,
-                  onClose: _closePreview,
-                ),
-              ),
-            ),
+    return Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1136),
+        child: Container(
+          key: const Key('claim-review-groups-panel'),
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.dividerBorder),
           ),
-        );
-      },
-      child: Container(
-        key: const Key('claim-review-groups-panel'),
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.dividerBorder),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Wrap(
-              spacing: 12,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                Text('Claim review', style: AppTextStyles.titleLarge),
-                TextButton(
-                  key: const Key('claim-review-view-toggle'),
-                  onPressed: () {
-                    _hideTimer?.cancel();
-                    _closePreview();
-                    setState(() => _continuous = !_continuous);
-                  },
-                  child: Text(_continuous ? 'Detailed list' : 'Reading view'),
-                ),
-                TextButton.icon(
-                  key: const Key('pin-source-preview'),
-                  onPressed: _togglePreview,
-                  icon: Icon(
-                    _pinned ? Icons.push_pin : Icons.push_pin_outlined,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: 12,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text('Claim review', style: AppTextStyles.titleLarge),
+                  TextButton(
+                    key: const Key('claim-review-view-toggle'),
+                    onPressed: () {
+                      _hideTimer?.cancel();
+                      _closePreview();
+                      setState(() => _continuous = !_continuous);
+                    },
+                    child: Text(_continuous ? 'Detailed list' : 'Reading view'),
                   ),
-                  label: Text(
-                    _pinned ? 'Close source pane' : 'Keep sources open',
+                  TextButton.icon(
+                    key: const Key('pin-source-preview'),
+                    onPressed: _togglePreview,
+                    icon: Icon(
+                      _pinned ? Icons.push_pin : Icons.push_pin_outlined,
+                    ),
+                    label: Text(
+                      _pinned ? 'Close source pane' : 'Keep sources open',
+                    ),
                   ),
-                ),
-              ],
-            ),
-            if (providerLabel != null) ...[
-              const SizedBox(height: 2),
-              Text(
-                key: const Key('claim-review-provider-label'),
-                'Answered via $providerLabel',
-                style: AppTextStyles.bodySmall,
+                ],
               ),
-            ],
-            const SizedBox(height: 12),
-            if (_continuous)
-              _readingView(items, active)
-            else
-              for (final group in visibleGroups) ...[
-                _ClaimReviewGroupSection(
-                  group: group,
-                  selectedIds: selectedIds,
-                  onToggle: onToggle,
-                  citations: widget.citations,
-                  onPreview: _activate,
-                  onOpenSources: (item) {
-                    _activate(item);
-                    if (!_pinned) _togglePreview();
-                  },
+              if (providerLabel != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  key: const Key('claim-review-provider-label'),
+                  'Answered via $providerLabel',
+                  style: AppTextStyles.bodySmall,
                 ),
-                const SizedBox(height: 16),
               ],
-          ],
+              const SizedBox(height: 12),
+              LayoutBuilder(builder: (context, constraints) {
+                final docked = _continuous &&
+                    constraints.maxWidth >= 960 &&
+                    MediaQuery.textScalerOf(context).scale(16) <= 24;
+                const sourceWidth = 340.0;
+                const gutter = 24.0;
+                final readingWidth = docked
+                    ? constraints.maxWidth - sourceWidth - gutter
+                    : math.min(740.0, constraints.maxWidth);
+                return OverlayPortal.overlayChildLayoutBuilder(
+                  controller: _previewController,
+                  overlayChildBuilder: (context, info) {
+                    final media = MediaQuery.of(context);
+                    final size = info.overlaySize;
+                    final origin = MatrixUtils.transformPoint(
+                        info.childPaintTransform, Offset.zero);
+                    final bottom =
+                        80 + media.padding.bottom + media.viewInsets.bottom;
+                    final safeTop =
+                        math.min(96.0 + media.padding.top, size.height * .25);
+                    final top = origin.dy
+                        .clamp(safeTop,
+                            math.max(safeTop, size.height - bottom - 160))
+                        .toDouble();
+                    final height = docked
+                        ? math.min(
+                            640.0, math.max(0.0, size.height - bottom - top))
+                        : math.max(
+                            0.0,
+                            math.min(
+                                size.height * .45, size.height - bottom - 16));
+                    return Positioned(
+                      key: Key(docked
+                          ? 'docked-source-preview'
+                          : 'compact-source-preview'),
+                      left: docked ? origin.dx + readingWidth + gutter : null,
+                      right: docked ? null : 16,
+                      top: docked ? top : null,
+                      bottom: docked ? null : bottom,
+                      width: docked
+                          ? sourceWidth
+                          : math.max(0, math.min(380.0, size.width - 32)),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(maxHeight: height),
+                        child: MouseRegion(
+                          onEnter: (_) => _hideTimer?.cancel(),
+                          onExit: (_) => _leave(),
+                          child: SingleChildScrollView(
+                            key: const Key('source-preview-scroll'),
+                            controller: _sourceScroll,
+                            child: ClaimSourcePreviewPane(
+                              item: active,
+                              citations: widget.citations,
+                              onClose: _closePreview,
+                              docked: docked,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                  child: _continuous
+                      ? Row(
+                          mainAxisAlignment: docked
+                              ? MainAxisAlignment.start
+                              : MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                              SizedBox(
+                                  width: readingWidth,
+                                  child: _readingView(items, active)),
+                              if (docked) ...[
+                                const SizedBox(width: gutter),
+                                const SizedBox(
+                                    width: sourceWidth,
+                                    child: _SourceWorkspacePlaceholder()),
+                              ],
+                            ])
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                              for (final group in visibleGroups) ...[
+                                _ClaimReviewGroupSection(
+                                  group: group,
+                                  selectedIds: selectedIds,
+                                  onToggle: onToggle,
+                                  citations: widget.citations,
+                                  onPreview: _activate,
+                                  onOpenSources: (item) {
+                                    _activate(item);
+                                    if (!_pinned) _togglePreview();
+                                  },
+                                ),
+                                const SizedBox(height: 16),
+                              ]
+                            ]),
+                );
+              }),
+            ],
+          ),
         ),
       ),
     );
   }
+}
+
+class _SourceWorkspacePlaceholder extends StatelessWidget {
+  const _SourceWorkspacePlaceholder();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        key: const Key('source-workspace-placeholder'),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: AppColors.aiResponseBackground.withAlpha(100),
+          border: Border.all(color: AppColors.dividerBorder),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.menu_book_outlined,
+                  size: 20, color: AppColors.deepAction),
+              SizedBox(height: 12),
+              Text('Sources',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+              SizedBox(height: 6),
+              Text('Hover a sentence to read its sources here.',
+                  style: TextStyle(
+                      fontSize: 14,
+                      height: 1.5,
+                      color: AppColors.secondaryText)),
+            ]),
+      );
 }
 
 class _ClaimReviewGroupSection extends StatelessWidget {
