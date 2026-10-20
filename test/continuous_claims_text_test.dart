@@ -116,6 +116,10 @@ void main() {
   testWidgets(
       'article preserves headings, hanging lists and literal Rust symbols',
       (tester) async {
+    tester.view.physicalSize = const Size(1000, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     Set<String>? selection;
     await pumpReview(
         tester,
@@ -153,6 +157,7 @@ void main() {
         lessThanOrEqualTo(740));
     await tester.tapAt(wordPosition(tester, 'Integers'));
     await tester.pumpAndSettle();
+    expect(selection, isNotNull);
     expect(selection, isNot(contains('list')));
     expect(selection, containsAll(['intro', 'heading', 'code']));
     expect(tester.takeException(), isNull);
