@@ -83,6 +83,7 @@ class ClaimReviewMapper {
       return ClaimReviewItem(
         id: r.claim.id,
         text: r.claim.text,
+        sourceOrder: r.claim.order,
         classification: r.classification,
         citationUrls: List.unmodifiable(r.citationUrls),
         citationTitles: List.unmodifiable(r.claim.citationTitles),
