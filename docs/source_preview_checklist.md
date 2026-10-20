@@ -57,3 +57,23 @@ that the provider already removed.
 A long answer can still exceed a screen; the reading view removes card spacing,
 per-claim controls and repeated source lists rather than shrinking the text.
 The popup continues to show provider excerpts, not a live website.
+
+## Article typography repair
+
+Diagnosis: the first reading view flattened Markdown blocks into inline spans,
+stripped their trailing breaks, used the whole window for text, and treated an
+HTML-escaped AST as display text. This glued headings/lists together, exposed
+`&amp;` and produced long, brightly highlighted lines.
+
+- [x] Keep an article rather than returning to individual claim cards.
+- [x] Preserve headings, paragraph breaks, nested/numbered lists and tables.
+- [x] Use hanging list indentation and horizontally scrollable code/tables.
+- [x] Limit reading width to 740 logical pixels with consistent type and spacing.
+- [x] Render literal ampersands and Rust references using a text AST.
+- [x] Replace solid pink highlighting with a subtle blush hover tint.
+- [x] Retain ignore/restore, original order, hover sources and popup scrolling.
+- [ ] Check the new typography visually on the Windows beta.
+
+Long runs of sentence claims receive paragraph breaks at claim boundaries; the
+original saved claim text is unchanged. Missing upstream Markdown cannot be
+reconstructed reliably, so this repair preserves structure present in the claims.
