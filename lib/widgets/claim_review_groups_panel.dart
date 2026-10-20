@@ -91,7 +91,9 @@ class _ClaimReviewGroupsPanelState extends State<ClaimReviewGroupsPanel> {
     if (event is! PointerScrollEvent ||
         !_previewController.isShowing ||
         !_sourceScroll.hasClients ||
-        _sourceScroll.position.maxScrollExtent == 0) return;
+        _sourceScroll.position.maxScrollExtent == 0) {
+      return;
+    }
     // Register before the ancestor page Scrollable, so only the source moves.
     GestureBinding.instance.pointerSignalResolver.register(event, (signal) {
       if (!mounted || !_sourceScroll.hasClients) return;
