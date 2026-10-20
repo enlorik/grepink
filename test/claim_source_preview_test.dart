@@ -147,36 +147,39 @@ void main() {
   testWidgets('Markdown claim keeps selection working and renders styled spans',
       (tester) async {
     final semantics = tester.ensureSemantics();
-    addTearDown(semantics.dispose);
-    final toggles = <String>[];
-    const claim = ClaimReviewItem(
-      id: 'styled',
-      text:
-          '**Bold claim** with `code`, *emphasis* and [source](https://example.com)',
-      classification: ClaimNoveltyClassification.newClaim,
-      citationUrls: ['https://example.com/a'],
-      citationTitles: [],
-      selectedByDefault: true,
-      reason: '',
-      matchedLocalEvidenceIds: [],
-      canBeSaved: true,
-    );
-    await pumpPanel(tester, [claim], toggle: toggles.add);
-    final tile = find.byKey(const Key('claim-review-item-styled'));
-    expect(find.descendant(of: tile, matching: find.byType(MarkdownBody)),
-        findsOneWidget);
-    final spans = tester
-        .widgetList<RichText>(
-            find.descendant(of: tile, matching: find.byType(RichText)))
-        .map((widget) => widget.text.toPlainText())
-        .join(' ');
-    expect(spans, contains('Bold claim'));
-    expect(spans, isNot(contains('**')));
-    await tester
-        .tap(find.descendant(of: tile, matching: find.byType(Checkbox)));
-    await tester.pump();
-    expect(toggles, ['styled']);
-    expect(tester.takeException(), isNull);
+    try {
+      final toggles = <String>[];
+      const claim = ClaimReviewItem(
+        id: 'styled',
+        text:
+            '**Bold claim** with `code`, *emphasis* and [source](https://example.com)',
+        classification: ClaimNoveltyClassification.newClaim,
+        citationUrls: ['https://example.com/a'],
+        citationTitles: [],
+        selectedByDefault: true,
+        reason: '',
+        matchedLocalEvidenceIds: [],
+        canBeSaved: true,
+      );
+      await pumpPanel(tester, [claim], toggle: toggles.add);
+      final tile = find.byKey(const Key('claim-review-item-styled'));
+      expect(find.descendant(of: tile, matching: find.byType(MarkdownBody)),
+          findsOneWidget);
+      final spans = tester
+          .widgetList<RichText>(
+              find.descendant(of: tile, matching: find.byType(RichText)))
+          .map((widget) => widget.text.toPlainText())
+          .join(' ');
+      expect(spans, contains('Bold claim'));
+      expect(spans, isNot(contains('**')));
+      await tester
+          .tap(find.descendant(of: tile, matching: find.byType(Checkbox)));
+      await tester.pump();
+      expect(toggles, ['styled']);
+      expect(tester.takeException(), isNull);
+    } finally {
+      semantics.dispose();
+    }
   });
 
   testWidgets(
