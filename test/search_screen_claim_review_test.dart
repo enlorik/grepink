@@ -182,6 +182,10 @@ Future<void> _askQuestion(WidgetTester tester, String question) async {
   await tester.pump();
   await tester.tap(find.byKey(const Key('ask-question-button')));
   await tester.pumpAndSettle();
+  if (find.text('Detailed list').evaluate().isNotEmpty) {
+    await tester.tap(find.byKey(const Key('claim-review-view-toggle')));
+    await tester.pumpAndSettle();
+  }
 }
 
 void main() {
