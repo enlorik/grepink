@@ -297,11 +297,48 @@ class _ClaimReviewGroupsPanelState extends State<ClaimReviewGroupsPanel> {
                         .toDouble();
                     final height = docked
                         ? math.min(
-                            640.0, math.max(0.0, size.height - bottom - top))
+                            640.0,
+                            math.max(
+                                0.0,
+                                math.min(size.height - bottom,
+                                        origin.dy + info.childSize.height) -
+                                    top))
                         : math.max(
                             0.0,
                             math.min(
                                 size.height * .45, size.height - bottom - 16));
+                    Widget preview = MouseRegion(
+                      onEnter: (_) => _hideTimer?.cancel(),
+                      onExit: (_) => _leave(),
+                      child: SingleChildScrollView(
+                        key: const Key('source-preview-scroll'),
+                        controller: _sourceScroll,
+                        child: ClaimSourcePreviewPane(
+                          item: active,
+                          citations: widget.citations,
+                          onClose: _closePreview,
+                          docked: docked,
+                        ),
+                      ),
+                    );
+                    if (docked) {
+                      preview = DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surface,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .primary
+                                  .withAlpha(60)),
+                        ),
+                        child: Padding(
+                            padding: const EdgeInsets.all(1),
+                            child: ClipRRect(
+                                borderRadius: BorderRadius.circular(11),
+                                child: preview)),
+                      );
+                    }
                     return Positioned(
                       key: Key(docked
                           ? 'docked-source-preview'
@@ -314,48 +351,40 @@ class _ClaimReviewGroupsPanelState extends State<ClaimReviewGroupsPanel> {
                           ? sourceWidth
                           : math.max(0, math.min(380.0, size.width - 32)),
                       child: ConstrainedBox(
+                        key: const Key('source-preview-frame'),
                         constraints: BoxConstraints(maxHeight: height),
-                        child: MouseRegion(
-                          onEnter: (_) => _hideTimer?.cancel(),
-                          onExit: (_) => _leave(),
-                          child: SingleChildScrollView(
-                            key: const Key('source-preview-scroll'),
-                            controller: _sourceScroll,
-                            child: ClaimSourcePreviewPane(
-                              item: active,
-                              citations: widget.citations,
-                              onClose: _closePreview,
-                              docked: docked,
-                            ),
-                          ),
-                        ),
+                        child: preview,
                       ),
                     );
                   },
                   child: _continuous
-                      ? Row(
-                          mainAxisAlignment: docked
-                              ? MainAxisAlignment.start
-                              : MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                              SizedBox(
-                                  width: readingWidth,
-                                  child: _readingView(items, active)),
-                              if (docked) ...[
-                                const SizedBox(width: gutter),
+                      ? ConstrainedBox(
+                          constraints:
+                              BoxConstraints(minHeight: docked ? 320 : 0),
+                          child: Row(
+                              mainAxisAlignment: docked
+                                  ? MainAxisAlignment.start
+                                  : MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
                                 SizedBox(
-                                  width: sourceWidth,
-                                  child: Visibility(
-                                    visible: !_previewVisible,
-                                    maintainSize: true,
-                                    maintainState: true,
-                                    maintainAnimation: true,
-                                    child: const _SourceWorkspacePlaceholder(),
+                                    width: readingWidth,
+                                    child: _readingView(items, active)),
+                                if (docked) ...[
+                                  const SizedBox(width: gutter),
+                                  SizedBox(
+                                    width: sourceWidth,
+                                    child: Visibility(
+                                      visible: !_previewVisible,
+                                      maintainSize: true,
+                                      maintainState: true,
+                                      maintainAnimation: true,
+                                      child:
+                                          const _SourceWorkspacePlaceholder(),
+                                    ),
                                   ),
-                                ),
-                              ],
-                            ])
+                                ],
+                              ]))
                       : Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
