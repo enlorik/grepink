@@ -99,7 +99,7 @@ Delivery checklist:
 - [x] Keep the compact popup when content width is below 960 or text scaling is above 1.5.
 - [x] Preserve hover matching, pin/close, ignore/restore, source wheel scrolling and citation URLs.
 - [x] Test pane geometry, scroll clamping, open-pane window resizing and narrow fallback.
-- [ ] Inspect the rendered CI layout preview before publishing the beta.
+- [x] Inspect the rendered CI layout preview and remove placeholder bleed behind an open pane.
 - [ ] Verify the new beta on the actual Windows device and a touch device.
 
 The CI-only preview uses the real review widgets with a representative Rust
