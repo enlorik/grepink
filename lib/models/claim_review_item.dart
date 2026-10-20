@@ -3,6 +3,9 @@ import 'claim_deduplication_result.dart';
 class ClaimReviewItem {
   final String id;
   final String text;
+
+  /// Position in the original answer, before novelty grouping.
+  final int? sourceOrder;
   final ClaimNoveltyClassification classification;
   final List<String> citationUrls;
   final List<String> citationTitles;
@@ -15,6 +18,7 @@ class ClaimReviewItem {
   const ClaimReviewItem({
     required this.id,
     required this.text,
+    this.sourceOrder,
     required this.classification,
     required this.citationUrls,
     required this.citationTitles,
