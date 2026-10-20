@@ -93,7 +93,8 @@ Research and choice:
 Delivery checklist:
 - [x] Center the workspace with a maximum width of 1136 logical pixels.
 - [x] Keep article width at most 740, source width 340, and their gutter 24.
-- [x] Align the source pane to the reading body and clamp it inside the viewport during scrolling.
+- [x] Align the source pane to the reading body and clamp it inside both the viewport and review area during scrolling.
+- [x] Keep a fixed pane outline while excerpts scroll, with a usable minimum reading area for short answers.
 - [x] Show a quiet Sources prompt before a sentence is hovered.
 - [x] Use an outlined companion pane instead of a heavy floating shadow on desktop.
 - [x] Keep the compact popup when content width is below 960 or text scaling is above 1.5.
