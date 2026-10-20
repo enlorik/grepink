@@ -40,3 +40,20 @@ Formatting changes only presentation; saved claims and citation URLs remain inta
 Plain prose retains the two-sentence preview; structured snippets can show up to
 1,600 characters to retain list/table layout. The preview cannot recover formatting
 that the provider already removed.
+
+## Continuous reading view
+
+- [x] Default to one flowing passage, preserving original answer order.
+- [x] Keep inline bold, emphasis and code formatting.
+- [x] Click/tap a claim to toggle ignored strikethrough and draft inclusion.
+- [x] Preserve existing eligibility and contradiction selection rules.
+- [x] Hover a claim to show its source popup; keep it open while entering it.
+- [x] Scroll over the passage to scroll the open source popup, not the page.
+- [x] Reset source scrolling when moving to a different claim.
+- [x] Provide previous/next, include/ignore and sources controls for touch/keyboard.
+- [x] Retain a Detailed list switch for full classification explanations.
+- [ ] Verify the new reading interactions on Windows and a touch device.
+
+A long answer can still exceed a screen; the reading view removes card spacing,
+per-claim controls and repeated source lists rather than shrinking the text.
+The popup continues to show provider excerpts, not a live website.
