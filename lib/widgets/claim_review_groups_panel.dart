@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 
 import '../models/claim_deduplication_result.dart';
 import '../models/claim_review_item.dart';
@@ -8,6 +10,7 @@ import '../models/grounded_answer.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import 'claim_source_preview.dart';
+import 'continuous_claims_text.dart';
 
 /// Above this many items, the "Already in your notes" section starts
 /// collapsed so a long list of known claims doesn't push the useful
@@ -42,12 +45,135 @@ class _ClaimReviewGroupsPanelState extends State<ClaimReviewGroupsPanel> {
   final _previewController = OverlayPortalController();
   String? _activeId;
   bool _pinned = false;
+  bool _continuous = true;
+  final _sourceScroll = ScrollController();
+  Timer? _hideTimer;
+  String? _dismissedId;
+
+  @override
+  void dispose() {
+    _hideTimer?.cancel();
+    _sourceScroll.dispose();
+    super.dispose();
+  }
+
+  void _leave() {
+    _hideTimer?.cancel();
+    if (!_pinned) {
+      _hideTimer = Timer(const Duration(milliseconds: 250), () {
+        if (mounted && !_pinned) _previewController.hide();
+      });
+    }
+  }
+
+  void _hover(ClaimReviewItem item) {
+    _hideTimer?.cancel();
+    final changed = _activeId != item.id;
+    _activate(item);
+    if (_dismissedId != item.id) _previewController.show();
+    if (changed) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _sourceScroll.hasClients) _sourceScroll.jumpTo(0);
+      });
+    }
+  }
+
+  void _closePreview() {
+    _hideTimer?.cancel();
+    setState(() {
+      _pinned = false;
+      _dismissedId = _activeId;
+    });
+    _previewController.hide();
+  }
+
+  void _scrollSource(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent ||
+        !_previewController.isShowing ||
+        !_sourceScroll.hasClients ||
+        _sourceScroll.position.maxScrollExtent == 0) return;
+    // Register before the ancestor page Scrollable, so only the source moves.
+    GestureBinding.instance.pointerSignalResolver.register(event, (signal) {
+      if (!mounted || !_sourceScroll.hasClients) return;
+      final position = _sourceScroll.position;
+      _sourceScroll.jumpTo(
+          (position.pixels + (signal as PointerScrollEvent).scrollDelta.dy)
+              .clamp(position.minScrollExtent, position.maxScrollExtent)
+              .toDouble());
+    });
+  }
+
+  Widget _readingView(List<ClaimReviewItem> items, ClaimReviewItem? active) {
+    final current = active ?? items.first;
+    final index = items.indexWhere((item) => item.id == current.id);
+    final group = widget.groups.firstWhere(
+        (group) => group.items.any((item) => item.id == current.id));
+    void navigate(int offset) => _hover(items[(index + offset) % items.length]);
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(
+          'Click a sentence to ignore it; click again to include it. Hover for sources and scroll to read them.',
+          style: AppTextStyles.bodySmall),
+      const SizedBox(height: 12),
+      ContinuousClaimsText(
+        items: items,
+        selectedIds: widget.selectedIds,
+        activeId: active?.id,
+        onActivate: _hover,
+        onToggle: widget.onToggle,
+        onLeave: _leave,
+        onPointerSignal: _scrollSource,
+      ),
+      const SizedBox(height: 12),
+      Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
+          children: [
+            IconButton(
+                key: const Key('previous-inline-claim'),
+                tooltip: 'Previous claim',
+                onPressed: () => navigate(-1),
+                icon: const Icon(Icons.chevron_left)),
+            Text('${index + 1}/${items.length} · ${group.label}',
+                key: const Key('active-claim-status'),
+                style: AppTextStyles.bodySmall),
+            TextButton(
+                key: const Key('toggle-active-claim'),
+                onPressed: current.canBeSaved
+                    ? () => widget.onToggle(current.id)
+                    : null,
+                child: Text(current.canBeSaved
+                    ? (widget.selectedIds.contains(current.id)
+                        ? 'Ignore'
+                        : 'Include')
+                    : 'Not eligible to add')),
+            TextButton(
+                key: const Key('inline-claim-sources'),
+                onPressed: () {
+                  _dismissedId = null;
+                  _hover(current);
+                  setState(() => _pinned = true);
+                },
+                child: Text(
+                    '${claimSourcePreviews(current, widget.citations).length} sources')),
+            IconButton(
+                key: const Key('next-inline-claim'),
+                tooltip: 'Next claim',
+                onPressed: () => navigate(1),
+                icon: const Icon(Icons.chevron_right)),
+          ]),
+      if (current.reason.trim().isNotEmpty)
+        ClaimFormattedText(
+            data: current.reason, style: AppTextStyles.bodySmall),
+    ]);
+  }
 
   void _activate(ClaimReviewItem item) {
     if (_activeId != item.id) setState(() => _activeId = item.id);
   }
 
   void _togglePreview() {
+    _dismissedId = null;
+    _hideTimer?.cancel();
     setState(() => _pinned = !_pinned);
     if (_pinned) {
       _previewController.show();
@@ -69,6 +195,14 @@ class _ClaimReviewGroupsPanelState extends State<ClaimReviewGroupsPanel> {
       return const SizedBox.shrink();
     }
 
+    final ordered =
+        groups.expand((group) => group.items).toList().asMap().entries.toList()
+          ..sort((a, b) {
+            final order = (a.value.sourceOrder ?? a.key)
+                .compareTo(b.value.sourceOrder ?? b.key);
+            return order == 0 ? a.key.compareTo(b.key) : order;
+          });
+    final items = ordered.map((entry) => entry.value).toList();
     final active = groups
         .expand((g) => g.items)
         .where((i) => i.id == _activeId)
@@ -85,11 +219,17 @@ class _ClaimReviewGroupsPanelState extends State<ClaimReviewGroupsPanel> {
             constraints: BoxConstraints(
               maxHeight: math.max(120.0, size.height * 0.55),
             ),
-            child: SingleChildScrollView(
-              child: ClaimSourcePreviewPane(
-                item: active,
-                citations: widget.citations,
-                onClose: _togglePreview,
+            child: MouseRegion(
+              onEnter: (_) => _hideTimer?.cancel(),
+              onExit: (_) => _leave(),
+              child: SingleChildScrollView(
+                key: const Key('source-preview-scroll'),
+                controller: _sourceScroll,
+                child: ClaimSourcePreviewPane(
+                  item: active,
+                  citations: widget.citations,
+                  onClose: _closePreview,
+                ),
               ),
             ),
           ),
@@ -112,6 +252,15 @@ class _ClaimReviewGroupsPanelState extends State<ClaimReviewGroupsPanel> {
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 Text('Claim review', style: AppTextStyles.titleLarge),
+                TextButton(
+                  key: const Key('claim-review-view-toggle'),
+                  onPressed: () {
+                    _hideTimer?.cancel();
+                    _closePreview();
+                    setState(() => _continuous = !_continuous);
+                  },
+                  child: Text(_continuous ? 'Detailed list' : 'Reading view'),
+                ),
                 TextButton.icon(
                   key: const Key('pin-source-preview'),
                   onPressed: _togglePreview,
@@ -133,20 +282,23 @@ class _ClaimReviewGroupsPanelState extends State<ClaimReviewGroupsPanel> {
               ),
             ],
             const SizedBox(height: 12),
-            for (final group in visibleGroups) ...[
-              _ClaimReviewGroupSection(
-                group: group,
-                selectedIds: selectedIds,
-                onToggle: onToggle,
-                citations: widget.citations,
-                onPreview: _activate,
-                onOpenSources: (item) {
-                  _activate(item);
-                  if (!_pinned) _togglePreview();
-                },
-              ),
-              const SizedBox(height: 16),
-            ],
+            if (_continuous)
+              _readingView(items, active)
+            else
+              for (final group in visibleGroups) ...[
+                _ClaimReviewGroupSection(
+                  group: group,
+                  selectedIds: selectedIds,
+                  onToggle: onToggle,
+                  citations: widget.citations,
+                  onPreview: _activate,
+                  onOpenSources: (item) {
+                    _activate(item);
+                    if (!_pinned) _togglePreview();
+                  },
+                ),
+                const SizedBox(height: 16),
+              ],
           ],
         ),
       ),
