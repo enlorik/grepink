@@ -140,12 +140,14 @@ class ClaimSourcePreviewPane extends StatelessWidget {
   final ClaimReviewItem? item;
   final List<GroundedAnswerCitation> citations;
   final VoidCallback onClose;
+  final bool docked;
 
   const ClaimSourcePreviewPane({
     super.key,
     required this.item,
     required this.citations,
     required this.onClose,
+    this.docked = false,
   });
 
   @override
@@ -155,8 +157,15 @@ class ClaimSourcePreviewPane extends StatelessWidget {
         : claimSourcePreviews(item!, citations);
     return Material(
       key: const Key('source-preview-pane'),
-      elevation: 12,
-      borderRadius: BorderRadius.circular(16),
+      elevation: docked ? 0 : 8,
+      color: Theme.of(context).colorScheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: docked
+            ? BorderSide(
+                color: Theme.of(context).colorScheme.primary.withAlpha(60))
+            : BorderSide.none,
+      ),
       clipBehavior: Clip.antiAlias,
       child: Padding(
         padding: const EdgeInsets.all(16),
