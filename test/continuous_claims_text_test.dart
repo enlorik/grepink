@@ -278,7 +278,7 @@ void main() {
     final article =
         tester.getRect(find.byKey(const Key('continuous-claims-text')));
     final source =
-        tester.getRect(find.byKey(const Key('source-preview-scroll')));
+        tester.getRect(find.byKey(const Key('source-preview-frame')));
     expect(source.left - article.right, closeTo(24, 1));
     expect(
         tester
@@ -288,6 +288,7 @@ void main() {
             .visible,
         isFalse);
     expect(source.right, lessThanOrEqualTo(workspace.right));
+    expect(source.bottom, lessThanOrEqualTo(workspace.bottom - 16));
     expect(source.top, lessThan(article.top + 1));
     expect(
         tester
@@ -331,6 +332,34 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('docked-source-preview')), findsNothing);
     expect(find.byKey(const Key('compact-source-preview')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('short answers keep a usable source pane within the workspace',
+      (tester) async {
+    tester.view.physicalSize = const Size(1600, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await pumpReview(tester, [
+      claim('one', 'One short sentence.', 0)
+    ], citations: const [
+      GroundedAnswerCitation(
+          id: 'one',
+          title: 'Reference',
+          url: 'https://example.com/one',
+          snippet: 'Reference text. Another sentence.')
+    ]);
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer(location: Offset.zero);
+    addTearDown(mouse.removePointer);
+    await mouse.moveTo(wordPosition(tester, 'One'));
+    await tester.pumpAndSettle();
+    final frame = tester.getRect(find.byKey(const Key('source-preview-frame')));
+    final workspace =
+        tester.getRect(find.byKey(const Key('claim-review-groups-panel')));
+    expect(frame.height, greaterThanOrEqualTo(200));
+    expect(frame.bottom, lessThanOrEqualTo(workspace.bottom - 16));
     expect(tester.takeException(), isNull);
   });
 
