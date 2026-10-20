@@ -17,7 +17,7 @@ ClaimReviewItem claim(String id, String text, int order,
             ? ClaimNoveltyClassification.newClaim
             : ClaimNoveltyClassification.alreadyKnown,
         citationUrls: ['https://example.com/$id'],
-        citationTitles: [id],
+        citationTitles: const [],
         selectedByDefault: saveable,
         reason: '',
         matchedLocalEvidenceIds: [],
@@ -97,13 +97,14 @@ void main() {
     await tester.tapAt(first);
     await tester.pumpAndSettle();
     expect(selection, {'second'});
-    final span = (tester.widget<RichText>(paragraph).text as TextSpan)
-        .children!
-        .first as TextSpan;
-    expect((span.children!.first as TextSpan).style!.decoration,
-        TextDecoration.lineThrough);
-    expect(
-        (span.children!.first as TextSpan).style!.fontWeight, FontWeight.bold);
+    final leaves = <TextSpan>[];
+    tester.widget<RichText>(paragraph).text.visitChildren((span) {
+      if (span is TextSpan && span.text == 'First') leaves.add(span);
+      return true;
+    });
+    expect(leaves, hasLength(1));
+    expect(leaves.single.style!.decoration, TextDecoration.lineThrough);
+    expect(leaves.single.style!.fontWeight, FontWeight.bold);
     await tester.tapAt(first);
     await tester.pumpAndSettle();
     expect(selection, {'first', 'second'});
@@ -142,6 +143,7 @@ void main() {
     final first = wordPosition(tester, 'First');
     await mouse.moveTo(first);
     await tester.pumpAndSettle();
+    expect(find.byKey(const Key('source-preview-pane')), findsOneWidget);
     expect(find.text('First page'), findsOneWidget);
     final popup = tester
         .widget<SingleChildScrollView>(
