@@ -155,7 +155,20 @@ void main() {
     expect(
         tester.getSize(find.byKey(const Key('continuous-claims-text'))).width,
         lessThanOrEqualTo(740));
-    await tester.tapAt(wordPosition(tester, 'Integers'));
+    final listPoint = wordPosition(tester, 'Integers');
+    final hits = tester.hitTestOnBinding(listPoint).path;
+    debugPrint(
+        'ARTICLE TAP $listPoint ${hits.map((e) => e.target.runtimeType).toList()}');
+    for (final hit in hits) {
+      if (hit.target is RenderParagraph) {
+        final target = hit.target as RenderParagraph;
+        final position =
+            target.getPositionForOffset(target.globalToLocal(listPoint));
+        final span = target.text.getSpanForPosition(position);
+        debugPrint('ARTICLE SPAN ${target.text.toPlainText()} $position $span');
+      }
+    }
+    await tester.tapAt(listPoint);
     await tester.pumpAndSettle();
     expect(selection, isNotNull);
     expect(selection, isNot(contains('list')));
