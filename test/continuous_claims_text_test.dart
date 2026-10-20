@@ -11,6 +11,7 @@ import 'package:grepink/models/claim_review_item.dart';
 import 'package:grepink/models/grounded_answer.dart';
 import 'package:grepink/widgets/claim_review_groups_panel.dart';
 import 'package:grepink/theme/app_colors.dart';
+import 'package:grepink/theme/app_text_styles.dart';
 
 ClaimReviewItem claim(String id, String text, int order,
         {bool saveable = true}) =>
@@ -58,6 +59,7 @@ Future<void> pumpReview(
   await tester.pumpWidget(RepaintBoundary(
       key: captureKey,
       child: MaterialApp(
+          debugShowCheckedModeBanner: false,
           theme: theme,
           home: Scaffold(
               body: StatefulBuilder(
@@ -204,16 +206,26 @@ void main() {
     final output = Platform.environment['GREPINK_LAYOUT_PREVIEW'];
     if (output != null) {
       await tester.runAsync(() async {
-        for (final entry in {
-          'Inter': 'GREPINK_PREVIEW_FONT',
-          'monospace': 'GREPINK_PREVIEW_MONO'
-        }.entries) {
-          final bytes =
-              await File(Platform.environment[entry.value]!).readAsBytes();
-          await (FontLoader(entry.key)
-                ..addFont(Future.value(ByteData.sublistView(bytes))))
-              .load();
+        final inter = ByteData.sublistView(
+            await File(Platform.environment['GREPINK_PREVIEW_FONT']!)
+                .readAsBytes());
+        final mono = ByteData.sublistView(
+            await File(Platform.environment['GREPINK_PREVIEW_MONO']!)
+                .readAsBytes());
+        for (final family in {
+          'Inter',
+          AppTextStyles.titleLarge.fontFamily!,
+          AppTextStyles.bodySmall.fontFamily!,
+          AppTextStyles.bodyMedium.fontFamily!,
+        }) {
+          await (FontLoader(family)..addFont(Future.value(inter))).load();
         }
+        for (final family in {'Consolas', 'monospace'}) {
+          await (FontLoader(family)..addFont(Future.value(mono))).load();
+        }
+        await (FontLoader('MaterialIcons')
+              ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf')))
+            .load();
       });
     }
     final page = ScrollController();
@@ -268,6 +280,13 @@ void main() {
     final source =
         tester.getRect(find.byKey(const Key('source-preview-scroll')));
     expect(source.left - article.right, closeTo(24, 1));
+    expect(
+        tester
+            .widget<Visibility>(find.ancestor(
+                of: find.byKey(const Key('source-workspace-placeholder')),
+                matching: find.byType(Visibility)))
+            .visible,
+        isFalse);
     expect(source.right, lessThanOrEqualTo(workspace.right));
     expect(source.top, lessThan(article.top + 1));
     expect(
