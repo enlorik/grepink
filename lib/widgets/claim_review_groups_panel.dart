@@ -219,7 +219,7 @@ class _ClaimReviewGroupsPanelState extends State<ClaimReviewGroupsPanel> {
           width: math.min(380.0, size.width - 32),
           child: ConstrainedBox(
             constraints: BoxConstraints(
-              maxHeight: math.max(120.0, size.height * 0.55),
+              maxHeight: math.max(120.0, size.height * 0.45),
             ),
             child: MouseRegion(
               onEnter: (_) => _hideTimer?.cancel(),
