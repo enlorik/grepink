@@ -28,7 +28,9 @@ Finder get paragraph => find.descendant(
     matching: find.byType(RichText));
 
 Offset wordPosition(WidgetTester tester, String word) {
-  final render = tester.renderObject<RenderParagraph>(paragraph);
+  final element = paragraph.evaluate().singleWhere((element) =>
+      (element.widget as RichText).text.toPlainText().contains(word));
+  final render = element.renderObject! as RenderParagraph;
   final start = render.text.toPlainText().indexOf(word);
   expect(start, greaterThanOrEqualTo(0));
   final boxes = render.getBoxesForSelection(
@@ -104,10 +106,73 @@ void main() {
     });
     expect(leaves, hasLength(1));
     expect(leaves.single.style!.decoration, TextDecoration.lineThrough);
-    expect(leaves.single.style!.fontWeight, FontWeight.bold);
+    expect(leaves.single.style!.fontWeight, FontWeight.w600);
     await tester.tapAt(first);
     await tester.pumpAndSettle();
     expect(selection, {'first', 'second'});
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'article preserves headings, hanging lists and literal Rust symbols',
+      (tester) async {
+    Set<String>? selection;
+    await pumpReview(
+        tester,
+        [
+          claim('intro', 'Rust has **primitive types** and `&str`.', 0),
+          claim('heading', '## Primitive types', 1),
+          claim(
+              'list',
+              '- **Integers**: signed and unsigned.\n- Floats\n  - Nested `&mut T`',
+              2),
+          claim('code', '```rust\nlet s: &str = "hello";\n```', 3),
+        ],
+        onSelection: (ids) => selection = ids);
+    final texts = tester
+        .widgetList<RichText>(paragraph)
+        .map((w) => w.text.toPlainText())
+        .join(' ');
+    expect(texts, contains('&str'));
+    expect(texts, contains('&mut T'));
+    expect(texts, isNot(contains('&amp;')));
+    expect(find.text('•'), findsNWidgets(3));
+    final heading = paragraph.evaluate().singleWhere(
+        (e) => (e.widget as RichText).text.toPlainText() == 'Primitive types');
+    final headingRender = heading.renderObject! as RenderParagraph;
+    expect(headingRender.localToGlobal(Offset.zero).dy,
+        greaterThan(wordPosition(tester, 'Rust').dy));
+    expect(
+        wordPosition(tester, 'Integers').dy,
+        greaterThan(headingRender.localToGlobal(Offset.zero).dy +
+            headingRender.size.height));
+    expect(wordPosition(tester, 'Nested').dx,
+        greaterThan(wordPosition(tester, 'Integers').dx));
+    expect(
+        tester.getSize(find.byKey(const Key('continuous-claims-text'))).width,
+        lessThanOrEqualTo(740));
+    await tester.tapAt(wordPosition(tester, 'Integers'));
+    await tester.pumpAndSettle();
+    expect(selection, isNot(contains('list')));
+    expect(selection, containsAll(['intro', 'heading', 'code']));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'narrow article renders numbered lists and tables without overflow',
+      (tester) async {
+    tester.view.physicalSize = const Size(380, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await pumpReview(tester, [
+      claim('numbered', '3. Borrow a reference.\n4. Return it safely.', 0),
+      claim('table',
+          '| Type | Meaning |\n| --- | --- |\n| `&str` | borrowed text |', 1),
+    ]);
+    expect(find.text('3.'), findsOneWidget);
+    expect(find.text('4.'), findsOneWidget);
+    expect(find.byType(Table), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
