@@ -57,7 +57,7 @@ class ClaimFormattedText extends StatelessWidget {
             ?.copyWith(height: 1.5),
         blockSpacing: 8,
       ),
-      imageBuilder: (uri, title, alt) => Text(alt ?? 'Image'),
+      sizedImageBuilder: (config) => Text(config.alt ?? 'Image'),
     );
   }
 }
