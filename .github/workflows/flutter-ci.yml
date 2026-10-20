@@ -29,8 +29,26 @@ jobs:
       - name: Static analysis
         run: flutter analyze
 
+      - name: Prepare local fonts for layout preview
+        run: |
+          curl --fail --location --retry 2 'https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/inter/Inter%5Bopsz,wght%5D.ttf' -o "$RUNNER_TEMP/Inter.ttf"
+          curl --fail --location --retry 2 'https://raw.githubusercontent.com/google/fonts/47d54ca1ebb14fd864695f1d39dc734f39017c33/ofl/robotomono/RobotoMono%5Bwght%5D.ttf' -o "$RUNNER_TEMP/RobotoMono.ttf"
+
       - name: Run tests
         run: flutter test
+        env:
+          GREPINK_LAYOUT_PREVIEW: build/review-workspace.png
+          GREPINK_PREVIEW_FONT: ${{ runner.temp }}/Inter.ttf
+          GREPINK_PREVIEW_MONO: ${{ runner.temp }}/RobotoMono.ttf
+
+      - name: Save rendered review layout
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: grepink-review-layout
+          path: build/review-workspace.png
+          if-no-files-found: warn
+          retention-days: 14
 
   compile-android:
     runs-on: ubuntu-latest
