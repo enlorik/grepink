@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:markdown/markdown.dart' as md;
-import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/services.dart';
 
 import '../models/grounded_answer.dart';
 import '../services/note_source_document.dart';
@@ -9,7 +9,7 @@ import '../theme/app_colors.dart';
 import 'claim_source_preview.dart';
 
 /// Rendering and source inspection are shared by the notebook and editor.
-/// Hovering never fetches a remote page; opening a browser is an explicit act.
+/// Hovering never fetches a remote page; copying its link is an explicit act.
 class NoteReadingView extends StatefulWidget {
   final String content;
   const NoteReadingView({super.key, required this.content});
@@ -90,17 +90,15 @@ class _NoteReadingViewState extends State<NoteReadingView> {
                               onPressed: () async {
                                 final messenger =
                                     ScaffoldMessenger.maybeOf(context);
-                                try {
-                                  if (await launchUrl(Uri.parse(source.url),
-                                      mode: LaunchMode.externalApplication))
-                                    return;
-                                } catch (_) {/* Report launch failure below. */}
+                                await Clipboard.setData(
+                                    ClipboardData(text: source.url));
+                                if (!context.mounted) return;
                                 messenger?.showSnackBar(const SnackBar(
-                                    content:
-                                        Text('Could not open this source.')));
+                                    content: Text(
+                                        'Source link copied; paste it into your browser.')));
                               },
                               icon: const Icon(Icons.open_in_new, size: 16),
-                              label: const Text('Open original page'),
+                              label: const Text('Copy original page link'),
                             ),
                             const Text(
                                 'Saved source excerpt; no live page is loaded.'),
