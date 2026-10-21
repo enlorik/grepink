@@ -1,6 +1,7 @@
 import '../models/claim_deduplication_result.dart';
 import '../models/claim_review_item.dart';
 import '../models/grounded_answer.dart';
+import 'note_source_document.dart';
 
 class ClaimDraftResult {
   final String markdownContent;
@@ -18,6 +19,13 @@ class ClaimDraftResult {
     sourceCount: 0,
     shouldSave: false,
   );
+}
+
+String _claimMarkdown(String text) {
+  final value = text.trim();
+  return RegExp(r'^(?:#{1,6}\s|[-+*]\s|\d+[.)]\s|```|~~~|>)').hasMatch(value)
+      ? value
+      : '- $value';
 }
 
 class SelectedClaimsDraftBuilder {
@@ -88,7 +96,7 @@ class SelectedClaimsDraftBuilder {
       buf.writeln('## New knowledge');
       buf.writeln();
       for (final item in newItems) {
-        buf.write('- ${item.text}');
+        buf.write(_claimMarkdown(item.text));
         if (item.citationUrls.isNotEmpty) {
           buf.write(' [Source](${item.citationUrls.first})');
         }
@@ -101,7 +109,7 @@ class SelectedClaimsDraftBuilder {
       buf.writeln('## Better sources');
       buf.writeln();
       for (final item in betterItems) {
-        buf.write('- ${item.text}');
+        buf.write(_claimMarkdown(item.text));
         if (item.citationUrls.isNotEmpty) {
           buf.write(' [Source](${item.citationUrls.first})');
         }
@@ -114,7 +122,7 @@ class SelectedClaimsDraftBuilder {
       buf.writeln('## Possible contradictions to review');
       buf.writeln();
       for (final item in contradictionItems) {
-        buf.write('- ${item.text}');
+        buf.write(_claimMarkdown(item.text));
         if (item.citationUrls.isNotEmpty) {
           buf.write(' [Source](${item.citationUrls.first})');
         }
@@ -131,6 +139,14 @@ class SelectedClaimsDraftBuilder {
         final label = titleByUrl[url] ?? url;
         buf.writeln('- $label — $url');
       }
+    }
+
+    final sourceMetadata = NoteSourceDocument.encode(
+      citations.where((c) => usedUrls.contains(c.url)),
+    );
+    if (sourceMetadata.isNotEmpty) {
+      buf.writeln();
+      buf.writeln(sourceMetadata);
     }
 
     return ClaimDraftResult(
