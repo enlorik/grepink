@@ -46,7 +46,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: grepink-review-layout
-          path: build/review-workspace.png
+          path: build/*workspace.png
           if-no-files-found: warn
           retention-days: 14
 
