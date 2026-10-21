@@ -146,7 +146,11 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           _contentController.text.isNotEmpty;
     }
     return _titleController.text != _originalNote!.title ||
-        _documentContent != _originalNote!.content.trim() ||
+        _contentController.text !=
+            NoteSourceDocument.withoutMetadata(_originalNote!.content) ||
+        NoteSourceDocument.encode(_sources) !=
+            NoteSourceDocument.encode(
+                NoteSourceDocument.sources(_originalNote!.content)) ||
         _tags.toString() != _originalNote!.tags.toString();
   }
 
