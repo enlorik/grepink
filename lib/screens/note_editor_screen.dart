@@ -10,7 +10,6 @@ import '../providers/notes_provider.dart';
 import '../services/database_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
-import '../widgets/grepink_fab.dart';
 import '../widgets/tag_chip.dart';
 
 class NoteEditorScreen extends ConsumerStatefulWidget {
@@ -216,7 +215,10 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
               keywords: _keywords,
             );
       } else if (_originalNote != null) {
-        final updated = _originalNote!.copyWith(
+        final latest = (ref.read(notesProvider).valueOrNull ?? <Note>[])
+            .where((note) => note.id == widget.noteId);
+        final updated =
+            (latest.isEmpty ? _originalNote! : latest.first).copyWith(
           title: title.isEmpty ? 'Untitled' : title,
           content: content,
           tags: _tags,
@@ -405,12 +407,6 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           ),
         ),
       ),
-      floatingActionButton: GrepinkFab(
-        onPressed: _isSaving ? null : _save,
-        isSaving: _isSaving,
-        showSuccess: _showSuccess,
-        icon: Icons.check,
-      ),
     );
     return PopScope(
       canPop: false,
@@ -439,6 +435,8 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
             child: Text(
               widget.noteId == null ? 'New Note' : 'Notebook',
               style: AppTextStyles.titleLarge,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           TextButton.icon(
@@ -453,6 +451,10 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
             icon: const Icon(Icons.add_comment_outlined),
             label: const Text('Ask'),
           ),
+          TextButton(
+              onPressed: _isSaving ? null : _save,
+              child: Text(
+                  _isSaving ? 'Saving…' : (_showSuccess ? 'Saved' : 'Save'))),
         ],
       ),
     );

@@ -45,7 +45,7 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
     await Future.delayed(const Duration(milliseconds: 200));
     if (mounted) {
       await ref.read(notesProvider.notifier).deleteNote(id);
-      setState(() => _deletingIds.remove(id));
+      if (mounted) setState(() => _deletingIds.remove(id));
     }
   }
 
@@ -75,6 +75,11 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
                     Expanded(
                       child:
                           Text('Grepink', style: AppTextStyles.displayMedium),
+                    ),
+                    IconButton(
+                      tooltip: 'New note',
+                      onPressed: () => context.push('/note/new'),
+                      icon: const Icon(Icons.add, color: AppColors.deepAction),
                     ),
                     IconButton(
                       icon:
@@ -109,9 +114,11 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
           ),
         ),
       ),
-      floatingActionButton: GrepinkFab(
-        onPressed: () => context.push('/note/new'),
-      ),
+      floatingActionButton: _visibleNotes.isNotEmpty
+          ? null
+          : GrepinkFab(
+              onPressed: () => context.push('/note/new'),
+            ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       bottomNavigationBar: GrepinkBottomNav(
         currentIndex: _navIndex,
