@@ -25,7 +25,9 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
   Future<void> _selectNote(String id) async {
     if (_selectedId == id) return;
     if (_editorKey.currentState != null &&
-        !await _editorKey.currentState!.confirmLeave()) return;
+        !await _editorKey.currentState!.confirmLeave()) {
+      return;
+    }
     if (!mounted) return;
     setState(() {
       _selectedId = id;
@@ -170,8 +172,9 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
                         await _showDeleteConfirm(context)) {
                       if (note.id == selected.id &&
                           _editorKey.currentState != null &&
-                          !await _editorKey.currentState!.confirmLeave())
+                          !await _editorKey.currentState!.confirmLeave()) {
                         return;
+                      }
                       await _deleteNote(note.id);
                     }
                   },
@@ -186,12 +189,13 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
             ),
         ],
       );
-      if (wide)
+      if (wide) {
         return Row(children: [
           SizedBox(width: 260, child: list),
           const VerticalDivider(width: 1),
           Expanded(child: editor)
         ]);
+      }
       if (_selectedId == null) return list;
       return Column(children: [
         Align(
@@ -199,7 +203,9 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
             child: TextButton.icon(
                 onPressed: () async {
                   if (_editorKey.currentState != null &&
-                      !await _editorKey.currentState!.confirmLeave()) return;
+                      !await _editorKey.currentState!.confirmLeave()) {
+                    return;
+                  }
                   if (mounted) setState(() => _selectedId = null);
                 },
                 icon: const Icon(Icons.arrow_back),

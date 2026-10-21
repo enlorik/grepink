@@ -104,11 +104,12 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   }
 
   void _contentChanged() {
-    if (mounted)
+    if (mounted) {
       setState(() {
         _insertOffset = -1;
         _showSuccess = false;
       });
+    }
   }
 
   void _insertDraft(String markdown) {
