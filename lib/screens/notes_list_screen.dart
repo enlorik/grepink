@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../models/note.dart';
+import '../services/note_source_document.dart';
+import '../widgets/claim_source_preview.dart';
 import 'note_editor_screen.dart';
 import '../providers/notes_provider.dart';
 import '../theme/app_colors.dart';
@@ -152,8 +154,8 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
                 title: Text(note.title,
                     maxLines: 2, overflow: TextOverflow.ellipsis),
                 subtitle: Text(
-                    note.content
-                        .replaceAll(RegExp(r'[#*`\[\]]'), '')
+                    sourcePlainText(
+                            NoteSourceDocument.withoutMetadata(note.content))
                         .split('\n')
                         .where((l) => l.trim().isNotEmpty)
                         .take(2)
