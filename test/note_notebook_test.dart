@@ -12,6 +12,7 @@ import 'package:grepink/providers/note_draft_review_provider.dart';
 import 'package:grepink/theme/app_text_styles.dart';
 import 'package:grepink/providers/notes_provider.dart';
 import 'package:grepink/screens/notes_list_screen.dart';
+import 'package:grepink/screens/note_editor_screen.dart';
 import 'package:grepink/services/note_source_document.dart';
 import 'package:grepink/widgets/note_reading_view.dart';
 
@@ -105,9 +106,32 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Discard'));
     await tester.pumpAndSettle();
-    expect(find.text('Other knowledge'), findsOneWidget);
+    expect(
+        find.descendant(
+            of: find.byType(NoteReadingView),
+            matching: find.text('Other knowledge')),
+        findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+  testWidgets('reopened appended source metadata is not an unsaved edit',
+      (tester) async {
+    final original = _notes.first;
+    _notes[0] = original.copyWith(
+        content: '${original.content}\n\n${original.content}');
+    addTearDown(() => _notes[0] = original);
+    await tester.pumpWidget(ProviderScope(
+        overrides: [notesProvider.overrideWith((ref) => _MemoryNotes(ref))],
+        child: const MaterialApp(
+            home: NoteEditorScreen(noteId: 'one', embedded: true))));
+    await tester.pumpAndSettle();
+    final state =
+        tester.state<NoteEditorScreenState>(find.byType(NoteEditorScreen));
+    final leaving = state.confirmLeave();
+    await tester.pump();
+    expect(find.text('Unsaved changes'), findsNothing);
+    expect(await leaving, isTrue);
+  });
+
   testWidgets(
       'research inserts into the unsaved note without leaving the reader',
       (tester) async {
@@ -189,6 +213,16 @@ void main() {
         '**Saved** explanation.');
     expect(container.read(notesProvider).value!.first.content,
         isNot(contains('## Tuples')));
+    await tester.tap(find.widgetWithText(TextButton, 'Save'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    final saved = container.read(notesProvider).value!.first;
+    expect(saved.content, contains('## Tuples'));
+    expect(NoteSourceDocument.sources(saved.content).single.snippet,
+        '**Saved** explanation.');
+    final editor =
+        tester.state<NoteEditorScreenState>(find.byType(NoteEditorScreen));
+    expect(await editor.confirmLeave(), isTrue);
     expect(tester.takeException(), isNull);
   });
 }
