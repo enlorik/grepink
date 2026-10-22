@@ -22,7 +22,7 @@ final _notes = [
       id: 'one',
       title: 'Rust notebook',
       content:
-          '# Types\n\n**Scalar** values [Source](https://example.com/types)\n\n${NoteSourceDocument.encode([
+          '# Types\n\n**Scalar** values represent one piece of information, such as a number or a boolean. [Source](https://example.com/types)\n\n## Compound values\n\nRust combines values without hiding how they are stored. A **tuple** can hold different types; an **array** contains values of the same type.\n\n- **Tuples** have a fixed number of elements.\n- **Arrays** have a known length and one element type.\n\n## Sized and unsized\n\n**Sized vs. Unsized:** a sized type has a size the compiler knows; slices describe a sequence whose length can vary.\n\n> Read the idea first, inspect its source, then add the missing piece to your note.\n\n${NoteSourceDocument.encode([
             const GroundedAnswerCitation(
                 id: '1',
                 title: 'Rust reference',
@@ -111,7 +111,8 @@ void main() {
             of: find.byType(AlertDialog),
             matching: find.text('Unsaved changes')),
         findsOneWidget);
-    await tester.tap(find.text('Cancel'));
+    await tester.tap(find.descendant(
+        of: find.byType(AlertDialog), matching: find.text('Cancel')));
     await tester.pumpAndSettle();
     expect(find.textContaining('My unsaved addition', findRichText: true),
         findsWidgets);
@@ -188,6 +189,8 @@ void main() {
                 theme: ThemeData(
                     fontFamily: 'Inter',
                     scaffoldBackgroundColor: AppColors.backgroundStart,
+                    dividerTheme:
+                        const DividerThemeData(color: AppColors.dividerBorder),
                     colorScheme: const ColorScheme.light(
                         primary: AppColors.primaryAction,
                         primaryContainer: AppColors.primaryAccent,
@@ -209,16 +212,35 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(NoteReadingView), findsOneWidget);
     if (output != null) {
-      final boundary =
-          capture.currentContext!.findRenderObject()! as RenderRepaintBoundary;
-      await tester.runAsync(() async {
-        final image = await boundary.toImage(pixelRatio: 1);
-        final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-        final file = File('${File(output).parent.path}/notebook-workspace.png');
-        await file.parent.create(recursive: true);
-        await file.writeAsBytes(bytes!.buffer.asUint8List());
-        image.dispose();
-      });
+      Future<void> capturePreview(String filename) async {
+        final boundary = capture.currentContext!.findRenderObject()!
+            as RenderRepaintBoundary;
+        await tester.runAsync(() async {
+          final image = await boundary.toImage(pixelRatio: 1);
+          final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+          final file = File('${File(output).parent.path}/$filename');
+          await file.parent.create(recursive: true);
+          await file.writeAsBytes(bytes!.buffer.asUint8List());
+          image.dispose();
+        });
+      }
+
+      await capturePreview('notebook-workspace.png');
+      await tester.tap(find.descendant(
+          of: find.byType(NoteReadingView), matching: find.text('Source')));
+      await tester.pumpAndSettle();
+      await capturePreview('notebook-sources-workspace.png');
+      await tester.tap(find.byTooltip('Close source'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Edit'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('note-passage-1')));
+      await tester.pumpAndSettle();
+      await capturePreview('notebook-editing-workspace.png');
+      await tester.tap(find.text('Done'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Read'));
+      await tester.pumpAndSettle();
     }
     final insert = find.widgetWithText(FilledButton, 'Insert into this note');
     await tester.ensureVisible(insert);

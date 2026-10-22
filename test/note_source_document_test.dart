@@ -3,6 +3,21 @@ import 'package:grepink/models/grounded_answer.dart';
 import 'package:grepink/services/note_source_document.dart';
 
 void main() {
+  test('old sourced bold fragments join for display while keeping every URL',
+      () {
+    const stored =
+        '- **Sized vs. [Source](https://one.example)\n- Unsized:** types. [Source](https://two.example)';
+    final rendered = NoteSourceDocument.visibleMarkdown(stored);
+    expect(rendered,
+        '- **Sized vs. [Source](https://one.example) Unsized:** types. [Source](https://two.example)');
+    expect(stored, contains('\n- Unsized:'));
+    expect(NoteSourceDocument.visibleMarkdown('```\n$stored\n```'),
+        '```\n$stored\n```');
+    const valid =
+        '- **One** [Source](https://one.example)\n- **Two** [Source](https://two.example)';
+    expect(NoteSourceDocument.visibleMarkdown(valid), valid);
+  });
+
   test('editable document text preserves spaces around metadata separators',
       () {
     const text = '  Draft ends with a space ';
