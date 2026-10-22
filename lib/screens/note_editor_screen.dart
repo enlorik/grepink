@@ -38,7 +38,7 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   List<GroundedAnswerCitation> _sources = [];
   String get _documentContent {
     final metadata = NoteSourceDocument.encode(_sources);
-    return [_contentController.text.trim(), metadata]
+    return [_contentController.text, metadata]
         .where((s) => s.isNotEmpty)
         .join('\n\n');
   }
@@ -96,7 +96,8 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     _originalNote = note;
     _titleController.text = note.title;
     _sources = NoteSourceDocument.sources(note.content);
-    _contentController.text = NoteSourceDocument.withoutMetadata(note.content);
+    _contentController.text =
+        NoteSourceDocument.withoutMetadata(note.content, trim: false);
     setState(() {
       _tags = List.from(note!.tags);
       _keywords = List.from(note.keywords);
@@ -147,7 +148,8 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     }
     return _titleController.text != _originalNote!.title ||
         _contentController.text !=
-            NoteSourceDocument.withoutMetadata(_originalNote!.content) ||
+            NoteSourceDocument.withoutMetadata(_originalNote!.content,
+                trim: false) ||
         NoteSourceDocument.encode(_sources) !=
             NoteSourceDocument.encode(
                 NoteSourceDocument.sources(_originalNote!.content)) ||
@@ -204,7 +206,9 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   Future<void> _save() async {
     final title = _titleController.text.trim();
     final content = _documentContent;
-    if (title.isEmpty && content.isEmpty) return;
+    if (title.isEmpty && NoteSourceDocument.withoutMetadata(content).isEmpty) {
+      return;
+    }
 
     setState(() {
       _isSaving = true;
@@ -352,7 +356,8 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                                 editable: _editing,
                                 onChanged: (value) {
                                   _contentController.text =
-                                      NoteSourceDocument.withoutMetadata(value);
+                                      NoteSourceDocument.withoutMetadata(value,
+                                          trim: false);
                                   _contentChanged();
                                 })),
                         if (_editing)
