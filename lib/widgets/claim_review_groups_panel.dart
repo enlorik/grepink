@@ -102,7 +102,7 @@ class _ClaimReviewGroupsPanelState extends State<ClaimReviewGroupsPanel> {
 
   void _scrollSource(PointerSignalEvent event) {
     if (event is! PointerScrollEvent ||
-        !_previewController.isShowing ||
+        !_previewVisible ||
         !_sourceScroll.hasClients ||
         _sourceScroll.position.maxScrollExtent == 0) {
       return;

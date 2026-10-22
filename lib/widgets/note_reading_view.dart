@@ -58,8 +58,9 @@ class _NoteReadingViewState extends State<NoteReadingView> {
       if (node is! md.Element) return;
       final href = node.attributes['href'];
       if (href != null &&
-          ['http', 'https'].contains(Uri.tryParse(href)?.scheme))
+          ['http', 'https'].contains(Uri.tryParse(href)?.scheme)) {
         result.add(href);
+      }
       for (final child in node.children ?? <md.Node>[]) {
         visit(child);
       }
@@ -169,14 +170,17 @@ class _NoteReadingViewState extends State<NoteReadingView> {
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: MarkdownBody(
               key: ValueKey('note-passage-$index'),
-              data: NoteSourceDocument.visibleMarkdown(block.markdown),
+              data: block.markdown.trim().isEmpty && widget.editable
+                  ? 'Start writing…'
+                  : NoteSourceDocument.visibleMarkdown(block.markdown),
               builders: {
                 'a': _SourceLinkBuilder((url, _) =>
                     _inspect(urls.isEmpty ? [url] : urls, selected: url))
               },
               onTapLink: (label, href, title) {
-                if (href != null)
+                if (href != null) {
                   _inspect(urls.isEmpty ? [href] : urls, selected: href);
+                }
               },
               sizedImageBuilder: (config) => Text(config.alt ?? 'Image'),
               styleSheet:
@@ -218,9 +222,10 @@ class _NoteReadingViewState extends State<NoteReadingView> {
                   icon: const Icon(Icons.close, size: 18)),
             ])),
         if (_sources.length > 1)
-          Padding(
+          SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Wrap(spacing: 6, children: [
+              child: Row(children: [
                 for (var i = 0; i < _sources.length; i++)
                   ChoiceChip(
                       label: Text('${i + 1}'),
@@ -282,6 +287,20 @@ class _NoteReadingViewState extends State<NoteReadingView> {
                       _before.length + _editor.text.length + b.end,
                       b.markdown)),
             ];
+      // Keep generated link directories in storage, with a compact reader entry.
+      if (NoteSourceDocument.sources(widget.content).isNotEmpty &&
+          _editing == null) {
+        final directory =
+            blocks.indexWhere((b) => b.markdown.trim() == '## Sources');
+        if (directory >= 0 &&
+            blocks.skip(directory + 1).every((b) => b.markdown
+                .trim()
+                .split('\n')
+                .every((line) =>
+                    RegExp(r'^- .+ — https?://\S+\s*$').hasMatch(line)))) {
+          blocks = blocks.take(directory).toList();
+        }
+      }
       final article =
           Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         if (widget.editable)
@@ -328,8 +347,10 @@ class _NoteReadingViewState extends State<NoteReadingView> {
                           SizedBox(width: 300, child: _inspector())
                         ])
                   : Column(children: [
-                      Expanded(child: article),
-                      SizedBox(height: height * .4, child: _inspector())
+                      if (height >= 420) Expanded(child: article),
+                      SizedBox(
+                          height: height < 420 ? height : height * .4,
+                          child: _inspector())
                     ]));
     });
   }
