@@ -37,6 +37,24 @@ void main() {
   const builder = SelectedClaimsDraftBuilder();
 
   group('SelectedClaimsDraftBuilder', () {
+    test('preserves all inline sources and does not manufacture nested bullets',
+        () {
+      final result = builder.build(
+          question: 'Q',
+          selected: [
+            _item(text: '**Sized vs. Unsized:** types.', citationUrls: [
+              'https://one.example/a',
+              'https://two.example/b'
+            ]),
+          ],
+          providerName: 'test',
+          citations: const []);
+      final body = result.markdownContent.split('## Sources').first;
+      expect(body, contains('[Source](<https://one.example/a>)'));
+      expect(body, contains('[Source 2](<https://two.example/b>)'));
+      expect(body, isNot(contains('- **Sized')));
+    });
+
     test('selected new claims appear in markdown', () {
       final result = builder.build(
         question: 'What is gravity?',

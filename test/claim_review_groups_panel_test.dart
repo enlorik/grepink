@@ -74,6 +74,33 @@ Future<void> _pumpPanel(
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 void main() {
+  testWidgets('embedded research sources stay inside the panel',
+      (tester) async {
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: SingleChildScrollView(
+                child: ClaimReviewGroupsPanel(
+      inlineSources: true,
+      groups: [
+        ClaimReviewGroup(
+            label: 'New',
+            classification: ClaimNoveltyClassification.newClaim,
+            items: [_item('new')])
+      ],
+      selectedIds: const {'new'},
+      onToggle: (_) {},
+    )))));
+    await tester.tap(find.byKey(const Key('pin-source-preview')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('source-preview-scroll')), findsOneWidget);
+    expect(
+        find.descendant(
+            of: find.byType(ClaimReviewGroupsPanel),
+            matching: find.byType(OverlayPortal)),
+        findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   group('ClaimReviewGroupsPanel already-known section', () {
     group('expansion defaults', () {
       for (final count in [1, 2, 3]) {

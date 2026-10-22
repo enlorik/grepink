@@ -10,6 +10,7 @@ import 'package:grepink/models/note.dart';
 import 'package:grepink/models/note_draft.dart';
 import 'package:grepink/providers/note_draft_review_provider.dart';
 import 'package:grepink/theme/app_text_styles.dart';
+import 'package:grepink/theme/app_theme.dart';
 import 'package:grepink/providers/notes_provider.dart';
 import 'package:grepink/screens/notes_list_screen.dart';
 import 'package:grepink/screens/note_editor_screen.dart';
@@ -92,7 +93,11 @@ void main() {
     expect(find.byType(NoteReadingView), findsOneWidget);
     await tester.tap(find.text('Edit'));
     await tester.pump();
-    final body = find.byType(TextField).at(1);
+    await tester.tap(find.byKey(const ValueKey('note-passage-0')));
+    await tester.pump();
+    final body = find.descendant(
+        of: find.byKey(const Key('active-passage-editor')),
+        matching: find.byType(TextField));
     await tester.enterText(body, '# Types\n\nMy unsaved addition');
     await tester.pump();
     await tester.tap(find.text('Second note'));
@@ -172,9 +177,7 @@ void main() {
             container: container,
             child: MaterialApp(
                 debugShowCheckedModeBanner: false,
-                theme: ThemeData(
-                    fontFamily: 'Inter',
-                    colorSchemeSeed: const Color(0xffed4e88)),
+                theme: AppTheme.lightTheme,
                 home: const NotesListScreen()))));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Ask'));

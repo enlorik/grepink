@@ -3,6 +3,13 @@ import 'package:grepink/models/grounded_answer.dart';
 import 'package:grepink/services/note_source_document.dart';
 
 void main() {
+  test('legacy double bullets normalize only for display outside code', () {
+    const document = '- * A fact\n\n```\n- * Code stays exact\n```\n\n* * *';
+    expect(NoteSourceDocument.visibleMarkdown(document),
+        '* A fact\n\n```\n- * Code stays exact\n```\n\n* * *');
+    expect(document, startsWith('- *'));
+  });
+
   test('saved excerpts survive note text round-trip without visible metadata',
       () {
     const citation = GroundedAnswerCitation(
