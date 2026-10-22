@@ -10,7 +10,7 @@ import 'package:grepink/models/note.dart';
 import 'package:grepink/models/note_draft.dart';
 import 'package:grepink/providers/note_draft_review_provider.dart';
 import 'package:grepink/theme/app_text_styles.dart';
-import 'package:grepink/theme/app_theme.dart';
+import 'package:grepink/theme/app_colors.dart';
 import 'package:grepink/providers/notes_provider.dart';
 import 'package:grepink/screens/notes_list_screen.dart';
 import 'package:grepink/screens/note_editor_screen.dart';
@@ -98,11 +98,19 @@ void main() {
     final body = find.descendant(
         of: find.byKey(const Key('active-passage-editor')),
         matching: find.byType(TextField));
-    await tester.enterText(body, '# Types\n\nMy unsaved addition');
+    await tester.enterText(body, '# Types\n\nMy unsaved addition ');
+    await tester.pump();
+    expect(find.byKey(const Key('active-passage-editor')), findsOneWidget);
+    expect(
+        tester.widget<TextField>(body).controller!.text, endsWith('addition '));
     await tester.pump();
     await tester.tap(find.text('Second note'));
     await tester.pumpAndSettle();
-    expect(find.text('Unsaved changes'), findsOneWidget);
+    expect(
+        find.descendant(
+            of: find.byType(AlertDialog),
+            matching: find.text('Unsaved changes')),
+        findsOneWidget);
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
     expect(find.textContaining('My unsaved addition', findRichText: true),
@@ -177,7 +185,14 @@ void main() {
             container: container,
             child: MaterialApp(
                 debugShowCheckedModeBanner: false,
-                theme: AppTheme.lightTheme,
+                theme: ThemeData(
+                    fontFamily: 'Inter',
+                    scaffoldBackgroundColor: AppColors.backgroundStart,
+                    colorScheme: const ColorScheme.light(
+                        primary: AppColors.primaryAction,
+                        primaryContainer: AppColors.primaryAccent,
+                        surface: AppColors.surface,
+                        onSurface: AppColors.bodyText)),
                 home: const NotesListScreen()))));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Ask'));

@@ -93,11 +93,13 @@ void main() {
     await tester.tap(find.byKey(const Key('pin-source-preview')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('source-preview-scroll')), findsOneWidget);
-    expect(
-        find.descendant(
-            of: find.byType(ClaimReviewGroupsPanel),
-            matching: find.byType(OverlayPortal)),
-        findsNothing);
+    final frame =
+        tester.getRect(find.byKey(const Key('source-preview-scroll')));
+    final panel =
+        tester.getRect(find.byKey(const Key('claim-review-groups-panel')));
+    expect(panel.contains(frame.topLeft), isTrue);
+    expect(panel.contains(frame.bottomRight - const Offset(1, 1)), isTrue);
+    expect(find.byKey(const Key('compact-source-preview')), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

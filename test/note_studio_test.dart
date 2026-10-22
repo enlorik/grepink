@@ -43,6 +43,7 @@ void main() {
         .widget<SingleChildScrollView>(
             find.byKey(const Key('saved-source-scroll')))
         .controller!;
+    expect(scroll.position.maxScrollExtent, greaterThan(0));
     await tester.sendEventToBinding(PointerScrollEvent(
         position:
             tester.getCenter(find.byKey(const ValueKey('note-passage-0'))),

@@ -3,6 +3,20 @@ import 'package:grepink/models/grounded_answer.dart';
 import 'package:grepink/services/note_source_document.dart';
 
 void main() {
+  test('editable document text preserves spaces around metadata separators',
+      () {
+    const text = '  Draft ends with a space ';
+    final metadata = NoteSourceDocument.encode([
+      const GroundedAnswerCitation(
+          id: '1', title: 'A', url: 'https://example.com')
+    ]);
+    expect(
+        NoteSourceDocument.withoutMetadata('$text\n\n$metadata', trim: false),
+        text);
+    expect(
+        NoteSourceDocument.withoutMetadata('$text\n\n$metadata'), text.trim());
+  });
+
   test('legacy double bullets normalize only for display outside code', () {
     const document = '- * A fact\n\n```\n- * Code stays exact\n```\n\n* * *';
     expect(NoteSourceDocument.visibleMarkdown(document),
