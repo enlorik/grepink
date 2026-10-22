@@ -443,7 +443,12 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
             showSelectedIcon: false,
             style: SegmentedButton.styleFrom(
                 visualDensity: VisualDensity.compact,
-                textStyle: const TextStyle(fontSize: 12)),
+                backgroundColor: AppColors.surface,
+                foregroundColor: AppColors.secondaryText,
+                selectedBackgroundColor:
+                    AppColors.primaryAccent.withValues(alpha: .28),
+                selectedForegroundColor: AppColors.deepAction,
+                textStyle: AppTextStyles.bodySmall),
             segments: const [
               ButtonSegment(value: false, label: Text('Read')),
               ButtonSegment(value: true, label: Text('Edit'))
