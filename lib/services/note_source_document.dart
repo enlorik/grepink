@@ -49,8 +49,13 @@ class NoteSourceDocument {
     return result.values.toList();
   }
 
-  static String withoutMetadata(String content) =>
-      content.replaceAll(_metadata, '').trim();
+  static String withoutMetadata(String content, {bool trim = true}) {
+    if (trim) return content.replaceAll(_metadata, '').trim();
+    // The writer adds exactly two separator newlines before each metadata block;
+    // retain all actual draft whitespace so typing a space cannot close editing.
+    return content.replaceAll(
+        RegExp(r'(?:\n\n)?<!-- grepink-sources:[A-Za-z0-9+/=]+ -->'), '');
+  }
 
   static String visibleMarkdown(String content) {
     var fenced = false;
