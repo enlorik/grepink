@@ -314,31 +314,6 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           child: Column(
             children: [
               _buildAppBar(),
-              if (_asking)
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                  child: DropdownButtonFormField<int>(
-                    key: ValueKey(
-                        'insert-$_insertOffset-${_contentController.text.length}'),
-                    initialValue: _insertOffset,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                        labelText: 'Insert reviewed answer'),
-                    items: noteInsertionTargets(_contentController.text)
-                        .map((target) => DropdownMenuItem(
-                              value: target.offset,
-                              child: Text(
-                                  target.offset < 0
-                                      ? target.label
-                                      : 'After: ${target.label}',
-                                  overflow: TextOverflow.ellipsis),
-                            ))
-                        .toList(),
-                    onChanged: (value) =>
-                        setState(() => _insertOffset = value ?? -1),
-                  ),
-                ),
               Expanded(child: LayoutBuilder(builder: (context, constraints) {
                 final note = ColoredBox(
                   color: AppColors.surface,
@@ -384,6 +359,30 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                             onPressed: () => setState(() => _asking = false),
                             icon: const Icon(Icons.close)),
                       ])),
+                  Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                    child: DropdownButtonFormField<int>(
+                      key: ValueKey(
+                          'insert-$_insertOffset-${_contentController.text.length}'),
+                      initialValue: _insertOffset,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                          labelText: 'Insert reviewed answer'),
+                      items: noteInsertionTargets(_contentController.text)
+                          .map((target) => DropdownMenuItem(
+                                value: target.offset,
+                                child: Text(
+                                    target.offset < 0
+                                        ? target.label
+                                        : 'After: ${target.label}',
+                                    overflow: TextOverflow.ellipsis),
+                              ))
+                          .toList(),
+                      onChanged: (value) =>
+                          setState(() => _insertOffset = value ?? -1),
+                    ),
+                  ),
                   Expanded(child: SearchScreen(onInsertDraft: _insertDraft)),
                 ]);
                 return constraints.maxWidth >= 1050 &&
