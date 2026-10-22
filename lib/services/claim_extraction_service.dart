@@ -40,6 +40,14 @@ class RuleBasedClaimExtractionService implements ClaimExtractionService {
     final sentences = <({int start, int end, String text})>[];
     int cursor = 0;
     for (final match in _sentenceEnd.allMatches(text)) {
+      // A sentence boundary inside emphasis or code is not a safe render boundary.
+      final prefix = text.substring(0, match.start);
+      if (RegExp(r'```|~~~').allMatches(prefix).length.isOdd ||
+          RegExp(r'(?<!\\)\*\*').allMatches(prefix).length.isOdd ||
+          RegExp(r'(?<!\\)__').allMatches(prefix).length.isOdd ||
+          RegExp(r'(?<!`)`(?!`)').allMatches(prefix).length.isOdd) {
+        continue;
+      }
       final segment = text.substring(cursor, match.start);
       if (segment.trim().isNotEmpty) {
         sentences.add((start: cursor, end: match.start, text: segment));

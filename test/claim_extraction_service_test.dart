@@ -29,6 +29,20 @@ void main() {
   const service = RuleBasedClaimExtractionService();
 
   group('RuleBasedClaimExtractionService', () {
+    test('keeps emphasis and code intact without shifting citation offsets',
+        () {
+      const text = '**Sized vs. Unsized:** types matter. Next fact.';
+      final claims = service.extract(_answer(answerText: text, citations: [
+        _citationWithOffsets('a', 'https://example.com', 'Reference', 0, 35),
+      ]));
+      expect(claims.first.text, '**Sized vs. Unsized:** types matter.');
+      expect(claims.first.citationUncertain, isFalse);
+      expect(claims.last.text, 'Next fact.');
+      final code =
+          service.extract(_answer(answerText: '`one. two` is code. Next.'));
+      expect(code.first.text, '`one. two` is code.');
+    });
+
     test('extracts multiple claims from a multi-sentence answer', () {
       final answer = _answer(
         answerText: 'Plants use sunlight to make food. '

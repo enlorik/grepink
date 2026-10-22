@@ -182,6 +182,10 @@ Future<void> _askQuestion(WidgetTester tester, String question) async {
   await tester.pump();
   await tester.tap(find.byKey(const Key('ask-question-button')));
   await tester.pumpAndSettle();
+  if (find.text('Detailed list').evaluate().isNotEmpty) {
+    await tester.tap(find.byKey(const Key('claim-review-view-toggle')));
+    await tester.pumpAndSettle();
+  }
 }
 
 void main() {
@@ -360,7 +364,7 @@ void main() {
           isNot(contains('n1')));
     });
 
-    testWidgets('citation urls are shown for a claim with sources',
+    testWidgets('citation URLs stay hidden behind the source count',
         (tester) async {
       final provider = _CountingGroundedAnswerProvider(
         GroundedAnswer(
@@ -401,8 +405,10 @@ void main() {
       await _pumpSearchScreen(tester, ingestionService: service);
       await _askQuestion(tester, 'question');
 
-      expect(find.text('Example A (https://example.com/a)'), findsOneWidget);
-      expect(find.text('https://example.com/b'), findsOneWidget);
+      expect(find.text('Example A (https://example.com/a)'), findsNothing);
+      expect(find.text('https://example.com/b'), findsNothing);
+      expect(find.byKey(const Key('claim-review-sources-n1')), findsOneWidget);
+      expect(find.text('2 sources'), findsOneWidget);
     });
 
     testWidgets(

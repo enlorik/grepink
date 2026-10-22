@@ -28,7 +28,8 @@ import '../widgets/claim_draft_preview_panel.dart';
 import '../services/provider_name_formatter.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
-  const SearchScreen({super.key});
+  final ValueChanged<String>? onInsertDraft;
+  const SearchScreen({super.key, this.onInsertDraft});
 
   @override
   ConsumerState<SearchScreen> createState() => _SearchScreenState();
@@ -44,7 +45,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(() => _focusNode.requestFocus());
+    if (widget.onInsertDraft == null) {
+      Future.microtask(() => _focusNode.requestFocus());
+    }
   }
 
   @override
@@ -256,7 +259,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              _buildHeader(context),
+              if (widget.onInsertDraft == null) _buildHeader(context),
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
@@ -270,13 +273,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                         claimReviewState: claimReviewState,
                       ),
                       const SizedBox(height: 24),
-                      if (searchState.isEmpty)
+                      if (widget.onInsertDraft == null && searchState.isEmpty)
                         _buildEmptyState(
                           reviewState.noteDraft == null
                               ? recentNotes
                               : const <Note>[],
                         )
-                      else
+                      else if (widget.onInsertDraft == null)
                         _buildResults(searchState),
                     ],
                   ),
@@ -286,13 +289,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           ),
         ),
       ),
-      bottomNavigationBar: GrepinkBottomNav(
-        currentIndex: 1,
-        onTap: (i) {
-          if (i == 0) context.go('/');
-          if (i == 2) context.push('/settings');
-        },
-      ),
+      bottomNavigationBar: widget.onInsertDraft != null
+          ? null
+          : GrepinkBottomNav(
+              currentIndex: 1,
+              onTap: (i) {
+                if (i == 0) context.go('/');
+                if (i == 2) context.push('/settings');
+              },
+            ),
     );
   }
 
@@ -317,21 +322,20 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: AppColors.dividerBorder),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.primaryAccent.withValues(alpha: 0.08),
-                blurRadius: 12,
-                offset: const Offset(0, 2),
-              ),
-            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Grow your notes', style: AppTextStyles.titleLarge),
+              Text(
+                  widget.onInsertDraft == null
+                      ? 'Grow your notes'
+                      : 'Ask about your note',
+                  style: AppTextStyles.titleLarge),
               const SizedBox(height: 8),
               Text(
-                'Ask a question and review the draft before you save, append, or discard it.',
+                widget.onInsertDraft == null
+                    ? 'Ask a question and review the draft before you save, append, or discard it.'
+                    : 'Review the answer, then add what belongs in your note.',
                 style: AppTextStyles.bodyMedium,
               ),
               const SizedBox(height: 12),
@@ -345,7 +349,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 onChanged: (_) => setState(() {}),
                 onSubmitted: (_) => _onAsk(),
                 decoration: InputDecoration(
-                  hintText: 'What should Grepink turn into durable notes?',
+                  hintText: 'What would you like to understand?',
                   filled: true,
                   fillColor: AppColors.aiResponseBackground,
                   border: OutlineInputBorder(
@@ -424,7 +428,19 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           const SizedBox(height: 12),
           _buildStatusCard(message: 'Draft discarded. Nothing was saved.'),
         ],
-        if (reviewState.noteDraft != null) ...[
+        if (widget.onInsertDraft != null && reviewState.noteDraft != null) ...[
+          const SizedBox(height: 12),
+          MarkdownBody(data: reviewState.noteDraft!.markdownContent),
+          FilledButton.icon(
+            onPressed: () {
+              widget.onInsertDraft!(reviewState.noteDraft!.markdownContent);
+              ref.read(noteDraftReviewProvider.notifier).clear();
+            },
+            icon: const Icon(Icons.add),
+            label: const Text('Insert into this note'),
+          ),
+        ],
+        if (widget.onInsertDraft == null && reviewState.noteDraft != null) ...[
           const SizedBox(height: 12),
           _buildAppendTargetSelector(
             availableNotes: availableNotes,
@@ -525,7 +541,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             claimReviewState.selection != null) ...[
           const SizedBox(height: 16),
           ClaimReviewGroupsPanel(
+            inlineSources: widget.onInsertDraft != null,
             groups: claimReviewState.groups,
+            citations: claimReviewState.citations,
             selectedIds: claimReviewState.selection!.selectedIds,
             onToggle: _toggleClaim,
             providerLabel:
@@ -570,7 +588,22 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             borderColor: AppColors.pinHighlight.withValues(alpha: 0.45),
           ),
         ],
-        if (claimReviewState.draft != null) ...[
+        if (widget.onInsertDraft != null &&
+            claimReviewState.draft != null &&
+            claimReviewState.draft!.shouldSave) ...[
+          const SizedBox(height: 16),
+          MarkdownBody(data: claimReviewState.draft!.markdownContent),
+          FilledButton.icon(
+            key: const Key('insert-reviewed-draft'),
+            onPressed: () {
+              widget.onInsertDraft!(claimReviewState.draft!.markdownContent);
+              ref.read(claimReviewProvider.notifier).reset();
+            },
+            icon: const Icon(Icons.add),
+            label: const Text('Insert into this note'),
+          ),
+        ],
+        if (widget.onInsertDraft == null && claimReviewState.draft != null) ...[
           const SizedBox(height: 16),
           ClaimDraftPreviewPanel(
             draft: claimReviewState.draft!,
