@@ -27,6 +27,7 @@ class ClaimReviewGroupsPanel extends StatefulWidget {
   // Safe, already-normalized provider label — null means no label is shown.
   final String? providerLabel;
   final List<GroundedAnswerCitation> citations;
+  final bool inlineSources;
 
   const ClaimReviewGroupsPanel({
     super.key,
@@ -35,6 +36,7 @@ class ClaimReviewGroupsPanel extends StatefulWidget {
     required this.onToggle,
     this.providerLabel,
     this.citations = const [],
+    this.inlineSources = false,
   });
 
   @override
@@ -59,12 +61,12 @@ class _ClaimReviewGroupsPanelState extends State<ClaimReviewGroupsPanel> {
   }
 
   void _showPreview() {
-    _previewController.show();
+    if (!widget.inlineSources) _previewController.show();
     if (!_previewVisible) setState(() => _previewVisible = true);
   }
 
   void _hidePreview() {
-    _previewController.hide();
+    if (!widget.inlineSources) _previewController.hide();
     if (_previewVisible) setState(() => _previewVisible = false);
   }
 
@@ -280,6 +282,27 @@ class _ClaimReviewGroupsPanelState extends State<ClaimReviewGroupsPanel> {
                 final readingWidth = docked
                     ? constraints.maxWidth - sourceWidth - gutter
                     : math.min(740.0, constraints.maxWidth);
+                if (widget.inlineSources) {
+                  return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _readingView(items, active),
+                        if (_previewVisible) ...[
+                          const SizedBox(height: 16),
+                          SizedBox(
+                              height: 260,
+                              child: SingleChildScrollView(
+                                key: const Key('source-preview-scroll'),
+                                controller: _sourceScroll,
+                                child: ClaimSourcePreviewPane(
+                                    item: active,
+                                    citations: widget.citations,
+                                    onClose: _closePreview,
+                                    docked: true),
+                              )),
+                        ],
+                      ]);
+                }
                 return OverlayPortal.overlayChildLayoutBuilder(
                   controller: _previewController,
                   overlayChildBuilder: (context, info) {
