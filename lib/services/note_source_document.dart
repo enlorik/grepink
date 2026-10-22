@@ -70,9 +70,38 @@ class NoteSourceDocument {
         (m) => '${m[1]}${m[2]}',
       );
     }).join('\n');
+    // Older generated drafts split a bold phrase across two list items at a
+    // sentence boundary. Join that narrowly identified display fragment while
+    // retaining both source links and leaving stored/exported Markdown alone.
+    final lines = clean.split('\n');
+    final repairedLines = <String>[];
+    String? codeFence;
+    final fragments = RegExp(
+        r'^(\s*[-+*]\s+\*\*[^\n*]*?\[Source(?: \d+)?\]\([^\n]+\))\n[-+*]\s+([^\n]*?\*\*[^\n]*)$');
+    for (var i = 0; i < lines.length; i++) {
+      final marker = RegExp(r'^\s{0,3}(`{3,}|~{3,})').firstMatch(lines[i]);
+      if (marker != null) {
+        final type = marker[1]![0];
+        if (codeFence == null) {
+          codeFence = type;
+        } else if (codeFence == type) {
+          codeFence = null;
+        }
+      }
+      final match = codeFence == null && i + 1 < lines.length
+          ? fragments.firstMatch('${lines[i]}\n${lines[i + 1]}')
+          : null;
+      if (match != null) {
+        repairedLines.add('${match[1]} ${match[2]}');
+        i++;
+      } else {
+        repairedLines.add(lines[i]);
+      }
+    }
+    final repaired = repairedLines.join('\n');
     // Existing drafts used a plain source directory; render compact links
     // without rewriting the saved note or losing its original URLs.
-    return clean.replaceAllMapped(
+    return repaired.replaceAllMapped(
       RegExp(r'^- (.+) — (https?://\S+)\s*$', multiLine: true),
       (m) => '- [${m[1]!.replaceAll('[', '').replaceAll(']', '')}](<${m[2]}>)',
     );

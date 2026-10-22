@@ -23,7 +23,8 @@ class ClaimDraftResult {
 
 String _claimMarkdown(String text) {
   final value = text.trim();
-  return value.replaceFirstMapped(RegExp(r'^[-+*]\s+([-+*]\s+)'), (m) => m[1]!);
+  return value.replaceFirstMapped(
+      RegExp(r'^[-+*]\s+([-+*]\s+)(?=[^\s*+\-])'), (m) => m[1]!);
 }
 
 class SelectedClaimsDraftBuilder {
