@@ -109,7 +109,8 @@ class _NoteReadingViewState extends State<NoteReadingView> {
   }
 
   void _edit(NoteDocumentBlock block) {
-    final source = NoteSourceDocument.withoutMetadata(widget.content);
+    final source =
+        NoteSourceDocument.withoutMetadata(widget.content, trim: false);
     setState(() {
       _editing = block;
       _before = source.substring(0, block.start);
@@ -277,7 +278,8 @@ class _NoteReadingViewState extends State<NoteReadingView> {
     return LayoutBuilder(builder: (context, constraints) {
       final height =
           constraints.hasBoundedHeight ? constraints.maxHeight : 600.0;
-      final source = NoteSourceDocument.withoutMetadata(widget.content);
+      final source =
+          NoteSourceDocument.withoutMetadata(widget.content, trim: false);
       // Keep surrounding blocks stable while the active passage changes length.
       var blocks = _editing == null
           ? noteDocumentBlocks(source)
