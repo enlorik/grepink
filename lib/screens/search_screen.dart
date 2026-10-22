@@ -322,23 +322,20 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: AppColors.dividerBorder),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.primaryAccent.withValues(alpha: 0.08),
-                blurRadius: 12,
-                offset: const Offset(0, 2),
-              ),
-            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Grow your notes', style: AppTextStyles.titleLarge),
+              Text(
+                  widget.onInsertDraft == null
+                      ? 'Grow your notes'
+                      : 'Ask about your note',
+                  style: AppTextStyles.titleLarge),
               const SizedBox(height: 8),
               Text(
                 widget.onInsertDraft == null
                     ? 'Ask a question and review the draft before you save, append, or discard it.'
-                    : 'Keep reading your note; review an answer, then insert it where you chose.',
+                    : 'Review the answer, then add what belongs in your note.',
                 style: AppTextStyles.bodyMedium,
               ),
               const SizedBox(height: 12),
@@ -352,7 +349,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 onChanged: (_) => setState(() {}),
                 onSubmitted: (_) => _onAsk(),
                 decoration: InputDecoration(
-                  hintText: 'What should Grepink turn into durable notes?',
+                  hintText: 'What would you like to understand?',
                   filled: true,
                   fillColor: AppColors.aiResponseBackground,
                   border: OutlineInputBorder(
@@ -544,6 +541,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             claimReviewState.selection != null) ...[
           const SizedBox(height: 16),
           ClaimReviewGroupsPanel(
+            inlineSources: widget.onInsertDraft != null,
             groups: claimReviewState.groups,
             citations: claimReviewState.citations,
             selectedIds: claimReviewState.selection!.selectedIds,

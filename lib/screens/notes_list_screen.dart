@@ -149,10 +149,15 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
                 selected:
                     (wide || _selectedId != null) && note.id == selected.id,
                 selectedTileColor: AppColors.surface,
+                selectedColor: AppColors.deepAction,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
-                title: Text(note.title,
-                    maxLines: 2, overflow: TextOverflow.ellipsis),
+                title: Text(note.isPinned ? '• ${note.title}' : note.title,
+                    style: AppTextStyles.titleMedium,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis),
                 subtitle: Text(
                     sourcePlainText(
                             NoteSourceDocument.withoutMetadata(note.content))
@@ -193,7 +198,17 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
       );
       if (wide) {
         return Row(children: [
-          SizedBox(width: 260, child: list),
+          SizedBox(
+              width: 260,
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 20, 12, 4),
+                        child: Text('YOUR NOTES · ${notes.length}',
+                            style: AppTextStyles.excerptSource)),
+                    Expanded(child: list)
+                  ])),
           const VerticalDivider(width: 1),
           Expanded(child: editor)
         ]);

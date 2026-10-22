@@ -336,56 +336,44 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                   ),
                 ),
               Expanded(child: LayoutBuilder(builder: (context, constraints) {
-                final note = SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 100),
-                  child: Center(
-                      child: ConstrainedBox(
-                    constraints:
-                        BoxConstraints(maxWidth: _editing ? 1160 : 760),
-                    child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildTitleField(),
-                          const Divider(color: AppColors.dividerBorder),
-                          const SizedBox(height: 12),
-                          LayoutBuilder(builder: (context, bodyConstraints) {
-                            final preview =
-                                NoteReadingView(content: _documentContent);
-                            if (!_editing) return preview;
-                            if (bodyConstraints.maxWidth >= 800) {
-                              return Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(child: _buildContentField()),
-                                    const SizedBox(width: 24),
-                                    Expanded(child: preview),
-                                  ]);
-                            }
-                            return Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  _buildContentField(),
-                                  const Divider(),
-                                  const Text('Reading preview'),
-                                  const SizedBox(height: 12),
-                                  preview,
-                                ]);
-                          }),
-                          if (_editing) ...[
-                            const SizedBox(height: 20),
-                            _buildTagsSection(),
-                            if (_keywords.isNotEmpty) _buildKeywordsSection(),
-                          ],
-                        ]),
-                  )),
+                final note = ColoredBox(
+                  color: AppColors.surface,
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Padding(
+                            padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+                            child: _buildTitleField()),
+                        const Divider(
+                            height: 1, color: AppColors.dividerBorder),
+                        Expanded(
+                            child: NoteReadingView(
+                                content: _documentContent,
+                                editable: _editing,
+                                onChanged: (value) {
+                                  _contentController.text =
+                                      NoteSourceDocument.withoutMetadata(value);
+                                  _contentChanged();
+                                })),
+                        if (_editing)
+                          SizedBox(
+                              height: 90,
+                              child: SingleChildScrollView(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 24),
+                                  child: Column(children: [
+                                    _buildTagsSection(),
+                                    if (_keywords.isNotEmpty)
+                                      _buildKeywordsSection()
+                                  ]))),
+                      ]),
                 );
                 if (!_asking) return note;
                 final questions = Column(children: [
                   Padding(
                       padding: const EdgeInsets.all(12),
                       child: Row(children: [
-                        const Expanded(
-                            child: Text('Research beside your note')),
+                        const Expanded(child: Text('Research')),
                         IconButton(
                             tooltip: 'Close questions',
                             onPressed: () => setState(() => _asking = false),
@@ -438,19 +426,28 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
             ),
           Expanded(
             child: Text(
-              widget.noteId == null ? 'New Note' : 'Notebook',
-              style: AppTextStyles.titleLarge,
+              widget.noteId == null
+                  ? 'New Note'
+                  : (_hasChanges ? 'Unsaved changes' : 'Notebook'),
+              style: AppTextStyles.bodySmall,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          TextButton.icon(
-            onPressed: () => setState(() => _editing = !_editing),
-            icon: Icon(_editing
-                ? Icons.chrome_reader_mode_outlined
-                : Icons.edit_outlined),
-            label: Text(_editing ? 'Read' : 'Edit'),
+          SegmentedButton<bool>(
+            showSelectedIcon: false,
+            style: SegmentedButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                textStyle: const TextStyle(fontSize: 12)),
+            segments: const [
+              ButtonSegment(value: false, label: Text('Read')),
+              ButtonSegment(value: true, label: Text('Edit'))
+            ],
+            selected: {_editing},
+            onSelectionChanged: (selection) =>
+                setState(() => _editing = selection.single),
           ),
+          const SizedBox(width: 8),
           TextButton.icon(
             onPressed: () => setState(() => _asking = !_asking),
             icon: const Icon(Icons.add_comment_outlined),
@@ -482,28 +479,6 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       ),
       textInputAction: TextInputAction.next,
       onSubmitted: (_) => _contentFocus.requestFocus(),
-    );
-  }
-
-  Widget _buildContentField() {
-    return TextField(
-      controller: _contentController,
-      focusNode: _contentFocus,
-      style: AppTextStyles.bodyLarge,
-      decoration: InputDecoration(
-        hintText: 'Write your thoughts...',
-        hintStyle:
-            AppTextStyles.bodyLarge.copyWith(color: AppColors.placeholderText),
-        border: InputBorder.none,
-        enabledBorder: InputBorder.none,
-        focusedBorder: InputBorder.none,
-        contentPadding: EdgeInsets.zero,
-        fillColor: Colors.transparent,
-        filled: false,
-      ),
-      maxLines: null,
-      minLines: 8,
-      keyboardType: TextInputType.multiline,
     );
   }
 
