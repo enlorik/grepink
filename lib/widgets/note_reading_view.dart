@@ -80,7 +80,9 @@ class _NoteReadingViewState extends State<NoteReadingView> {
     };
     final index = selected == null ? 0 : urls.indexOf(selected);
     if (_sources.map((c) => c.url).join('\n') == urls.join('\n') &&
-        selected == null) return;
+        selected == null) {
+      return;
+    }
     setState(() {
       _sources = urls
           .map((url) =>
@@ -96,7 +98,9 @@ class _NoteReadingViewState extends State<NoteReadingView> {
   void _wheel(PointerSignalEvent event) {
     if (event is! PointerScrollEvent ||
         !_sourceScroll.hasClients ||
-        _sourceScroll.position.maxScrollExtent <= 0) return;
+        _sourceScroll.position.maxScrollExtent <= 0) {
+      return;
+    }
     GestureBinding.instance.pointerSignalResolver.register(event, (_) {
       _sourceScroll.jumpTo((_sourceScroll.offset + event.scrollDelta.dy)
           .clamp(0.0, _sourceScroll.position.maxScrollExtent)
