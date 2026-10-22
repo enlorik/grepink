@@ -166,6 +166,8 @@ class _NoteReadingViewState extends State<NoteReadingView> {
       onEnter: (_) => _inspect(urls),
       cursor: widget.editable ? SystemMouseCursors.text : MouseCursor.defer,
       child: Listener(
+        key: ValueKey('note-passage-$index'),
+        behavior: HitTestBehavior.opaque,
         onPointerSignal: urls.isEmpty ? null : _wheel,
         child: GestureDetector(
           behavior: HitTestBehavior.translucent,
@@ -173,7 +175,6 @@ class _NoteReadingViewState extends State<NoteReadingView> {
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: MarkdownBody(
-              key: ValueKey('note-passage-$index'),
               data: block.markdown.trim().isEmpty && widget.editable
                   ? 'Start writing…'
                   : NoteSourceDocument.visibleMarkdown(block.markdown),
