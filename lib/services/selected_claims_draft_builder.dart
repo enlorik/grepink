@@ -23,9 +23,7 @@ class ClaimDraftResult {
 
 String _claimMarkdown(String text) {
   final value = text.trim();
-  return RegExp(r'^(?:#{1,6}\s|[-+*]\s|\d+[.)]\s|```|~~~|>)').hasMatch(value)
-      ? value
-      : '- $value';
+  return value.replaceFirstMapped(RegExp(r'^[-+*]\s+([-+*]\s+)'), (m) => m[1]!);
 }
 
 class SelectedClaimsDraftBuilder {
@@ -98,8 +96,12 @@ class SelectedClaimsDraftBuilder {
       for (final item in newItems) {
         buf.write(_claimMarkdown(item.text));
         if (item.citationUrls.isNotEmpty) {
-          buf.write(' [Source](${item.citationUrls.first})');
+          for (var i = 0; i < item.citationUrls.length; i++) {
+            buf.write(
+                ' [${i == 0 ? 'Source' : 'Source ${i + 1}'}](<${item.citationUrls[i]}>)');
+          }
         }
+        buf.writeln();
         buf.writeln();
       }
       buf.writeln();
@@ -111,8 +113,12 @@ class SelectedClaimsDraftBuilder {
       for (final item in betterItems) {
         buf.write(_claimMarkdown(item.text));
         if (item.citationUrls.isNotEmpty) {
-          buf.write(' [Source](${item.citationUrls.first})');
+          for (var i = 0; i < item.citationUrls.length; i++) {
+            buf.write(
+                ' [${i == 0 ? 'Source' : 'Source ${i + 1}'}](<${item.citationUrls[i]}>)');
+          }
         }
+        buf.writeln();
         buf.writeln();
       }
       buf.writeln();
@@ -124,8 +130,12 @@ class SelectedClaimsDraftBuilder {
       for (final item in contradictionItems) {
         buf.write(_claimMarkdown(item.text));
         if (item.citationUrls.isNotEmpty) {
-          buf.write(' [Source](${item.citationUrls.first})');
+          for (var i = 0; i < item.citationUrls.length; i++) {
+            buf.write(
+                ' [${i == 0 ? 'Source' : 'Source ${i + 1}'}](<${item.citationUrls[i]}>)');
+          }
         }
+        buf.writeln();
         buf.writeln();
       }
       buf.writeln();

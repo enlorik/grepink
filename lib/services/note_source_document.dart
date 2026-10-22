@@ -53,7 +53,18 @@ class NoteSourceDocument {
       content.replaceAll(_metadata, '').trim();
 
   static String visibleMarkdown(String content) {
-    final clean = content.replaceAll(_metadata, '').trim();
+    var fenced = false;
+    final clean =
+        content.replaceAll(_metadata, '').trim().split('\n').map((line) {
+      if (RegExp(r'^\s{0,3}(`{3,}|~{3,})').hasMatch(line)) fenced = !fenced;
+      if (fenced) return line;
+      // Legacy drafts wrapped provider list markers in another bullet.
+      // This is display-only and deliberately leaves thematic breaks intact.
+      return line.replaceFirstMapped(
+        RegExp(r'^(\s*)[-+*]\s+([-+*]\s+)(?=[^\s*+\-])'),
+        (m) => '${m[1]}${m[2]}',
+      );
+    }).join('\n');
     // Existing drafts used a plain source directory; render compact links
     // without rewriting the saved note or losing its original URLs.
     return clean.replaceAllMapped(
