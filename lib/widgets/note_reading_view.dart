@@ -196,6 +196,11 @@ class _NoteReadingViewState extends State<NoteReadingView> {
                     .bodyLarge
                     ?.copyWith(height: 1.65),
                 blockSpacing: 14,
+                blockquoteDecoration: const BoxDecoration(
+                    color: AppColors.codeBackground,
+                    border: Border(
+                        left: BorderSide(
+                            color: AppColors.dividerBorder, width: 3))),
                 codeblockDecoration: BoxDecoration(
                     color: AppColors.codeBackground,
                     borderRadius: BorderRadius.circular(8)),
@@ -236,6 +241,9 @@ class _NoteReadingViewState extends State<NoteReadingView> {
                   ChoiceChip(
                       label: Text('${i + 1}'),
                       selected: i == _sourceIndex,
+                      selectedColor:
+                          AppColors.primaryAccent.withValues(alpha: .28),
+                      backgroundColor: AppColors.surface,
                       onSelected: (_) {
                         setState(() => _sourceIndex = i);
                         if (_sourceScroll.hasClients) _sourceScroll.jumpTo(0);

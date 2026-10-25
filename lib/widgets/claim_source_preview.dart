@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 
 import '../models/claim_review_item.dart';
+import '../theme/app_colors.dart';
 import '../models/grounded_answer.dart';
 
 /// Presentation metadata only: the original citation lists remain untouched.
@@ -56,6 +57,10 @@ class ClaimFormattedText extends StatelessWidget {
         p: (style ?? Theme.of(context).textTheme.bodyMedium)
             ?.copyWith(height: 1.5),
         blockSpacing: 8,
+        blockquoteDecoration: const BoxDecoration(
+            color: AppColors.codeBackground,
+            border: Border(
+                left: BorderSide(color: AppColors.dividerBorder, width: 3))),
       ),
       sizedImageBuilder: (config) => Text(config.alt ?? 'Image'),
     );
