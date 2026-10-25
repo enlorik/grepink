@@ -341,11 +341,14 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                               child: SingleChildScrollView(
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 24),
-                                  child: Column(children: [
-                                    _buildTagsSection(),
-                                    if (_keywords.isNotEmpty)
-                                      _buildKeywordsSection()
-                                  ]))),
+                                  child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        _buildTagsSection(),
+                                        if (_keywords.isNotEmpty)
+                                          _buildKeywordsSection()
+                                      ]))),
                       ]),
                 );
                 if (!_asking) return note;
