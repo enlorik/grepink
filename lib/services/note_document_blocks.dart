@@ -45,5 +45,25 @@ List<NoteDocumentBlock> noteDocumentBlocks(String source) {
   }
   flush(source.length);
   if (blocks.isEmpty) blocks.add(const NoteDocumentBlock(0, 0, ''));
-  return blocks;
+  // Old generated drafts sometimes split one bold phrase across two bullets.
+  // Keep that known fragment as one logical passage so display repair still sees
+  // both halves; the original source range remains exact for editing/export.
+  final fragments = RegExp(
+    r'^(\s*[-+*]\s+\*\*[^\n*]*?\[Source(?: \d+)?\]\([^\n]+\))\n[-+*]\s+([^\n]*?\*\*[^\n]*)$',
+  );
+  final result = <NoteDocumentBlock>[];
+  for (var i = 0; i < blocks.length; i++) {
+    final block = blocks[i];
+    if (i + 1 < blocks.length &&
+        source.substring(block.end, blocks[i + 1].start) == '\n' &&
+        fragments.hasMatch(source.substring(block.start, blocks[i + 1].end))) {
+      final end = blocks[++i].end;
+      result.add(
+        NoteDocumentBlock(block.start, end, source.substring(block.start, end)),
+      );
+    } else {
+      result.add(block);
+    }
+  }
+  return result;
 }
