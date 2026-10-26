@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:grepink/services/note_document_blocks.dart';
+import 'package:grepink/services/note_source_document.dart';
 
 void main() {
   test(
@@ -18,6 +19,26 @@ void main() {
         edited,
         '# Title\n\nChanged\n  - Nested\n\n```dart\none\n\ntwo\n```\n\nEnd.',
       );
+    },
+  );
+  test(
+    'legacy split emphasis remains one exact logical passage for display repair',
+    () {
+      const source =
+          '- **First sentence. [Source](https://example.com/one)\n- Second sentence** ends here.\n- Separate item';
+      final blocks = noteDocumentBlocks(source);
+      expect(blocks.length, 2);
+      expect(
+        source.substring(blocks.first.start, blocks.first.end),
+        blocks.first.markdown,
+      );
+      expect(
+        NoteSourceDocument.visibleMarkdown(blocks.first.markdown),
+        '- **First sentence. [Source](https://example.com/one) Second sentence** ends here.',
+      );
+      expect(blocks.last.markdown, '- Separate item');
+      const ordinary = '- First\n- Second';
+      expect(noteDocumentBlocks(ordinary).length, 2);
     },
   );
 }
