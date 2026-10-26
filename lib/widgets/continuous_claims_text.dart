@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:markdown/markdown.dart' as md;
 
 import '../models/claim_review_item.dart';
+import '../services/markdown_list_lines.dart';
 
 /// One reading article, preserving Markdown blocks and per-claim hit targets.
 class ContinuousClaimsText extends StatefulWidget {
@@ -47,8 +48,9 @@ class _ContinuousClaimsTextState extends State<ContinuousClaimsText> {
         text: item.text,
         // AST text is consumed by Flutter, not by an HTML renderer.
         nodes: md.Document(
-                extensionSet: md.ExtensionSet.gitHubFlavored, encodeHtml: false)
-            .parseLines(item.text.split('\n')),
+          extensionSet: md.ExtensionSet.gitHubFlavored,
+          encodeHtml: false,
+        ).parseLines(standaloneListMarkdown(item.text).split('\n')),
       );
     }
     return _parsed[item.id]!.nodes;
@@ -73,20 +75,25 @@ class _ContinuousClaimsTextState extends State<ContinuousClaimsText> {
   }
 
   List<InlineSpan> _inline(
-      ClaimReviewItem item, List<md.Node> nodes, TextStyle style) {
+    ClaimReviewItem item,
+    List<md.Node> nodes,
+    TextStyle style,
+  ) {
     final tap = _taps.putIfAbsent(item.id, TapGestureRecognizer.new);
     tap.onTap = () {
       widget.onActivate(item);
       if (item.canBeSaved) widget.onToggle(item.id);
     };
     final spans = <InlineSpan>[];
-    void add(String text, TextStyle current) => spans.add(TextSpan(
-          text: text,
-          style: current,
-          recognizer: tap,
-          mouseCursor: SystemMouseCursors.click,
-          onEnter: (_) => widget.onActivate(item),
-        ));
+    void add(String text, TextStyle current) => spans.add(
+      TextSpan(
+        text: text,
+        style: current,
+        recognizer: tap,
+        mouseCursor: SystemMouseCursors.click,
+        onEnter: (_) => widget.onActivate(item),
+      ),
+    );
     void visit(md.Node node, TextStyle current) {
       if (node is md.Text) {
         add(node.text, current);
@@ -103,11 +110,11 @@ class _ContinuousClaimsTextState extends State<ContinuousClaimsText> {
       }
       if (node.tag == 'code') {
         next = next.copyWith(
-            fontFamily: 'Consolas',
-            fontFamilyFallback: const ['Menlo', 'Courier New', 'monospace'],
-            fontSize: 14,
-            backgroundColor:
-                Theme.of(context).colorScheme.onSurface.withAlpha(8));
+          fontFamily: 'Consolas',
+          fontFamilyFallback: const ['Menlo', 'Courier New', 'monospace'],
+          fontSize: 14,
+          backgroundColor: Theme.of(context).colorScheme.onSurface.withAlpha(8),
+        );
       }
       if (node.tag == 'br') add('\n', next);
       if (node.tag == 'img') add(node.attributes['alt'] ?? 'Image', next);
@@ -122,10 +129,15 @@ class _ContinuousClaimsTextState extends State<ContinuousClaimsText> {
     return spans;
   }
 
-  Widget _text(ClaimReviewItem item, List<md.Node> nodes,
-          {TextStyle? style, bool softWrap = true}) =>
-      Text.rich(TextSpan(children: _inline(item, nodes, style ?? _style(item))),
-          softWrap: softWrap);
+  Widget _text(
+    ClaimReviewItem item,
+    List<md.Node> nodes, {
+    TextStyle? style,
+    bool softWrap = true,
+  }) => Text.rich(
+    TextSpan(children: _inline(item, nodes, style ?? _style(item))),
+    softWrap: softWrap,
+  );
 
   bool _isBlock(md.Node node) =>
       node is md.Element &&
@@ -142,7 +154,7 @@ class _ContinuousClaimsTextState extends State<ContinuousClaimsText> {
         'h3',
         'h4',
         'h5',
-        'h6'
+        'h6',
       }.contains(node.tag);
 
   List<Widget> _children(ClaimReviewItem item, List<md.Node> nodes) {
@@ -174,63 +186,88 @@ class _ContinuousClaimsTextState extends State<ContinuousClaimsText> {
     if (RegExp(r'^h[1-6]$').hasMatch(tag)) {
       final level = int.parse(tag.substring(1));
       return Semantics(
-          header: true,
-          child: Padding(
-            padding: const EdgeInsets.only(top: 12, bottom: 8),
-            child: _text(item, nodes,
-                style: _style(item).copyWith(
-                    fontSize: level <= 2 ? 22 : 18,
-                    height: 1.3,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: -0.2)),
-          ));
+        header: true,
+        child: Padding(
+          padding: const EdgeInsets.only(top: 12, bottom: 8),
+          child: _text(
+            item,
+            nodes,
+            style: _style(item).copyWith(
+              fontSize: level <= 2 ? 22 : 18,
+              height: 1.3,
+              fontWeight: FontWeight.w600,
+              letterSpacing: -0.2,
+            ),
+          ),
+        ),
+      );
     }
     if (tag == 'ul' || tag == 'ol') {
-      final entries =
-          nodes.whereType<md.Element>().where((n) => n.tag == 'li').toList();
+      final entries = nodes
+          .whereType<md.Element>()
+          .where((n) => n.tag == 'li')
+          .toList();
       final start = int.tryParse(node.attributes['start'] ?? '') ?? 1;
-      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        for (var i = 0; i < entries.length; i++)
-          Padding(
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var i = 0; i < entries.length; i++)
+            Padding(
               padding: const EdgeInsets.only(bottom: 6),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   SizedBox(
-                      width: 26,
-                      child: Text(tag == 'ol' ? '${start + i}.' : '•',
-                          style: _style(item))),
+                    width: 26,
+                    child: Text(
+                      tag == 'ol' ? '${start + i}.' : '•',
+                      style: _style(item),
+                    ),
+                  ),
                   Expanded(
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: _children(
-                              item, entries[i].children ?? <md.Node>[]))),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: _children(
+                        item,
+                        entries[i].children ?? <md.Node>[],
+                      ),
+                    ),
+                  ),
                 ],
-              )),
-      ]);
+              ),
+            ),
+        ],
+      );
     }
     if (tag == 'pre') {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-            color: theme.colorScheme.onSurface.withAlpha(5),
-            borderRadius: BorderRadius.circular(8)),
+          color: theme.colorScheme.onSurface.withAlpha(5),
+          borderRadius: BorderRadius.circular(8),
+        ),
         child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: _text(item, nodes, softWrap: false)),
+          scrollDirection: Axis.horizontal,
+          child: _text(item, nodes, softWrap: false),
+        ),
       );
     }
     if (tag == 'blockquote') {
       return Container(
         padding: const EdgeInsets.only(left: 14, top: 4, bottom: 4),
         decoration: BoxDecoration(
-            border: Border(
-                left: BorderSide(
-                    color: theme.colorScheme.primary.withAlpha(65), width: 3))),
+          border: Border(
+            left: BorderSide(
+              color: theme.colorScheme.primary.withAlpha(65),
+              width: 3,
+            ),
+          ),
+        ),
         child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: _children(item, nodes)),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: _children(item, nodes),
+        ),
       );
     }
     if (tag == 'table') {
@@ -251,24 +288,29 @@ class _ContinuousClaimsTextState extends State<ContinuousClaimsText> {
       final columns = rows
           .map((row) => row.children!.length)
           .reduce((a, b) => a > b ? a : b);
-      return LayoutBuilder(builder: (context, constraints) {
-        final width = constraints.maxWidth > columns * 140
-            ? constraints.maxWidth
-            : columns * 140.0;
-        return SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: SizedBox(
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.maxWidth > columns * 140
+              ? constraints.maxWidth
+              : columns * 140.0;
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: SizedBox(
               width: width,
               child: Table(
                 border: TableBorder(
-                    horizontalInside: BorderSide(color: theme.dividerColor)),
+                  horizontalInside: BorderSide(color: theme.dividerColor),
+                ),
                 children: [
                   for (final row in rows)
-                    TableRow(children: [
-                      for (var i = 0; i < columns; i++)
-                        Padding(
+                    TableRow(
+                      children: [
+                        for (var i = 0; i < columns; i++)
+                          Padding(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 10),
+                              horizontal: 8,
+                              vertical: 10,
+                            ),
                             child: i >= row.children!.length
                                 ? const SizedBox.shrink()
                                 : _text(
@@ -276,18 +318,24 @@ class _ContinuousClaimsTextState extends State<ContinuousClaimsText> {
                                     (row.children![i] as md.Element).children ??
                                         <md.Node>[],
                                     style: _style(item).copyWith(
-                                        fontSize: 14,
-                                        fontWeight:
-                                            (row.children![i] as md.Element)
-                                                        .tag ==
-                                                    'th'
-                                                ? FontWeight.w600
-                                                : FontWeight.normal))),
-                    ])
+                                      fontSize: 14,
+                                      fontWeight:
+                                          (row.children![i] as md.Element)
+                                                  .tag ==
+                                              'th'
+                                          ? FontWeight.w600
+                                          : FontWeight.normal,
+                                    ),
+                                  ),
+                          ),
+                      ],
+                    ),
                 ],
-              )),
-        );
-      });
+              ),
+            ),
+          );
+        },
+      );
     }
     if (tag == 'hr') return const Divider(height: 24);
     return _text(item, nodes);
@@ -299,13 +347,17 @@ class _ContinuousClaimsTextState extends State<ContinuousClaimsText> {
     var characters = 0;
     void flush() {
       if (paragraph.isEmpty) return;
-      blocks.add(Padding(
+      blocks.add(
+        Padding(
           padding: const EdgeInsets.only(bottom: 14),
-          child: Text.rich(TextSpan(children: paragraph),
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyLarge!
-                  .copyWith(fontSize: 16, height: 1.6))));
+          child: Text.rich(
+            TextSpan(children: paragraph),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyLarge!.copyWith(fontSize: 16, height: 1.6),
+          ),
+        ),
+      );
       paragraph = [];
       characters = 0;
     }
@@ -318,18 +370,30 @@ class _ContinuousClaimsTextState extends State<ContinuousClaimsText> {
           // Keep sentences flowing, while respecting explicit paragraphs and
           // breaking long runs only at claim boundaries, never inside a claim.
           if (i > 0 || characters > 420) flush();
-          paragraph.add(TextSpan(
-              children:
-                  _inline(item, node.children ?? <md.Node>[], _style(item))));
+          paragraph.add(
+            TextSpan(
+              children: _inline(
+                item,
+                node.children ?? <md.Node>[],
+                _style(item),
+              ),
+            ),
+          );
           paragraph.add(const TextSpan(text: ' '));
           characters += node.textContent.length;
         } else {
           flush();
-          blocks.add(Padding(
-              padding: const EdgeInsets.only(bottom: 10),
+          blocks.add(
+            Padding(
+              padding: EdgeInsets.only(
+                bottom: 10,
+                left: (MarkdownListLine.parse(item.text)?.indent ?? 0) * 8.0,
+              ),
               child: node is md.Element
                   ? _block(item, node)
-                  : _text(item, [node])));
+                  : _text(item, [node]),
+            ),
+          );
         }
       }
     }
@@ -353,9 +417,10 @@ class _ContinuousClaimsTextState extends State<ContinuousClaimsText> {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 740),
             child: Column(
-                key: const Key('continuous-claims-text'),
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: _article()),
+              key: const Key('continuous-claims-text'),
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: _article(),
+            ),
           ),
         ),
       ),

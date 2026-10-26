@@ -4,6 +4,8 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 
 import '../models/claim_review_item.dart';
 import '../theme/app_colors.dart';
+import '../services/source_page_loader.dart';
+import 'source_page_reader.dart';
 import '../models/grounded_answer.dart';
 
 /// Presentation metadata only: the original citation lists remain untouched.
@@ -44,8 +46,9 @@ class ClaimFormattedText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!RegExp(r'[*_`#>~\[\]\n|]|^\s*(?:[-+]\s|\d+[.)]\s|---+\s*$)')
-        .hasMatch(data)) {
+    if (!RegExp(
+      r'[*_`#>~\[\]\n|]|^\s*(?:[-+]\s|\d+[.)]\s|---+\s*$)',
+    ).hasMatch(data)) {
       return selectable
           ? SelectableText(data, style: style)
           : Text(data, style: style);
@@ -54,13 +57,16 @@ class ClaimFormattedText extends StatelessWidget {
       data: data,
       selectable: selectable,
       styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
-        p: (style ?? Theme.of(context).textTheme.bodyMedium)
-            ?.copyWith(height: 1.5),
+        p: (style ?? Theme.of(context).textTheme.bodyMedium)?.copyWith(
+          height: 1.5,
+        ),
         blockSpacing: 8,
         blockquoteDecoration: const BoxDecoration(
-            color: AppColors.codeBackground,
-            border: Border(
-                left: BorderSide(color: AppColors.dividerBorder, width: 3))),
+          color: AppColors.codeBackground,
+          border: Border(
+            left: BorderSide(color: AppColors.dividerBorder, width: 3),
+          ),
+        ),
       ),
       sizedImageBuilder: (config) => Text(config.alt ?? 'Image'),
     );
@@ -102,9 +108,12 @@ String sourceExcerpt(String text) {
 String sourcePlainText(String text) => text
     .replaceAllMapped(RegExp(r'!?\[([^\]]+)\]\([^)]*\)'), (m) => m[1]!)
     .replaceAll(
-        RegExp(r'^\s{0,3}(?:#{1,6}\s+|>\s*|[-+*]\s+|\d+[.)]\s+)',
-            multiLine: true),
-        '')
+      RegExp(
+        r'^\s{0,3}(?:#{1,6}\s+|>\s*|[-+*]\s+|\d+[.)]\s+)',
+        multiLine: true,
+      ),
+      '',
+    )
     .replaceAll(RegExp(r'^\s*(?:```|~~~).*$', multiLine: true), '')
     .replaceAll(RegExp(r'[*_`~]'), '')
     .replaceAll(RegExp(r'\s+'), ' ')
@@ -120,8 +129,9 @@ List<ClaimSourcePreview> claimSourcePreviews(
     final url = item.citationUrls[i].trim();
     if (url.isEmpty || !seen.add(url)) continue;
     final matching = citations.where((c) => c.url.trim() == url);
-    var title =
-        i < item.citationTitles.length ? item.citationTitles[i].trim() : '';
+    var title = i < item.citationTitles.length
+        ? item.citationTitles[i].trim()
+        : '';
     String? excerpt;
     for (final citation in matching) {
       if ((title.isEmpty || title == url) && citation.title.trim().isNotEmpty) {
@@ -140,12 +150,13 @@ List<ClaimSourcePreview> claimSourcePreviews(
   return result;
 }
 
-/// A modeless reading companion; no remote page is loaded just by hovering.
+/// A modeless reading companion that loads missing source excerpts on hover.
 class ClaimSourcePreviewPane extends StatelessWidget {
   final ClaimReviewItem? item;
   final List<GroundedAnswerCitation> citations;
   final VoidCallback onClose;
   final bool docked;
+  final SourcePageLoader? sourceLoader;
 
   const ClaimSourcePreviewPane({
     super.key,
@@ -153,6 +164,7 @@ class ClaimSourcePreviewPane extends StatelessWidget {
     required this.citations,
     required this.onClose,
     this.docked = false,
+    this.sourceLoader,
   });
 
   @override
@@ -164,9 +176,7 @@ class ClaimSourcePreviewPane extends StatelessWidget {
       key: const Key('source-preview-pane'),
       elevation: docked ? 0 : 8,
       color: Theme.of(context).colorScheme.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       clipBehavior: Clip.antiAlias,
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -206,10 +216,11 @@ class ClaimSourcePreviewPane extends StatelessWidget {
                 if (sources[i].title != Uri.tryParse(sources[i].url)?.host)
                   Text(Uri.tryParse(sources[i].url)?.host ?? 'Source'),
                 const SizedBox(height: 4),
-                ClaimFormattedText(
-                  selectable: true,
-                  data: sources[i].excerpt ??
-                      'The provider did not supply a source excerpt.',
+                SourcePageReader(
+                  url: sources[i].url,
+                  passage: item!.text,
+                  savedExcerpt: sources[i].excerpt,
+                  loader: sourceLoader,
                 ),
                 TextButton.icon(
                   key: Key('copy-source-link-$i'),
@@ -237,7 +248,7 @@ class ClaimSourcePreviewPane extends StatelessWidget {
               ],
             ],
             const Text(
-              'Source excerpts, not a live webpage; highlighting depends on your browser and matching page text.',
+              'Website reader; scripts and images are omitted. Saved excerpts remain available offline.',
               style: TextStyle(fontSize: 12),
             ),
           ],
