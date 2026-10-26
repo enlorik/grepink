@@ -2,6 +2,7 @@ import '../models/claim_deduplication_result.dart';
 import '../models/claim_review_item.dart';
 import '../models/grounded_answer.dart';
 import 'note_source_document.dart';
+import 'markdown_list_lines.dart';
 
 class ClaimDraftResult {
   final String markdownContent;
@@ -21,11 +22,7 @@ class ClaimDraftResult {
   );
 }
 
-String _claimMarkdown(String text) {
-  final value = text.trim();
-  return value.replaceFirstMapped(
-      RegExp(r'^[-+*]\s+([-+*]\s+)(?=[^\s*+\-])'), (m) => m[1]!);
-}
+String _claimMarkdown(String text) => normalizeMarkdownLists(text.trimRight());
 
 class SelectedClaimsDraftBuilder {
   const SelectedClaimsDraftBuilder();
@@ -43,9 +40,11 @@ class SelectedClaimsDraftBuilder {
     required List<GroundedAnswerCitation> citations,
   }) {
     final saveable = selected
-        .where((item) =>
-            item.canBeSaved &&
-            item.classification != ClaimNoveltyClassification.alreadyKnown)
+        .where(
+          (item) =>
+              item.canBeSaved &&
+              item.classification != ClaimNoveltyClassification.alreadyKnown,
+        )
         .toList();
 
     if (saveable.isEmpty) return ClaimDraftResult.empty;
@@ -55,11 +54,13 @@ class SelectedClaimsDraftBuilder {
         .toList();
     final betterItems = saveable
         .where(
-            (i) => i.classification == ClaimNoveltyClassification.betterSource)
+          (i) => i.classification == ClaimNoveltyClassification.betterSource,
+        )
         .toList();
     final contradictionItems = saveable
         .where(
-            (i) => i.classification == ClaimNoveltyClassification.contradiction)
+          (i) => i.classification == ClaimNoveltyClassification.contradiction,
+        )
         .toList();
 
     // Titles are resolved primarily from the provider-level citations list,
@@ -76,8 +77,9 @@ class SelectedClaimsDraftBuilder {
       usedUrls.addAll(item.citationUrls);
       for (var i = 0; i < item.citationUrls.length; i++) {
         final url = item.citationUrls[i];
-        final itemTitle =
-            i < item.citationTitles.length ? item.citationTitles[i] : '';
+        final itemTitle = i < item.citationTitles.length
+            ? item.citationTitles[i]
+            : '';
         if (itemTitle.isNotEmpty) {
           titleByUrl.putIfAbsent(url, () => itemTitle);
         }
@@ -99,7 +101,8 @@ class SelectedClaimsDraftBuilder {
         if (item.citationUrls.isNotEmpty) {
           for (var i = 0; i < item.citationUrls.length; i++) {
             buf.write(
-                ' [${i == 0 ? 'Source' : 'Source ${i + 1}'}](<${item.citationUrls[i]}>)');
+              ' [${i == 0 ? 'Source' : 'Source ${i + 1}'}](<${item.citationUrls[i]}>)',
+            );
           }
         }
         buf.writeln();
@@ -116,7 +119,8 @@ class SelectedClaimsDraftBuilder {
         if (item.citationUrls.isNotEmpty) {
           for (var i = 0; i < item.citationUrls.length; i++) {
             buf.write(
-                ' [${i == 0 ? 'Source' : 'Source ${i + 1}'}](<${item.citationUrls[i]}>)');
+              ' [${i == 0 ? 'Source' : 'Source ${i + 1}'}](<${item.citationUrls[i]}>)',
+            );
           }
         }
         buf.writeln();
@@ -133,7 +137,8 @@ class SelectedClaimsDraftBuilder {
         if (item.citationUrls.isNotEmpty) {
           for (var i = 0; i < item.citationUrls.length; i++) {
             buf.write(
-                ' [${i == 0 ? 'Source' : 'Source ${i + 1}'}](<${item.citationUrls[i]}>)');
+              ' [${i == 0 ? 'Source' : 'Source ${i + 1}'}](<${item.citationUrls[i]}>)',
+            );
           }
         }
         buf.writeln();

@@ -1,24 +1,29 @@
 import 'dart:convert';
 
+import 'markdown_list_lines.dart';
+
 import '../models/grounded_answer.dart';
 
 /// Portable source excerpts travel with the note through sync and export.
 /// Only citations used by the saved draft are embedded; no provider response
 /// or credentials are retained. The comment stays invisible in Markdown.
 class NoteSourceDocument {
-  static final _metadata =
-      RegExp(r'<!-- grepink-sources:([A-Za-z0-9+/=]+) -->');
+  static final _metadata = RegExp(
+    r'<!-- grepink-sources:([A-Za-z0-9+/=]+) -->',
+  );
 
   static String encode(Iterable<GroundedAnswerCitation> citations) {
     final rows = citations
-        .map((c) => {
-              'url': c.url,
-              'title': c.title,
-              if (c.snippet != null)
-                'snippet': c.snippet!.length > 1600
-                    ? c.snippet!.substring(0, 1600)
-                    : c.snippet,
-            })
+        .map(
+          (c) => {
+            'url': c.url,
+            'title': c.title,
+            if (c.snippet != null)
+              'snippet': c.snippet!.length > 1600
+                  ? c.snippet!.substring(0, 1600)
+                  : c.snippet,
+          },
+        )
         .toList();
     if (rows.isEmpty) return '';
     return '<!-- grepink-sources:${base64Encode(utf8.encode(jsonEncode(rows)))} -->';
@@ -54,22 +59,26 @@ class NoteSourceDocument {
     // The writer adds exactly two separator newlines before each metadata block;
     // retain all actual draft whitespace so typing a space cannot close editing.
     return content.replaceAll(
-        RegExp(r'(?:\n\n)?<!-- grepink-sources:[A-Za-z0-9+/=]+ -->'), '');
+      RegExp(r'(?:\n\n)?<!-- grepink-sources:[A-Za-z0-9+/=]+ -->'),
+      '',
+    );
   }
 
   static String visibleMarkdown(String content) {
     var fenced = false;
-    final clean =
-        content.replaceAll(_metadata, '').trim().split('\n').map((line) {
-      if (RegExp(r'^\s{0,3}(`{3,}|~{3,})').hasMatch(line)) fenced = !fenced;
-      if (fenced) return line;
-      // Legacy drafts wrapped provider list markers in another bullet.
-      // This is display-only and deliberately leaves thematic breaks intact.
-      return line.replaceFirstMapped(
-        RegExp(r'^(\s*)[-+*]\s+([-+*]\s+)(?=[^\s*+\-])'),
-        (m) => '${m[1]}${m[2]}',
-      );
-    }).join('\n');
+    final clean = normalizeMarkdownLists(content.replaceAll(_metadata, '').trim())
+        .split('\n')
+        .map((line) {
+          if (RegExp(r'^\s{0,3}(`{3,}|~{3,})').hasMatch(line)) fenced = !fenced;
+          if (fenced) return line;
+          // Legacy drafts wrapped provider list markers in another bullet.
+          // This is display-only and deliberately leaves thematic breaks intact.
+          return line.replaceFirstMapped(
+            RegExp(r'^(\s*)[-+*]\s+([-+*]\s+)(?=[^\s*+\-])'),
+            (m) => '${m[1]}${m[2]}',
+          );
+        })
+        .join('\n');
     // Older generated drafts split a bold phrase across two list items at a
     // sentence boundary. Join that narrowly identified display fragment while
     // retaining both source links and leaving stored/exported Markdown alone.
@@ -77,7 +86,8 @@ class NoteSourceDocument {
     final repairedLines = <String>[];
     String? codeFence;
     final fragments = RegExp(
-        r'^(\s*[-+*]\s+\*\*[^\n*]*?\[Source(?: \d+)?\]\([^\n]+\))\n[-+*]\s+([^\n]*?\*\*[^\n]*)$');
+      r'^(\s*[-+*]\s+\*\*[^\n*]*?\[Source(?: \d+)?\]\([^\n]+\))\n[-+*]\s+([^\n]*?\*\*[^\n]*)$',
+    );
     for (var i = 0; i < lines.length; i++) {
       final marker = RegExp(r'^\s{0,3}(`{3,}|~{3,})').firstMatch(lines[i]);
       if (marker != null) {
@@ -136,8 +146,12 @@ List<NoteInsertionTarget> noteInsertionTargets(String content) {
         final previous = result.removeLast();
         result.add(NoteInsertionTarget(previous.label, offset));
       }
-      result.add(NoteInsertionTarget(
-          line.replaceFirst(RegExp(r'^#+\s+'), ''), content.length));
+      result.add(
+        NoteInsertionTarget(
+          line.replaceFirst(RegExp(r'^#+\s+'), ''),
+          content.length,
+        ),
+      );
     }
     offset += line.length + 1;
   }
@@ -149,6 +163,6 @@ String insertNoteDraft(String content, String draft, int offset) {
   return [
     content.substring(0, at).trimRight(),
     draft.trim(),
-    content.substring(at).trimLeft()
+    content.substring(at).trimLeft(),
   ].where((s) => s.isNotEmpty).join('\n\n');
 }

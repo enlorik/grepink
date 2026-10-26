@@ -33,8 +33,9 @@ class RuleBasedClaimExtractionService implements ClaimExtractionService {
     if (text.trim().isEmpty) return const [];
 
     final allCitations = answer.citations;
-    final hasOffsets =
-        allCitations.any((c) => c.startIndex != null && c.endIndex != null);
+    final hasOffsets = allCitations.any(
+      (c) => c.startIndex != null && c.endIndex != null,
+    );
 
     // Build sentence ranges using allMatches for position awareness.
     final sentences = <({int start, int end, String text})>[];
@@ -82,10 +83,12 @@ class RuleBasedClaimExtractionService implements ClaimExtractionService {
         // When citations are present, uncertainty prevents saving without a
         // verifiable source. When there are no citations at all, marking uncertain
         // ensures claims from unannotated answers are not saved as sourced facts.
-        citationUrls =
-            List.unmodifiable(allCitations.map((c) => c.url).toList());
-        citationTitles =
-            List.unmodifiable(allCitations.map((c) => c.title).toList());
+        citationUrls = List.unmodifiable(
+          allCitations.map((c) => c.url).toList(),
+        );
+        citationTitles = List.unmodifiable(
+          allCitations.map((c) => c.title).toList(),
+        );
         uncertain = true;
       } else {
         final overlapping = allCitations.where((c) {
@@ -93,35 +96,55 @@ class RuleBasedClaimExtractionService implements ClaimExtractionService {
           return c.startIndex! < sentenceEnd && c.endIndex! > sentenceStart;
         }).toList();
         if (overlapping.isNotEmpty) {
-          citationUrls =
-              List.unmodifiable(overlapping.map((c) => c.url).toList());
-          citationTitles =
-              List.unmodifiable(overlapping.map((c) => c.title).toList());
+          citationUrls = List.unmodifiable(
+            overlapping.map((c) => c.url).toList(),
+          );
+          citationTitles = List.unmodifiable(
+            overlapping.map((c) => c.title).toList(),
+          );
           uncertain = false;
         } else {
           // No citation range covers this sentence; attach all citations
           // conservatively so saved claims still carry a source URL.
-          citationUrls =
-              List.unmodifiable(allCitations.map((c) => c.url).toList());
-          citationTitles =
-              List.unmodifiable(allCitations.map((c) => c.title).toList());
+          citationUrls = List.unmodifiable(
+            allCitations.map((c) => c.url).toList(),
+          );
+          citationTitles = List.unmodifiable(
+            allCitations.map((c) => c.title).toList(),
+          );
           uncertain = true;
         }
       }
 
-      final id = _claimId(answer.providerName, answer.question, trimmed,
-          claims.length, answer.generatedAt);
+      final id = _claimId(
+        answer.providerName,
+        answer.question,
+        trimmed,
+        claims.length,
+        answer.generatedAt,
+      );
 
-      claims.add(ExtractedClaim(
-        id: id,
-        text: trimmed,
-        citationUrls: citationUrls,
-        citationTitles: citationTitles,
-        sourceAnswerProvider: answer.providerName,
-        sourceQuestion: answer.question,
-        order: claims.length,
-        citationUncertain: uncertain,
-      ));
+      final contentStart = sentence.start + sentence.text.indexOf(trimmed);
+      final lineStart =
+          text.lastIndexOf('\n', contentStart == 0 ? 0 : contentStart - 1) + 1;
+      final indentation = text.substring(lineStart, contentStart);
+      final formatted =
+          RegExp(r'^[ \t]*$').hasMatch(indentation) &&
+              RegExp(r'^(?:[-+*•●◦▪]|\d+[.)])\s').hasMatch(trimmed)
+          ? '$indentation$trimmed'
+          : trimmed;
+      claims.add(
+        ExtractedClaim(
+          id: id,
+          text: formatted,
+          citationUrls: citationUrls,
+          citationTitles: citationTitles,
+          sourceAnswerProvider: answer.providerName,
+          sourceQuestion: answer.question,
+          order: claims.length,
+          citationUncertain: uncertain,
+        ),
+      );
     }
 
     return List.unmodifiable(claims);
@@ -132,12 +155,19 @@ class RuleBasedClaimExtractionService implements ClaimExtractionService {
   /// [generatedAt] scopes the ID to the specific answer instance so that two
   /// answers to the same question at different times never share claim IDs,
   /// even when provider/question/text are identical.
-  static String _claimId(String provider, String question, String claimText,
-      int index, DateTime generatedAt) {
+  static String _claimId(
+    String provider,
+    String question,
+    String claimText,
+    int index,
+    DateTime generatedAt,
+  ) {
     final qKey = question.length > 40 ? question.substring(0, 40) : question;
     final tKey = claimText.length > 40 ? claimText.substring(0, 40) : claimText;
     final tsKey = generatedAt.millisecondsSinceEpoch.toRadixString(36);
-    return '${provider}_ts:${tsKey}_q:${qKey}_i:${index}_t:$tKey'
-        .replaceAll(RegExp(r'\s+'), '_');
+    return '${provider}_ts:${tsKey}_q:${qKey}_i:${index}_t:$tKey'.replaceAll(
+      RegExp(r'\s+'),
+      '_',
+    );
   }
 }
