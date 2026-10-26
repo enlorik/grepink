@@ -20,7 +20,8 @@ String normalizeMarkdownLists(String source) {
         ).firstMatch(line);
         if (match == null || RegExp(r'^[-+*\s]+$').hasMatch(line)) return line;
         final markers = match[2]!.replaceAll(RegExp(r'\s'), '');
-        final bullet = '-+*'.contains(markers[0]) ? markers[0] : '-';
+        final inner = markers[markers.length - 1];
+        final bullet = '-+*'.contains(inner) ? inner : '-';
         return '${match[1]}$bullet ${match[3]}';
       })
       .join('\n');
