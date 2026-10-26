@@ -32,15 +32,16 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   bool _showSuccess = false;
   Note? _originalNote;
   bool _initialized = false;
-  bool _editing = false;
+  bool _showMetadata = false;
   bool _asking = false;
   int _insertOffset = -1;
   List<GroundedAnswerCitation> _sources = [];
   String get _documentContent {
     final metadata = NoteSourceDocument.encode(_sources);
-    return [_contentController.text, metadata]
-        .where((s) => s.isNotEmpty)
-        .join('\n\n');
+    return [
+      _contentController.text,
+      metadata,
+    ].where((s) => s.isNotEmpty).join('\n\n');
   }
 
   final FocusNode _contentFocus = FocusNode();
@@ -51,7 +52,6 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     _titleController = TextEditingController();
     _contentController = TextEditingController();
     _tagController = TextEditingController();
-    _editing = widget.noteId == null;
     _contentController.addListener(_contentChanged);
   }
 
@@ -76,7 +76,7 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       _contentController.clear();
       _tags = [];
       _keywords = [];
-      _editing = false;
+      _showMetadata = false;
       _asking = false;
       _loadNote();
     }
@@ -96,8 +96,10 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     _originalNote = note;
     _titleController.text = note.title;
     _sources = NoteSourceDocument.sources(note.content);
-    _contentController.text =
-        NoteSourceDocument.withoutMetadata(note.content, trim: false);
+    _contentController.text = NoteSourceDocument.withoutMetadata(
+      note.content,
+      trim: false,
+    );
     setState(() {
       _tags = List.from(note!.tags);
       _keywords = List.from(note.keywords);
@@ -119,13 +121,17 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       byUrl[source.url] = source;
     }
     _sources = byUrl.values.toList();
-    final updated = insertNoteDraft(_contentController.text,
-        NoteSourceDocument.withoutMetadata(markdown), _insertOffset);
+    final updated = insertNoteDraft(
+      _contentController.text,
+      NoteSourceDocument.withoutMetadata(markdown),
+      _insertOffset,
+    );
     _contentController.text = updated;
-    setState(() => _editing = false);
+    setState(() => _showMetadata = false);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-          content: Text('Inserted into your draft; Save to keep it.')),
+        content: Text('Inserted into your draft; Save to keep it.'),
+      ),
     );
   }
 
@@ -148,11 +154,14 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     }
     return _titleController.text != _originalNote!.title ||
         _contentController.text !=
-            NoteSourceDocument.withoutMetadata(_originalNote!.content,
-                trim: false) ||
+            NoteSourceDocument.withoutMetadata(
+              _originalNote!.content,
+              trim: false,
+            ) ||
         NoteSourceDocument.encode(_sources) !=
             NoteSourceDocument.encode(
-                NoteSourceDocument.sources(_originalNote!.content)) ||
+              NoteSourceDocument.sources(_originalNote!.content),
+            ) ||
         _tags.toString() != _originalNote!.tags.toString();
   }
 
@@ -217,23 +226,26 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
 
     try {
       if (widget.noteId == null) {
-        await ref.read(notesProvider.notifier).addNote(
+        await ref
+            .read(notesProvider.notifier)
+            .addNote(
               title: title,
               content: content,
               tags: _tags,
               keywords: _keywords,
             );
       } else if (_originalNote != null) {
-        final latest = (ref.read(notesProvider).valueOrNull ?? <Note>[])
-            .where((note) => note.id == widget.noteId);
-        final updated =
-            (latest.isEmpty ? _originalNote! : latest.first).copyWith(
-          title: title.isEmpty ? 'Untitled' : title,
-          content: content,
-          tags: _tags,
-          keywords: _keywords,
-          updatedAt: DateTime.now(),
+        final latest = (ref.read(notesProvider).valueOrNull ?? <Note>[]).where(
+          (note) => note.id == widget.noteId,
         );
+        final updated = (latest.isEmpty ? _originalNote! : latest.first)
+            .copyWith(
+              title: title.isEmpty ? 'Untitled' : title,
+              content: content,
+              tags: _tags,
+              keywords: _keywords,
+              updatedAt: DateTime.now(),
+            );
         await ref.read(notesProvider.notifier).updateNote(updated);
         _originalNote = updated;
       }
@@ -250,9 +262,9 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       if (!mounted) return;
       setState(() => _isSaving = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving note: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error saving note: $e')));
       }
     }
   }
@@ -264,8 +276,10 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('Unsaved changes', style: AppTextStyles.titleMedium),
-        content:
-            Text('What would you like to do?', style: AppTextStyles.bodyMedium),
+        content: Text(
+          'What would you like to do?',
+          style: AppTextStyles.bodyMedium,
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, 'discard'),
@@ -314,95 +328,130 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           child: Column(
             children: [
               _buildAppBar(),
-              Expanded(child: LayoutBuilder(builder: (context, constraints) {
-                final note = ColoredBox(
-                  color: AppColors.surface,
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Padding(
-                            padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
-                            child: _buildTitleField()),
-                        const Divider(
-                            height: 1, color: AppColors.dividerBorder),
-                        Expanded(
-                            child: NoteReadingView(
-                                content: _documentContent,
-                                editable: _editing,
-                                onChanged: (value) {
-                                  _contentController.text =
-                                      NoteSourceDocument.withoutMetadata(value,
-                                          trim: false);
-                                  _contentChanged();
-                                })),
-                        if (_editing)
-                          SizedBox(
-                              height: 90,
-                              child: SingleChildScrollView(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 24),
-                                  child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.stretch,
-                                      children: [
-                                        _buildTagsSection(),
-                                        if (_keywords.isNotEmpty)
-                                          _buildKeywordsSection()
-                                      ]))),
-                      ]),
-                );
-                if (!_asking) return note;
-                final questions = Column(children: [
-                  Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Row(children: [
-                        const Expanded(child: Text('Research')),
-                        IconButton(
-                            tooltip: 'Close questions',
-                            onPressed: () => setState(() => _asking = false),
-                            icon: const Icon(Icons.close)),
-                      ])),
-                  Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                    child: DropdownButtonFormField<int>(
-                      key: ValueKey(
-                          'insert-$_insertOffset-${_contentController.text.length}'),
-                      initialValue: _insertOffset,
-                      isExpanded: true,
-                      decoration: const InputDecoration(
-                          labelText: 'Insert reviewed answer'),
-                      items: noteInsertionTargets(_contentController.text)
-                          .map((target) => DropdownMenuItem(
-                                value: target.offset,
-                                child: Text(
-                                    target.offset < 0
-                                        ? target.label
-                                        : 'After: ${target.label}',
-                                    overflow: TextOverflow.ellipsis),
-                              ))
-                          .toList(),
-                      onChanged: (value) =>
-                          setState(() => _insertOffset = value ?? -1),
-                    ),
-                  ),
-                  Expanded(child: SearchScreen(onInsertDraft: _insertDraft)),
-                ]);
-                return constraints.maxWidth >= 1050 &&
-                        MediaQuery.textScalerOf(context).scale(1) <= 1.5
-                    ? Row(
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final note = ColoredBox(
+                      color: AppColors.surface,
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                            Expanded(child: note),
-                            const VerticalDivider(width: 1),
-                            SizedBox(width: 440, child: questions),
-                          ])
-                    : Column(children: [
-                        Expanded(child: note),
-                        const Divider(height: 1),
-                        Expanded(child: questions)
-                      ]);
-              })),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+                            child: _buildTitleField(),
+                          ),
+                          const Divider(
+                            height: 1,
+                            color: AppColors.dividerBorder,
+                          ),
+                          Expanded(
+                            child: NoteReadingView(
+                              content: _documentContent,
+                              editable: true,
+                              onChanged: (value) {
+                                _contentController.text =
+                                    NoteSourceDocument.withoutMetadata(
+                                      value,
+                                      trim: false,
+                                    );
+                                _contentChanged();
+                              },
+                            ),
+                          ),
+                          if (_showMetadata)
+                            SizedBox(
+                              height: 90,
+                              child: SingleChildScrollView(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 24,
+                                ),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    _buildTagsSection(),
+                                    if (_keywords.isNotEmpty)
+                                      _buildKeywordsSection(),
+                                  ],
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                    if (!_asking) return note;
+                    final questions = Column(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
+                            children: [
+                              const Expanded(child: Text('Research')),
+                              IconButton(
+                                tooltip: 'Close questions',
+                                onPressed: () =>
+                                    setState(() => _asking = false),
+                                icon: const Icon(Icons.close),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 8,
+                          ),
+                          child: DropdownButtonFormField<int>(
+                            key: ValueKey(
+                              'insert-$_insertOffset-${_contentController.text.length}',
+                            ),
+                            initialValue: _insertOffset,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Insert reviewed answer',
+                            ),
+                            items: noteInsertionTargets(_contentController.text)
+                                .map(
+                                  (target) => DropdownMenuItem(
+                                    value: target.offset,
+                                    child: Text(
+                                      target.offset < 0
+                                          ? target.label
+                                          : 'After: ${target.label}',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (value) =>
+                                setState(() => _insertOffset = value ?? -1),
+                          ),
+                        ),
+                        Expanded(
+                          child: SearchScreen(onInsertDraft: _insertDraft),
+                        ),
+                      ],
+                    );
+                    return constraints.maxWidth >= 1050 &&
+                            MediaQuery.textScalerOf(context).scale(1) <= 1.5
+                        ? Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Expanded(child: note),
+                              const VerticalDivider(width: 1),
+                              SizedBox(width: 440, child: questions),
+                            ],
+                          )
+                        : Column(
+                            children: [
+                              Expanded(child: note),
+                              const Divider(height: 1),
+                              Expanded(child: questions),
+                            ],
+                          );
+                  },
+                ),
+              ),
             ],
           ),
         ),
@@ -441,34 +490,22 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          SegmentedButton<bool>(
-            showSelectedIcon: false,
-            style: SegmentedButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                backgroundColor: AppColors.surface,
-                foregroundColor: AppColors.secondaryText,
-                selectedBackgroundColor:
-                    AppColors.primaryAccent.withValues(alpha: .28),
-                selectedForegroundColor: AppColors.deepAction,
-                textStyle: AppTextStyles.bodySmall),
-            segments: const [
-              ButtonSegment(value: false, label: Text('Read')),
-              ButtonSegment(value: true, label: Text('Edit'))
-            ],
-            selected: {_editing},
-            onSelectionChanged: (selection) =>
-                setState(() => _editing = selection.single),
+          IconButton(
+            tooltip: 'Note details',
+            icon: const Icon(Icons.info_outline, size: 20),
+            onPressed: () => setState(() => _showMetadata = !_showMetadata),
           ),
-          const SizedBox(width: 8),
           TextButton.icon(
             onPressed: () => setState(() => _asking = !_asking),
             icon: const Icon(Icons.add_comment_outlined),
             label: const Text('Ask'),
           ),
           TextButton(
-              onPressed: _isSaving ? null : _save,
-              child: Text(
-                  _isSaving ? 'Saving…' : (_showSuccess ? 'Saved' : 'Save'))),
+            onPressed: _isSaving ? null : _save,
+            child: Text(
+              _isSaving ? 'Saving…' : (_showSuccess ? 'Saved' : 'Save'),
+            ),
+          ),
         ],
       ),
     );
@@ -480,8 +517,9 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       style: AppTextStyles.displayMedium,
       decoration: InputDecoration(
         hintText: 'Title',
-        hintStyle: AppTextStyles.displayMedium
-            .copyWith(color: AppColors.placeholderText),
+        hintStyle: AppTextStyles.displayMedium.copyWith(
+          color: AppColors.placeholderText,
+        ),
         border: InputBorder.none,
         enabledBorder: InputBorder.none,
         focusedBorder: InputBorder.none,
@@ -504,38 +542,47 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           spacing: 8,
           runSpacing: 8,
           children: [
-            ..._tags.map((tag) => TagChip(
-                  label: tag,
-                  isEditable: true,
-                  onDelete: () => setState(() => _tags.remove(tag)),
-                )),
+            ..._tags.map(
+              (tag) => TagChip(
+                label: tag,
+                isEditable: true,
+                onDelete: () => setState(() => _tags.remove(tag)),
+              ),
+            ),
             SizedBox(
               width: 120,
               height: 32,
               child: TextField(
                 controller: _tagController,
-                style: AppTextStyles.bodySmall
-                    .copyWith(color: AppColors.deepAction),
+                style: AppTextStyles.bodySmall.copyWith(
+                  color: AppColors.deepAction,
+                ),
                 decoration: InputDecoration(
                   hintText: 'Add tag...',
-                  hintStyle: AppTextStyles.bodySmall
-                      .copyWith(color: AppColors.placeholderText),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  hintStyle: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.placeholderText,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(20),
-                    borderSide:
-                        const BorderSide(color: AppColors.dividerBorder),
+                    borderSide: const BorderSide(
+                      color: AppColors.dividerBorder,
+                    ),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(20),
-                    borderSide:
-                        const BorderSide(color: AppColors.dividerBorder),
+                    borderSide: const BorderSide(
+                      color: AppColors.dividerBorder,
+                    ),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(20),
-                    borderSide:
-                        const BorderSide(color: AppColors.primaryAccent),
+                    borderSide: const BorderSide(
+                      color: AppColors.primaryAccent,
+                    ),
                   ),
                   isDense: true,
                   filled: true,
@@ -561,22 +608,27 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           spacing: 6,
           runSpacing: 6,
           children: _keywords
-              .map((kw) => Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: AppColors.keywordHighlight.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                          color: AppColors.keywordHighlight
-                              .withValues(alpha: 0.5)),
+              .map(
+                (kw) => Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.keywordHighlight.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: AppColors.keywordHighlight.withValues(alpha: 0.5),
                     ),
-                    child: Text(
-                      kw,
-                      style: AppTextStyles.bodySmall
-                          .copyWith(color: AppColors.deepAction),
+                  ),
+                  child: Text(
+                    kw,
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: AppColors.deepAction,
                     ),
-                  ))
+                  ),
+                ),
+              )
               .toList(),
         ),
       ],
