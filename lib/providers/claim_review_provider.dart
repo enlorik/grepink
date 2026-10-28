@@ -1,4 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../services/note_addition.dart';
+import '../services/note_source_document.dart';
 
 import '../models/claim_review_session_state.dart';
 import '../models/grounded_answer_provider_outcome.dart';
@@ -15,8 +17,9 @@ import 'brave_settings_provider.dart';
 import 'knowledge_ingestion_provider.dart';
 import 'note_draft_review_provider.dart';
 
-final groundedAnswerProviderProvider =
-    FutureProvider<GroundedAnswerProvider>((ref) async {
+final groundedAnswerProviderProvider = FutureProvider<GroundedAnswerProvider>((
+  ref,
+) async {
   final braveSettings = await ref.watch(braveSettingsProvider.future);
   if (!braveSettings.answersKeyConfigured) {
     return const NullGroundedAnswerProvider();
@@ -56,14 +59,14 @@ final selectedClaimsDraftBuilderProvider = Provider<SelectedClaimsDraftBuilder>(
 
 final groundedAnswerIngestionServiceProvider =
     FutureProvider<GroundedAnswerIngestionService>((ref) async {
-  final provider = await ref.watch(groundedAnswerProviderProvider.future);
-  return GroundedAnswerIngestionService(
-    provider: provider,
-    extractor: ref.watch(claimExtractionServiceProvider),
-    deduplicator: ref.watch(claimDeduplicationServiceProvider),
-    localEvidence: ref.watch(localEvidenceRetrieverProvider),
-  );
-});
+      final provider = await ref.watch(groundedAnswerProviderProvider.future);
+      return GroundedAnswerIngestionService(
+        provider: provider,
+        extractor: ref.watch(claimExtractionServiceProvider),
+        deduplicator: ref.watch(claimDeduplicationServiceProvider),
+        localEvidence: ref.watch(localEvidenceRetrieverProvider),
+      );
+    });
 
 class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
   final Ref _ref;
@@ -88,8 +91,9 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
     );
 
     try {
-      final service =
-          await _ref.read(groundedAnswerIngestionServiceProvider.future);
+      final service = await _ref.read(
+        groundedAnswerIngestionServiceProvider.future,
+      );
       if (requestId != _requestSequence) return;
 
       final mapper = _ref.read(claimReviewMapperProvider);
@@ -165,7 +169,8 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
   }
 
   ClaimReviewSessionStatus _statusForOutcome(
-      GroundedAnswerProviderOutcome outcome) {
+    GroundedAnswerProviderOutcome outcome,
+  ) {
     return switch (outcome) {
       GroundedAnswerNotConfigured() =>
         ClaimReviewSessionStatus.providerNotConfigured,
@@ -226,8 +231,9 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
     // in flight, and marking unrelated content as saving would leave it stuck
     // disabled after the in-flight insert completes.
     final inSaved = state.savedDraftContents.contains(result.markdownContent);
-    final inPending =
-        state.pendingDraftContents.contains(result.markdownContent);
+    final inPending = state.pendingDraftContents.contains(
+      result.markdownContent,
+    );
     final ClaimDraftSaveStatus newSaveStatus;
     if (inSaved) {
       newSaveStatus = ClaimDraftSaveStatus.saved;
@@ -236,9 +242,11 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
     } else {
       newSaveStatus = ClaimDraftSaveStatus.idle;
     }
-    final matchesAppendedTarget = state.targetNoteId != null &&
-        (state.appendedTargetsByContent[result.markdownContent]
-                ?.contains(state.targetNoteId) ??
+    final matchesAppendedTarget =
+        state.targetNoteId != null &&
+        (state.appendedTargetsByContent[result.markdownContent]?.contains(
+              state.targetNoteId,
+            ) ??
             false);
     // Do NOT clear an in-flight append lock: if appendToExistingNote is
     // awaiting updateNote, resetting appendStatus → idle here re-enables the
@@ -253,8 +261,8 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
       appendStatus: appendInFlight
           ? null
           : matchesAppendedTarget
-              ? ClaimDraftAppendStatus.appended
-              : ClaimDraftAppendStatus.idle,
+          ? ClaimDraftAppendStatus.appended
+          : ClaimDraftAppendStatus.idle,
       clearAppendError: !appendInFlight,
       clearDraftGenerationError: true,
     );
@@ -299,14 +307,14 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
       clearBackgroundSaveError: true,
       pendingDraftContents: {
         ...state.pendingDraftContents,
-        draft.markdownContent
+        draft.markdownContent,
       },
     );
 
     try {
       final repository = _ref.read(noteDraftReviewRepositoryProvider);
       await repository.insertNote(
-        title: _titleFor(state.question),
+        title: noteTopicTitle(state.question, draft.markdownContent),
         content: draft.markdownContent,
       );
       // Abandon if reset() was called while insertNote was in flight —
@@ -324,14 +332,16 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
       final matchesCurrentDraft =
           state.draft?.markdownContent == draft.markdownContent;
       state = state.copyWith(
-        saveStatus:
-            matchesCurrentDraft ? ClaimDraftSaveStatus.saved : state.saveStatus,
+        saveStatus: matchesCurrentDraft
+            ? ClaimDraftSaveStatus.saved
+            : state.saveStatus,
         savedDraftContents: {
           ...state.savedDraftContents,
-          draft.markdownContent
+          draft.markdownContent,
         },
-        pendingDraftContents:
-            state.pendingDraftContents.difference({draft.markdownContent}),
+        pendingDraftContents: state.pendingDraftContents.difference({
+          draft.markdownContent,
+        }),
       );
       return ClaimDraftSaveOutcome.success;
     } catch (error) {
@@ -351,15 +361,17 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
           saveStatus: ClaimDraftSaveStatus.error,
           saveErrorMessage:
               'Could not save this draft as a note. Please try again.',
-          pendingDraftContents:
-              state.pendingDraftContents.difference({draft.markdownContent}),
+          pendingDraftContents: state.pendingDraftContents.difference({
+            draft.markdownContent,
+          }),
         );
       } else {
         state = state.copyWith(
           backgroundSaveError:
               'A save failed while you were editing. No note was created.',
-          pendingDraftContents:
-              state.pendingDraftContents.difference({draft.markdownContent}),
+          pendingDraftContents: state.pendingDraftContents.difference({
+            draft.markdownContent,
+          }),
         );
       }
       return ClaimDraftSaveOutcome.failure;
@@ -371,10 +383,12 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
   void selectTargetNote(String? noteId) {
     if (state.appendStatus == ClaimDraftAppendStatus.appending) return;
 
-    final matchesAppendedTarget = noteId != null &&
+    final matchesAppendedTarget =
+        noteId != null &&
         state.draft != null &&
-        (state.appendedTargetsByContent[state.draft!.markdownContent]
-                ?.contains(noteId) ??
+        (state.appendedTargetsByContent[state.draft!.markdownContent]?.contains(
+              noteId,
+            ) ??
             false);
     state = state.copyWith(
       targetNoteId: noteId,
@@ -443,7 +457,7 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
           state.draft?.markdownContent == draft.markdownContent;
       final existingTargets =
           state.appendedTargetsByContent[draft.markdownContent] ??
-              const <String>{};
+          const <String>{};
       // Release the appending lock when the draft changed mid-write (e.g.
       // the user toggled a claim). The write succeeded, so record the target,
       // but reset to idle rather than leaving appendStatus stuck at appending.
@@ -477,17 +491,18 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
   }
 
   String _appendDraftMarkdown(String existingContent, ClaimDraftResult draft) {
-    final trimmedExisting = existingContent.trimRight();
-    final trimmedDraft = draft.markdownContent.trim();
-    if (trimmedExisting.isEmpty) return trimmedDraft;
-    return '$trimmedExisting\n\n---\n\n$trimmedDraft';
-  }
-
-  String _titleFor(String question) {
-    final compact = question.replaceAll(RegExp(r'\s+'), ' ').trim();
-    if (compact.isEmpty) return 'Generated note';
-    if (compact.length <= 80) return compact;
-    return '${compact.substring(0, 77)}...';
+    final sources = {
+      for (final s in NoteSourceDocument.sources(existingContent)) s.url: s,
+      for (final s in NoteSourceDocument.sources(draft.markdownContent))
+        s.url: s,
+    };
+    final body = insertNoteDraft(
+      NoteSourceDocument.withoutMetadata(existingContent, trim: false),
+      noteAdditionBody(draft.markdownContent),
+      -1,
+    );
+    final metadata = NoteSourceDocument.encode(sources.values);
+    return '$body${metadata.isEmpty ? '' : '\n\n$metadata'}';
   }
 
   void reset() {
@@ -498,5 +513,5 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
 
 final claimReviewProvider =
     StateNotifierProvider<ClaimReviewNotifier, ClaimReviewSessionState>(
-  (ref) => ClaimReviewNotifier(ref),
-);
+      (ref) => ClaimReviewNotifier(ref),
+    );
