@@ -486,7 +486,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         if (widget.onInsertDraft != null && reviewState.noteDraft != null) ...[
           const SizedBox(height: 12),
           SizedBox(
-            height: 260,
+            height: 180,
             child: NoteReadingView(
               content: reviewState.noteDraft!.markdownContent,
               evidence: _evidence,
@@ -666,7 +666,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             claimReviewState.draft!.shouldSave) ...[
           const SizedBox(height: 16),
           SizedBox(
-            height: 260,
+            height: 180,
             child: NoteReadingView(
               content: claimReviewState.draft!.markdownContent,
               evidence: _evidence,

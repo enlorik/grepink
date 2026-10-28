@@ -38,6 +38,7 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   bool _asking = false;
   int _insertOffset = -1;
   final _evidence = EvidenceController();
+  final _researchKey = GlobalKey();
   List<GroundedAnswerCitation> _sources = [];
   String get _documentContent {
     final metadata = NoteSourceDocument.encode(_sources);
@@ -339,6 +340,7 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
               Expanded(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
+                    final compactResearch = constraints.maxHeight < 600;
                     final note = ColoredBox(
                       color: AppColors.surface,
                       child: Column(
@@ -411,49 +413,51 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                             ],
                           ),
                         ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 8,
-                          ),
-                          child: DropdownButtonFormField<int>(
-                            key: ValueKey(
-                              'insert-$_insertOffset-${_contentController.text.length}',
+                        if (!compactResearch)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 8,
                             ),
-                            initialValue: _insertOffset,
-                            isExpanded: true,
-                            decoration: const InputDecoration(
-                              labelText: 'Insert reviewed answer',
-                            ),
-                            items: [
-                              if (_insertOffset >= 0 &&
-                                  !noteInsertionTargets(
-                                    _contentController.text,
-                                  ).any((t) => t.offset == _insertOffset))
-                                DropdownMenuItem(
-                                  value: _insertOffset,
-                                  child: const Text('After selected passage'),
-                                ),
-                              ...noteInsertionTargets(
-                                _contentController.text,
-                              ).map(
-                                (target) => DropdownMenuItem(
-                                  value: target.offset,
-                                  child: Text(
-                                    target.offset < 0
-                                        ? target.label
-                                        : 'After: ${target.label}',
-                                    overflow: TextOverflow.ellipsis,
+                            child: DropdownButtonFormField<int>(
+                              key: ValueKey(
+                                'insert-$_insertOffset-${_contentController.text.length}',
+                              ),
+                              initialValue: _insertOffset,
+                              isExpanded: true,
+                              decoration: const InputDecoration(
+                                labelText: 'Insert reviewed answer',
+                              ),
+                              items: [
+                                if (_insertOffset >= 0 &&
+                                    !noteInsertionTargets(
+                                      _contentController.text,
+                                    ).any((t) => t.offset == _insertOffset))
+                                  DropdownMenuItem(
+                                    value: _insertOffset,
+                                    child: const Text('After selected passage'),
+                                  ),
+                                ...noteInsertionTargets(
+                                  _contentController.text,
+                                ).map(
+                                  (target) => DropdownMenuItem(
+                                    value: target.offset,
+                                    child: Text(
+                                      target.offset < 0
+                                          ? target.label
+                                          : 'After: ${target.label}',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ],
-                            onChanged: (value) =>
-                                setState(() => _insertOffset = value ?? -1),
+                              ],
+                              onChanged: (value) =>
+                                  setState(() => _insertOffset = value ?? -1),
+                            ),
                           ),
-                        ),
                         Expanded(
                           child: SearchScreen(
+                            key: _researchKey,
                             onInsertDraft: _insertDraft,
                             evidence: _evidence,
                           ),
@@ -469,6 +473,8 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                             MediaQuery.textScalerOf(context).scale(1) <= 1.5;
                         Widget work = !_asking
                             ? note
+                            : compactResearch
+                            ? questions
                             : sideBySide
                             ? Row(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -543,7 +549,7 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
             child: Text(
               widget.noteId == null
                   ? 'New Note'
-                  : (_hasChanges ? 'Unsaved changes' : 'Notebook'),
+                  : (_hasChanges ? 'Unsaved changes' : 'Saved locally'),
               style: AppTextStyles.bodySmall,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
