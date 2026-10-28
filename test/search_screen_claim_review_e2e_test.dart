@@ -430,7 +430,9 @@ void main() {
       // Target note's original content is preserved.
       expect(updatedNote.content, contains('Pre-existing content.'));
       // Draft B is appended after the original content.
-      expect(updatedNote.content, contains(draftB.markdownContent));
+      expect(updatedNote.content, contains('Plants convert light into energy.'));
+      expect(updatedNote.content, contains('Chlorophyll absorbs red and blue light.'));
+      expect(updatedNote.content, isNot(contains('## New knowledge')));
       // Source links are present.
       expect(updatedNote.content, contains('https://example.com/photo'));
       // No additional insert occurred for draft B.

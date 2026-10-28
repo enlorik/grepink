@@ -307,7 +307,9 @@ void main() {
       expect(repo.updatedNotes, hasLength(1));
       final updatedContent = repo.updatedNotes.single.content;
       expect(updatedContent, contains('Old content here.'));
-      expect(updatedContent, contains(generatedMarkdown.trim()));
+      expect(generatedMarkdown, contains('A brand new claim.'));
+      expect(updatedContent, contains('A brand new claim.'));
+      expect(updatedContent, isNot(contains('## New knowledge')));
     });
 
     testWidgets('append inserts a separator between old and new content',

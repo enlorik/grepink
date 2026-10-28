@@ -15,6 +15,9 @@ void main() {
       expect(noteTopicTitle('Explain tuple layout', ''), 'Tuple layout');
       const draft =
           '# What are tuples?\n\n## New knowledge\n\nTuples group values. [Source](<https://example.com>)\n\n## Possible contradictions to review\n\nAn explicit warning.\n\n## Sources\n- Example — https://example.com';
+      const code =
+          '```md\n## New knowledge\n## Sources\n- Example — https://example.com\n```';
+      expect(noteAdditionBody(code), code);
       final body = noteAdditionBody(draft);
       expect(body, startsWith('Tuples group values.'));
       expect(body, contains('[Source](<https://example.com>)'));
