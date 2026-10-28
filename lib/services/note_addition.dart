@@ -42,27 +42,39 @@ String noteTopicTitle(String question, String markdown) {
 /// Insert prose into an existing story, not a nested Q&A/report envelope.
 /// Explicit contradiction warnings and every inline citation stay intact.
 String noteAdditionBody(String markdown) {
-  var body = NoteSourceDocument.withoutMetadata(markdown);
-  body = body.replaceFirst(RegExp(r'^#\s+[^\n]+\n*'), '');
-  body = body.replaceAll(
-    RegExp(r'^## (?:New knowledge|Better sources)\s*\n', multiLine: true),
-    '',
-  );
-  final directory = RegExp(
-    r'^## Sources\s*$',
-    multiLine: true,
-  ).firstMatch(body);
-  if (directory != null) {
-    final tail = body.substring(directory.end).trim();
-    if (tail
-        .split('\n')
-        .every(
-          (line) =>
-              line.trim().isEmpty ||
-              RegExp(r'^- .+ — https?://\S+\s*$').hasMatch(line),
-        )) {
-      body = body.substring(0, directory.start);
+  final lines = NoteSourceDocument.withoutMetadata(markdown).split('\n');
+  final kept = <String>[];
+  String? fence;
+  for (var i = 0; i < lines.length; i++) {
+    final line = lines[i];
+    final marker = RegExp(r'^\s{0,3}(`{3,}|~{3,})').firstMatch(line);
+    if (marker != null) {
+      final type = marker[1]![0];
+      fence = fence == null
+          ? type
+          : fence == type
+          ? null
+          : fence;
+      kept.add(line);
+      continue;
     }
+    if (fence == null) {
+      if (i == 0 && RegExp(r'^#\s+').hasMatch(line)) continue;
+      if (RegExp(r'^## (?:New knowledge|Better sources)\s*$').hasMatch(line)) {
+        continue;
+      }
+      if (line.trim() == '## Sources' &&
+          lines
+              .skip(i + 1)
+              .every(
+                (tail) =>
+                    tail.trim().isEmpty ||
+                    RegExp(r'^- .+ — https?://\S+\s*$').hasMatch(tail),
+              )) {
+        break;
+      }
+    }
+    kept.add(line);
   }
-  return body.trim();
+  return kept.join('\n').trim();
 }
