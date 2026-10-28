@@ -395,8 +395,9 @@ class _NoteReadingViewState extends State<NoteReadingView> {
         _inspect(urls, passage: sourcePlainText(body));
       },
       onExit: (_) {
-        if (mounted && _hotBlock == block.start)
+        if (mounted && _hotBlock == block.start) {
           setState(() => _hotBlock = null);
+        }
       },
       onHover: (_) => _inspect(urls, passage: sourcePlainText(body)),
       cursor: canEdit ? SystemMouseCursors.text : MouseCursor.defer,
