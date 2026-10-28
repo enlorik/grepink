@@ -6,7 +6,8 @@ version: 2.1.0+1
 environment:
   # Ranges used for cross-platform compatibility; use pubspec.lock for reproducible builds.
   sdk: '>=3.3.0 <4.0.0'
-  flutter: '>=3.22.0'
+  # Match the existing lockfile toolchain; anchored overlays use modern Flutter.
+  flutter: '>=3.38.4'
 
 dependencies:
   flutter:
@@ -22,6 +23,8 @@ dependencies:
   uuid: ^4.4.0
   intl: ^0.19.0
   flutter_markdown: ^0.7.3
+  markdown: ^7.3.1
+  html: ^0.15.7
   google_fonts: ^6.2.1
   path: ^1.9.0
   file_picker: ^8.1.2

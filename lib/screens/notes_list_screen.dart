@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../models/note.dart';
+import 'note_editor_screen.dart';
 import '../providers/notes_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
-import '../widgets/note_card.dart';
 import '../widgets/grepink_fab.dart';
 import '../widgets/grepink_bottom_nav.dart';
 
@@ -18,6 +18,21 @@ class NotesListScreen extends ConsumerStatefulWidget {
 
 class _NotesListScreenState extends ConsumerState<NotesListScreen> {
   final Map<String, bool> _deletingIds = {};
+  final _editorKey = GlobalKey<NoteEditorScreenState>();
+  List<Note> _visibleNotes = [];
+  String? _selectedId;
+
+  Future<void> _selectNote(String id) async {
+    if (_selectedId == id) return;
+    if (_editorKey.currentState != null &&
+        !await _editorKey.currentState!.confirmLeave()) {
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      _selectedId = id;
+    });
+  }
 
   final int _navIndex = 0;
 
@@ -32,13 +47,14 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
     await Future.delayed(const Duration(milliseconds: 200));
     if (mounted) {
       await ref.read(notesProvider.notifier).deleteNote(id);
-      setState(() => _deletingIds.remove(id));
+      if (mounted) setState(() => _deletingIds.remove(id));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final notesAsync = ref.watch(notesProvider);
+    if (notesAsync.valueOrNull != null) _visibleNotes = notesAsync.valueOrNull!;
     final pinnedNotes = ref.watch(pinnedNotesProvider);
     final unpinnedNotes = ref.watch(unpinnedNotesProvider);
 
@@ -54,52 +70,169 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 16, 0),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child:
-                          Text('Grepink', style: AppTextStyles.displayMedium),
-                    ),
-                    IconButton(
-                      icon:
-                          const Icon(Icons.search, color: AppColors.deepAction),
-                      onPressed: () => context.push('/search'),
-                    ),
-                  ],
+              if (_visibleNotes.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 16, 0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Grepink',
+                          style: AppTextStyles.displayMedium,
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'New note',
+                        onPressed: () => context.push('/note/new'),
+                        icon: const Icon(
+                          Icons.add,
+                          color: AppColors.deepAction,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.search,
+                          color: AppColors.deepAction,
+                        ),
+                        onPressed: () => context.push('/search'),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
               Expanded(
-                child: notesAsync.when(
-                  loading: () => const Center(
-                    child: CircularProgressIndicator(
-                        color: AppColors.primaryAction),
-                  ),
-                  error: (e, _) => Center(
-                    child: Text('Error loading notes',
-                        style: AppTextStyles.bodyMedium),
-                  ),
-                  data: (_) {
-                    if (pinnedNotes.isEmpty && unpinnedNotes.isEmpty) {
-                      return _buildEmptyState();
-                    }
-                    return _buildNotesList(pinnedNotes, unpinnedNotes);
-                  },
-                ),
+                child: _visibleNotes.isNotEmpty
+                    ? _buildNotebook(_visibleNotes)
+                    : notesAsync.when(
+                        loading: () => const Center(
+                          child: CircularProgressIndicator(
+                            color: AppColors.primaryAction,
+                          ),
+                        ),
+                        error: (e, _) => Center(
+                          child: Text(
+                            'Error loading notes',
+                            style: AppTextStyles.bodyMedium,
+                          ),
+                        ),
+                        data: (_) {
+                          if (pinnedNotes.isEmpty && unpinnedNotes.isEmpty) {
+                            return _buildEmptyState();
+                          }
+                          return _buildNotebook([
+                            ...pinnedNotes,
+                            ...unpinnedNotes,
+                          ]);
+                        },
+                      ),
               ),
             ],
           ),
         ),
       ),
-      floatingActionButton: GrepinkFab(
-        onPressed: () => context.push('/note/new'),
-      ),
+      floatingActionButton: _visibleNotes.isNotEmpty
+          ? null
+          : GrepinkFab(onPressed: () => context.push('/note/new')),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       bottomNavigationBar: GrepinkBottomNav(
         currentIndex: _navIndex,
         onTap: _onNavTap,
       ),
+    );
+  }
+
+  Widget _buildNotebook(List<Note> notes) {
+    _selectedId ??= notes.first.id;
+    final active = notes.where((n) => n.id == _selectedId);
+    final selected = active.isEmpty ? notes.first : active.first;
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 12, 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 480),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        key: const Key('notebook-switcher'),
+                        value: selected.id,
+                        isExpanded: true,
+                        menuMaxHeight: 420,
+                        borderRadius: BorderRadius.circular(16),
+                        items: notes
+                            .map(
+                              (note) => DropdownMenuItem(
+                                value: note.id,
+                                child: Text(
+                                  note.isPinned
+                                      ? '• ${note.title}'
+                                      : note.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (id) {
+                          if (id != null) _selectNote(id);
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: 'New note',
+                onPressed: () => context.push('/note/new'),
+                icon: const Icon(Icons.add),
+              ),
+              IconButton(
+                tooltip: 'Search notes',
+                onPressed: () => context.push('/search'),
+                icon: const Icon(Icons.search),
+              ),
+              PopupMenuButton<String>(
+                tooltip: 'Note actions',
+                onSelected: (action) async {
+                  if (action == 'pin') {
+                    await ref
+                        .read(notesProvider.notifier)
+                        .togglePin(selected.id);
+                    return;
+                  }
+                  if (action == 'delete' &&
+                      context.mounted &&
+                      await _showDeleteConfirm(context)) {
+                    if (_editorKey.currentState != null &&
+                        !await _editorKey.currentState!.confirmLeave()) {
+                      return;
+                    }
+                    if (!mounted) return;
+                    await _deleteNote(selected.id);
+                  }
+                },
+                itemBuilder: (_) => [
+                  PopupMenuItem(
+                    value: 'pin',
+                    child: Text(selected.isPinned ? 'Unpin' : 'Pin'),
+                  ),
+                  const PopupMenuItem(value: 'delete', child: Text('Delete')),
+                ],
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: NoteEditorScreen(
+            key: _editorKey,
+            noteId: selected.id,
+            embedded: true,
+          ),
+        ),
+      ],
     );
   }
 
@@ -111,153 +244,18 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
           const SizedBox(
             width: 80,
             height: 80,
-            child: Icon(Icons.lightbulb_outline,
-                size: 80, color: AppColors.primaryAccent),
+            child: Icon(
+              Icons.lightbulb_outline,
+              size: 80,
+              color: AppColors.primaryAccent,
+            ),
           ),
           const SizedBox(height: 24),
           Text('Your mind is blank...', style: AppTextStyles.titleLarge),
           const SizedBox(height: 8),
-          Text(
-            'Tap + to add your first note',
-            style: AppTextStyles.bodyMedium,
-          ),
+          Text('Tap + to add your first note', style: AppTextStyles.bodyMedium),
         ],
       ),
-    );
-  }
-
-  Widget _buildNotesList(List<Note> pinned, List<Note> unpinned) {
-    return LayoutBuilder(builder: (context, constraints) {
-      final width = constraints.maxWidth;
-      int cols;
-      double margin;
-      if (width < 450) {
-        cols = 1;
-        margin = 16;
-      } else if (width < 1024) {
-        cols = 2;
-        margin = 24;
-      } else {
-        cols = width > 1400 ? 4 : 3;
-        margin = 48;
-      }
-
-      return RefreshIndicator(
-        onRefresh: () => ref.read(notesProvider.notifier).loadNotes(),
-        color: AppColors.primaryAction,
-        child: CustomScrollView(
-          slivers: [
-            if (pinned.isNotEmpty) ...[
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(margin, 20, margin, 8),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.push_pin,
-                          size: 14, color: AppColors.pinHighlight),
-                      const SizedBox(width: 6),
-                      Text('PINNED', style: AppTextStyles.excerptSource),
-                    ],
-                  ),
-                ),
-              ),
-              SliverPadding(
-                padding: EdgeInsets.symmetric(horizontal: margin),
-                sliver: cols == 1
-                    ? SliverList(
-                        delegate: SliverChildBuilderDelegate(
-                          (ctx, i) => Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: _buildSwipeable(pinned[i], i),
-                          ),
-                          childCount: pinned.length,
-                        ),
-                      )
-                    : SliverGrid(
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: cols,
-                          mainAxisSpacing: 12,
-                          crossAxisSpacing: 12,
-                          childAspectRatio: 1.2,
-                        ),
-                        delegate: SliverChildBuilderDelegate(
-                          (ctx, i) => _buildSwipeable(pinned[i], i),
-                          childCount: pinned.length,
-                        ),
-                      ),
-              ),
-            ],
-            if (unpinned.isNotEmpty) ...[
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(margin, 20, margin, 8),
-                  child: Text('NOTES', style: AppTextStyles.excerptSource),
-                ),
-              ),
-              SliverPadding(
-                padding: EdgeInsets.fromLTRB(margin, 0, margin, 100),
-                sliver: cols == 1
-                    ? SliverList(
-                        delegate: SliverChildBuilderDelegate(
-                          (ctx, i) => Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child:
-                                _buildSwipeable(unpinned[i], pinned.length + i),
-                          ),
-                          childCount: unpinned.length,
-                        ),
-                      )
-                    : SliverGrid(
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: cols,
-                          mainAxisSpacing: 12,
-                          crossAxisSpacing: 12,
-                          childAspectRatio: 1.2,
-                        ),
-                        delegate: SliverChildBuilderDelegate(
-                          (ctx, i) =>
-                              _buildSwipeable(unpinned[i], pinned.length + i),
-                          childCount: unpinned.length,
-                        ),
-                      ),
-              ),
-            ],
-          ],
-        ),
-      );
-    });
-  }
-
-  Widget _buildSwipeable(Note note, int index) {
-    final isDeleting = _deletingIds[note.id] == true;
-    return AnimatedSize(
-      duration: const Duration(milliseconds: 200),
-      child: isDeleting
-          ? const SizedBox.shrink()
-          : Dismissible(
-              key: Key(note.id),
-              direction: DismissDirection.endToStart,
-              background: Container(
-                alignment: Alignment.centerRight,
-                padding: const EdgeInsets.only(right: 20),
-                decoration: BoxDecoration(
-                  color: AppColors.deleteHighlight,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Icon(Icons.delete, color: Colors.white),
-              ),
-              confirmDismiss: (_) async {
-                return await _showDeleteConfirm(context);
-              },
-              onDismissed: (_) => _deleteNote(note.id),
-              child: NoteCard(
-                note: note,
-                index: index,
-                onDelete: () => _deleteNote(note.id),
-                onPin: () =>
-                    ref.read(notesProvider.notifier).togglePin(note.id),
-              ),
-            ),
     );
   }
 
@@ -266,8 +264,10 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('Delete note?', style: AppTextStyles.titleMedium),
-        content:
-            Text('This cannot be undone.', style: AppTextStyles.bodyMedium),
+        content: Text(
+          'This cannot be undone.',
+          style: AppTextStyles.bodyMedium,
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -275,8 +275,10 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child:
-                const Text('Delete', style: TextStyle(color: AppColors.error)),
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: AppColors.error),
+            ),
           ),
         ],
       ),

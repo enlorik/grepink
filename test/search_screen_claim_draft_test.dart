@@ -411,7 +411,10 @@ void main() {
       expect(draft.markdownContent, contains('https://example.com/a'));
       expect(draft.sourceCount, 1);
       expect(find.byKey(const Key('claim-draft-source-count')), findsOneWidget);
-      expect(find.text('1 source'), findsOneWidget);
+      final sourceCount = tester.widget<Text>(
+        find.byKey(const Key('claim-draft-source-count')),
+      );
+      expect(sourceCount.data, '1 source');
     });
   });
 }

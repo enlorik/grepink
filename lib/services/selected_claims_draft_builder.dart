@@ -1,6 +1,9 @@
 import '../models/claim_deduplication_result.dart';
 import '../models/claim_review_item.dart';
 import '../models/grounded_answer.dart';
+import 'note_source_document.dart';
+import 'markdown_list_lines.dart';
+import 'note_addition.dart';
 
 class ClaimDraftResult {
   final String markdownContent;
@@ -20,6 +23,8 @@ class ClaimDraftResult {
   );
 }
 
+String _claimMarkdown(String text) => normalizeMarkdownLists(text.trimRight());
+
 class SelectedClaimsDraftBuilder {
   const SelectedClaimsDraftBuilder();
 
@@ -36,9 +41,11 @@ class SelectedClaimsDraftBuilder {
     required List<GroundedAnswerCitation> citations,
   }) {
     final saveable = selected
-        .where((item) =>
-            item.canBeSaved &&
-            item.classification != ClaimNoveltyClassification.alreadyKnown)
+        .where(
+          (item) =>
+              item.canBeSaved &&
+              item.classification != ClaimNoveltyClassification.alreadyKnown,
+        )
         .toList();
 
     if (saveable.isEmpty) return ClaimDraftResult.empty;
@@ -48,11 +55,13 @@ class SelectedClaimsDraftBuilder {
         .toList();
     final betterItems = saveable
         .where(
-            (i) => i.classification == ClaimNoveltyClassification.betterSource)
+          (i) => i.classification == ClaimNoveltyClassification.betterSource,
+        )
         .toList();
     final contradictionItems = saveable
         .where(
-            (i) => i.classification == ClaimNoveltyClassification.contradiction)
+          (i) => i.classification == ClaimNoveltyClassification.contradiction,
+        )
         .toList();
 
     // Titles are resolved primarily from the provider-level citations list,
@@ -69,8 +78,9 @@ class SelectedClaimsDraftBuilder {
       usedUrls.addAll(item.citationUrls);
       for (var i = 0; i < item.citationUrls.length; i++) {
         final url = item.citationUrls[i];
-        final itemTitle =
-            i < item.citationTitles.length ? item.citationTitles[i] : '';
+        final itemTitle = i < item.citationTitles.length
+            ? item.citationTitles[i]
+            : '';
         if (itemTitle.isNotEmpty) {
           titleByUrl.putIfAbsent(url, () => itemTitle);
         }
@@ -80,7 +90,10 @@ class SelectedClaimsDraftBuilder {
     final buf = StringBuffer();
 
     // Title
-    final title = question.trim().isEmpty ? 'Research notes' : question;
+    final title = noteTopicTitle(
+      question,
+      saveable.map((item) => item.text).join('\n'),
+    );
     buf.writeln('# $title');
     buf.writeln();
 
@@ -88,10 +101,15 @@ class SelectedClaimsDraftBuilder {
       buf.writeln('## New knowledge');
       buf.writeln();
       for (final item in newItems) {
-        buf.write('- ${item.text}');
+        buf.write(_claimMarkdown(item.text));
         if (item.citationUrls.isNotEmpty) {
-          buf.write(' [Source](${item.citationUrls.first})');
+          for (var i = 0; i < item.citationUrls.length; i++) {
+            buf.write(
+              ' [${i == 0 ? 'Source' : 'Source ${i + 1}'}](<${item.citationUrls[i]}>)',
+            );
+          }
         }
+        buf.writeln();
         buf.writeln();
       }
       buf.writeln();
@@ -101,10 +119,15 @@ class SelectedClaimsDraftBuilder {
       buf.writeln('## Better sources');
       buf.writeln();
       for (final item in betterItems) {
-        buf.write('- ${item.text}');
+        buf.write(_claimMarkdown(item.text));
         if (item.citationUrls.isNotEmpty) {
-          buf.write(' [Source](${item.citationUrls.first})');
+          for (var i = 0; i < item.citationUrls.length; i++) {
+            buf.write(
+              ' [${i == 0 ? 'Source' : 'Source ${i + 1}'}](<${item.citationUrls[i]}>)',
+            );
+          }
         }
+        buf.writeln();
         buf.writeln();
       }
       buf.writeln();
@@ -114,10 +137,15 @@ class SelectedClaimsDraftBuilder {
       buf.writeln('## Possible contradictions to review');
       buf.writeln();
       for (final item in contradictionItems) {
-        buf.write('- ${item.text}');
+        buf.write(_claimMarkdown(item.text));
         if (item.citationUrls.isNotEmpty) {
-          buf.write(' [Source](${item.citationUrls.first})');
+          for (var i = 0; i < item.citationUrls.length; i++) {
+            buf.write(
+              ' [${i == 0 ? 'Source' : 'Source ${i + 1}'}](<${item.citationUrls[i]}>)',
+            );
+          }
         }
+        buf.writeln();
         buf.writeln();
       }
       buf.writeln();
@@ -131,6 +159,22 @@ class SelectedClaimsDraftBuilder {
         final label = titleByUrl[url] ?? url;
         buf.writeln('- $label — $url');
       }
+    }
+
+    final sourceMetadata = NoteSourceDocument.encode(
+      usedUrls.map(
+        (url) =>
+            citations.where((c) => c.url == url).firstOrNull ??
+            GroundedAnswerCitation(
+              id: url,
+              title: titleByUrl[url] ?? url,
+              url: url,
+            ),
+      ),
+    );
+    if (sourceMetadata.isNotEmpty) {
+      buf.writeln();
+      buf.writeln(sourceMetadata);
     }
 
     return ClaimDraftResult(

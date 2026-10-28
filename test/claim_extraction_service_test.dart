@@ -8,30 +8,94 @@ GroundedAnswer _answer({
   String answerText = '',
   List<GroundedAnswerCitation> citations = const [],
   String provider = 'test-provider',
-}) =>
-    GroundedAnswer(
-      question: question,
-      answerText: answerText,
-      citations: citations,
-      providerName: provider,
-      generatedAt: DateTime(2024, 1, 1),
-    );
+}) => GroundedAnswer(
+  question: question,
+  answerText: answerText,
+  citations: citations,
+  providerName: provider,
+  generatedAt: DateTime(2024, 1, 1),
+);
 
 GroundedAnswerCitation _citation(String id, String url, String title) =>
     GroundedAnswerCitation(id: id, title: title, url: url);
 
 GroundedAnswerCitation _citationWithOffsets(
-        String id, String url, String title, int start, int end) =>
-    GroundedAnswerCitation(
-        id: id, title: title, url: url, startIndex: start, endIndex: end);
+  String id,
+  String url,
+  String title,
+  int start,
+  int end,
+) => GroundedAnswerCitation(
+  id: id,
+  title: title,
+  url: url,
+  startIndex: start,
+  endIndex: end,
+);
 
 void main() {
   const service = RuleBasedClaimExtractionService();
 
   group('RuleBasedClaimExtractionService', () {
+    test(
+      'nested list indentation survives sentence extraction without changing citation ranges',
+      () {
+        const text = '- Parent.\n    - Child.\n    - Another child.';
+        final claims = service.extract(
+          _answer(
+            answerText: text,
+            citations: [
+              _citationWithOffsets(
+                '1',
+                'https://example.com',
+                'Reference',
+                0,
+                text.length,
+              ),
+            ],
+          ),
+        );
+        expect(claims.map((c) => c.text), [
+          '- Parent.',
+          '    - Child.',
+          '    - Another child.',
+        ]);
+        expect(claims.every((c) => !c.citationUncertain), isTrue);
+      },
+    );
+
+    test(
+      'keeps emphasis and code intact without shifting citation offsets',
+      () {
+        const text = '**Sized vs. Unsized:** types matter. Next fact.';
+        final claims = service.extract(
+          _answer(
+            answerText: text,
+            citations: [
+              _citationWithOffsets(
+                'a',
+                'https://example.com',
+                'Reference',
+                0,
+                35,
+              ),
+            ],
+          ),
+        );
+        expect(claims.first.text, '**Sized vs. Unsized:** types matter.');
+        expect(claims.first.citationUncertain, isFalse);
+        expect(claims.last.text, 'Next fact.');
+        final code = service.extract(
+          _answer(answerText: '`one. two` is code. Next.'),
+        );
+        expect(code.first.text, '`one. two` is code.');
+      },
+    );
+
     test('extracts multiple claims from a multi-sentence answer', () {
       final answer = _answer(
-        answerText: 'Plants use sunlight to make food. '
+        answerText:
+            'Plants use sunlight to make food. '
             'This process is called photosynthesis. '
             'Chlorophyll captures light energy.',
       );
@@ -55,9 +119,7 @@ void main() {
     });
 
     test('ignores empty sentences and whitespace-only segments', () {
-      final answer = _answer(
-        answerText: 'Valid claim.   ',
-      );
+      final answer = _answer(answerText: 'Valid claim.   ');
 
       final claims = service.extract(answer);
 
@@ -89,8 +151,10 @@ void main() {
       final claims = service.extract(answer);
 
       for (final claim in claims) {
-        expect(claim.citationUrls,
-            containsAll(['https://example.com/a', 'https://example.com/b']));
+        expect(
+          claim.citationUrls,
+          containsAll(['https://example.com/a', 'https://example.com/b']),
+        );
         expect(claim.citationTitles, containsAll(['Source A', 'Source B']));
       }
     });
@@ -103,8 +167,11 @@ void main() {
       expect(claims.length, 1);
       expect(claims.first.citationUrls, isEmpty);
       expect(claims.first.citationTitles, isEmpty);
-      expect(claims.first.citationUncertain, isTrue,
-          reason: 'claims without any source URL must be uncertain');
+      expect(
+        claims.first.citationUncertain,
+        isTrue,
+        reason: 'claims without any source URL must be uncertain',
+      );
     });
 
     test('returns empty list for empty answer text', () {
@@ -125,10 +192,7 @@ void main() {
 
     test('does not mutate the original GroundedAnswer', () {
       final citations = [_citation('c1', 'https://example.com', 'Example')];
-      final answer = _answer(
-        answerText: 'A claim.',
-        citations: citations,
-      );
+      final answer = _answer(answerText: 'A claim.', citations: citations);
 
       final before = answer.answerText;
       final beforeCount = answer.citations.length;
@@ -164,51 +228,55 @@ void main() {
     });
 
     test(
-        'claim IDs are stable across multiple extract calls for the same input',
-        () {
-      final answer = _answer(
-        question: 'What is gravity?',
-        answerText: 'Gravity pulls objects. It acts at a distance.',
-      );
+      'claim IDs are stable across multiple extract calls for the same input',
+      () {
+        final answer = _answer(
+          question: 'What is gravity?',
+          answerText: 'Gravity pulls objects. It acts at a distance.',
+        );
 
-      final first = service.extract(answer);
-      final second = service.extract(answer);
+        final first = service.extract(answer);
+        final second = service.extract(answer);
 
-      expect(first.map((c) => c.id).toList(),
-          equals(second.map((c) => c.id).toList()));
-    });
+        expect(
+          first.map((c) => c.id).toList(),
+          equals(second.map((c) => c.id).toList()),
+        );
+      },
+    );
 
     test(
-        'same question and text but different generatedAt produces different IDs',
-        () {
-      final t1 = DateTime(2024, 1, 1, 10, 0, 0);
-      final t2 = DateTime(2024, 1, 1, 10, 0, 1);
-      final answer1 = _answer(
-        question: 'What is gravity?',
-        answerText: 'Gravity pulls objects.',
-      );
-      // Manually build second answer with different timestamp via copyWith-style
-      final answer2 = GroundedAnswer(
-        question: answer1.question,
-        answerText: answer1.answerText,
-        citations: [],
-        providerName: answer1.providerName,
-        generatedAt: t2,
-      );
-      final a1 = GroundedAnswer(
-        question: answer1.question,
-        answerText: answer1.answerText,
-        citations: [],
-        providerName: answer1.providerName,
-        generatedAt: t1,
-      );
+      'same question and text but different generatedAt produces different IDs',
+      () {
+        final t1 = DateTime(2024, 1, 1, 10, 0, 0);
+        final t2 = DateTime(2024, 1, 1, 10, 0, 1);
+        final answer1 = _answer(
+          question: 'What is gravity?',
+          answerText: 'Gravity pulls objects.',
+        );
+        // Manually build second answer with different timestamp via copyWith-style
+        final answer2 = GroundedAnswer(
+          question: answer1.question,
+          answerText: answer1.answerText,
+          citations: [],
+          providerName: answer1.providerName,
+          generatedAt: t2,
+        );
+        final a1 = GroundedAnswer(
+          question: answer1.question,
+          answerText: answer1.answerText,
+          citations: [],
+          providerName: answer1.providerName,
+          generatedAt: t1,
+        );
 
-      final ids1 = service.extract(a1).map((c) => c.id).toList();
-      final ids2 = service.extract(answer2).map((c) => c.id).toList();
+        final ids1 = service.extract(a1).map((c) => c.id).toList();
+        final ids2 = service.extract(answer2).map((c) => c.id).toList();
 
-      expect(ids1, isNotEmpty);
-      expect(ids1, isNot(equals(ids2)));
-    });
+        expect(ids1, isNotEmpty);
+        expect(ids1, isNot(equals(ids2)));
+      },
+    );
 
     test('all IDs within one extracted answer are unique', () {
       final answer = _answer(
@@ -243,46 +311,48 @@ void main() {
       //   sentence 2: start=11, end=21, text="Claim two."
 
       test(
-          'sentence within citation range gets only that citation, citationUncertain false',
-          () {
-        final answer = _answer(
-          answerText: 'Claim one. Claim two.',
-          citations: [
-            _citationWithOffsets('c1', 'https://one.example', 'One', 0, 10),
-            _citationWithOffsets('c2', 'https://two.example', 'Two', 11, 21),
-          ],
-        );
+        'sentence within citation range gets only that citation, citationUncertain false',
+        () {
+          final answer = _answer(
+            answerText: 'Claim one. Claim two.',
+            citations: [
+              _citationWithOffsets('c1', 'https://one.example', 'One', 0, 10),
+              _citationWithOffsets('c2', 'https://two.example', 'Two', 11, 21),
+            ],
+          );
 
-        final claims = service.extract(answer);
+          final claims = service.extract(answer);
 
-        expect(claims[0].text, 'Claim one.');
-        expect(claims[0].citationUrls, ['https://one.example']);
-        expect(claims[0].citationUncertain, isFalse);
+          expect(claims[0].text, 'Claim one.');
+          expect(claims[0].citationUrls, ['https://one.example']);
+          expect(claims[0].citationUncertain, isFalse);
 
-        expect(claims[1].text, 'Claim two.');
-        expect(claims[1].citationUrls, ['https://two.example']);
-        expect(claims[1].citationUncertain, isFalse);
-      });
+          expect(claims[1].text, 'Claim two.');
+          expect(claims[1].citationUrls, ['https://two.example']);
+          expect(claims[1].citationUncertain, isFalse);
+        },
+      );
 
       test(
-          'sentence with no overlapping citation falls back to all citations with citationUncertain true',
-          () {
-        // Citation covers only sentence 1 (chars 0–10); sentence 2 (11–21) has no
-        // overlapping citation. All citations are attached conservatively to preserve
-        // source URLs on saved claims.
-        final answer = _answer(
-          answerText: 'Claim one. Claim two.',
-          citations: [
-            _citationWithOffsets('c1', 'https://one.example', 'One', 0, 10),
-          ],
-        );
+        'sentence with no overlapping citation falls back to all citations with citationUncertain true',
+        () {
+          // Citation covers only sentence 1 (chars 0–10); sentence 2 (11–21) has no
+          // overlapping citation. All citations are attached conservatively to preserve
+          // source URLs on saved claims.
+          final answer = _answer(
+            answerText: 'Claim one. Claim two.',
+            citations: [
+              _citationWithOffsets('c1', 'https://one.example', 'One', 0, 10),
+            ],
+          );
 
-        final claims = service.extract(answer);
+          final claims = service.extract(answer);
 
-        expect(claims[1].text, 'Claim two.');
-        expect(claims[1].citationUrls, equals(['https://one.example']));
-        expect(claims[1].citationUncertain, isTrue);
-      });
+          expect(claims[1].text, 'Claim two.');
+          expect(claims[1].citationUrls, equals(['https://one.example']));
+          expect(claims[1].citationUncertain, isTrue);
+        },
+      );
 
       test('citation spanning two sentences is attached to both', () {
         // Citation spans chars 5–15, which overlaps both sentences.
@@ -304,23 +374,26 @@ void main() {
         expect(claims[1].citationUncertain, isFalse);
       });
 
-      test('citations without offsets mark all sentences as citationUncertain',
-          () {
-        final answer = _answer(
-          answerText: 'Claim one. Claim two.',
-          citations: [
-            _citation('c1', 'https://example.com', 'Source'),
-          ],
-        );
+      test(
+        'citations without offsets mark all sentences as citationUncertain',
+        () {
+          final answer = _answer(
+            answerText: 'Claim one. Claim two.',
+            citations: [_citation('c1', 'https://example.com', 'Source')],
+          );
 
-        final claims = service.extract(answer);
+          final claims = service.extract(answer);
 
-        for (final claim in claims) {
-          expect(claim.citationUncertain, isTrue,
+          for (final claim in claims) {
+            expect(
+              claim.citationUncertain,
+              isTrue,
               reason:
-                  'claims should be uncertain when citations lack offset fields');
-        }
-      });
+                  'claims should be uncertain when citations lack offset fields',
+            );
+          }
+        },
+      );
     });
 
     test('ExtractedClaim equality is id-based', () {
