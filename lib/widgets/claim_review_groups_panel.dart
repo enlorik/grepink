@@ -64,11 +64,13 @@ class _ClaimReviewGroupsPanelState extends State<ClaimReviewGroupsPanel> {
   }
 
   void _showPreview() {
+    if (widget.evidence != null) return;
     if (!widget.inlineSources) _previewController.show();
     if (!_previewVisible) setState(() => _previewVisible = true);
   }
 
   void _hidePreview() {
+    if (widget.evidence != null) return;
     if (!widget.inlineSources) _previewController.hide();
     if (_previewVisible) setState(() => _previewVisible = false);
   }
@@ -330,7 +332,23 @@ class _ClaimReviewGroupsPanelState extends State<ClaimReviewGroupsPanel> {
                       ? constraints.maxWidth - sourceWidth - gutter
                       : math.min(740.0, constraints.maxWidth);
                   if (widget.evidence != null) {
-                    return _readingView(items, active);
+                    if (_continuous) return _readingView(items, active);
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        for (final group in visibleGroups) ...[
+                          _ClaimReviewGroupSection(
+                            group: group,
+                            selectedIds: selectedIds,
+                            onToggle: onToggle,
+                            citations: widget.citations,
+                            onPreview: _hover,
+                            onOpenSources: _hover,
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                      ],
+                    );
                   }
                   if (widget.inlineSources) {
                     return Column(
