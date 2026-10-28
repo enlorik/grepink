@@ -434,19 +434,19 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                                   value: _insertOffset,
                                   child: const Text('After selected passage'),
                                 ),
-                              ...noteInsertionTargets(_contentController.text)
-                                  .map(
-                                    (target) => DropdownMenuItem(
-                                      value: target.offset,
-                                      child: Text(
-                                        target.offset < 0
-                                            ? target.label
-                                            : 'After: ${target.label}',
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
+                              ...noteInsertionTargets(
+                                _contentController.text,
+                              ).map(
+                                (target) => DropdownMenuItem(
+                                  value: target.offset,
+                                  child: Text(
+                                    target.offset < 0
+                                        ? target.label
+                                        : 'After: ${target.label}',
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ),
                             ],
                             onChanged: (value) =>
                                 setState(() => _insertOffset = value ?? -1),

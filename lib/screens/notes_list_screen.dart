@@ -70,31 +70,35 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 16, 0),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Grepink',
-                        style: AppTextStyles.displayMedium,
+              if (_visibleNotes.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 16, 0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Grepink',
+                          style: AppTextStyles.displayMedium,
+                        ),
                       ),
-                    ),
-                    IconButton(
-                      tooltip: 'New note',
-                      onPressed: () => context.push('/note/new'),
-                      icon: const Icon(Icons.add, color: AppColors.deepAction),
-                    ),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.search,
-                        color: AppColors.deepAction,
+                      IconButton(
+                        tooltip: 'New note',
+                        onPressed: () => context.push('/note/new'),
+                        icon: const Icon(
+                          Icons.add,
+                          color: AppColors.deepAction,
+                        ),
                       ),
-                      onPressed: () => context.push('/search'),
-                    ),
-                  ],
+                      IconButton(
+                        icon: const Icon(
+                          Icons.search,
+                          color: AppColors.deepAction,
+                        ),
+                        onPressed: () => context.push('/search'),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
               Expanded(
                 child: _visibleNotes.isNotEmpty
                     ? _buildNotebook(_visibleNotes)
@@ -180,17 +184,33 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
                   ),
                 ),
               ),
+              IconButton(
+                tooltip: 'New note',
+                onPressed: () => context.push('/note/new'),
+                icon: const Icon(Icons.add),
+              ),
+              IconButton(
+                tooltip: 'Search notes',
+                onPressed: () => context.push('/search'),
+                icon: const Icon(Icons.search),
+              ),
               PopupMenuButton<String>(
                 tooltip: 'Note actions',
                 onSelected: (action) async {
-                  if (action == 'pin')
+                  if (action == 'pin') {
                     await ref
                         .read(notesProvider.notifier)
                         .togglePin(selected.id);
-                  if (action == 'delete' && await _showDeleteConfirm(context)) {
+                    return;
+                  }
+                  if (action == 'delete' &&
+                      context.mounted &&
+                      await _showDeleteConfirm(context)) {
                     if (_editorKey.currentState != null &&
-                        !await _editorKey.currentState!.confirmLeave())
+                        !await _editorKey.currentState!.confirmLeave()) {
                       return;
+                    }
+                    if (!mounted) return;
                     await _deleteNote(selected.id);
                   }
                 },
