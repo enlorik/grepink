@@ -347,13 +347,12 @@ void main() {
 
       final updatedContent = repo.updatedNotes.single.content;
       final oldIndex = updatedContent.indexOf('Old content here.');
-      final separatorIndex = updatedContent.indexOf('---');
-      final draftIndex = updatedContent.indexOf(
-          container.read(claimReviewProvider).draft!.markdownContent.trim());
-
+      final additionIndex = updatedContent.indexOf('A brand new claim.');
       expect(oldIndex, greaterThanOrEqualTo(0));
-      expect(separatorIndex, greaterThan(oldIndex));
-      expect(draftIndex, greaterThan(separatorIndex));
+      expect(additionIndex, greaterThan(oldIndex));
+      expect(updatedContent, isNot(contains('## New knowledge')));
+      expect(updatedContent, isNot(contains('---')));
+
     });
 
     testWidgets('repeated append calls do not duplicate the content',

@@ -233,7 +233,7 @@ void main() {
       expect(result.markdownContent, contains('Claim without URL.'));
     });
 
-    test('question is used as markdown title', () {
+    test('question becomes a topic rather than an interrogative title', () {
       final result = builder.build(
         question: 'What is photosynthesis?',
         selected: [_item(text: 'Plants use sunlight.')],
@@ -241,7 +241,7 @@ void main() {
         citations: const [],
       );
 
-      expect(result.markdownContent, contains('# What is photosynthesis?'));
+      expect(result.markdownContent, contains('# Photosynthesis'));
     });
 
     test('sourceCount reflects deduplicated URL count', () {

@@ -1,4 +1,10 @@
+import 'package:grepink/providers/claim_review_provider.dart';
+import 'package:grepink/models/claim_review_session_state.dart';
+import 'package:grepink/models/claim_review_item.dart';
+import 'package:grepink/models/claim_deduplication_result.dart';
 import 'dart:io';
+import 'package:flutter/gestures.dart';
+import 'package:grepink/widgets/evidence_workspace.dart';
 import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -56,7 +62,108 @@ class _MemoryNotes extends NotesNotifier {
   }
 }
 
+class _ReadyReview extends ClaimReviewNotifier {
+  _ReadyReview(Ref ref) : super(ref) {
+    const item = ClaimReviewItem(
+      id: 'new',
+      text: 'A tuple keeps the order of its fields.',
+      classification: ClaimNoveltyClassification.newClaim,
+      citationUrls: ['https://example.com/layout'],
+      citationTitles: ['Tuple layout'],
+      selectedByDefault: true,
+      reason: '',
+      matchedLocalEvidenceIds: [],
+      canBeSaved: true,
+    );
+    state = const ClaimReviewSessionState(
+      status: ClaimReviewSessionStatus.success,
+      question: 'What is tuple layout?',
+      providerName: 'Test',
+      groups: [
+        ClaimReviewGroup(
+          label: 'New knowledge',
+          classification: ClaimNoveltyClassification.newClaim,
+          items: [item],
+        ),
+      ],
+      selection: ClaimReviewSelectionState(
+        allItems: [item],
+        selectedIds: {'new'},
+      ),
+      citations: [
+        GroundedAnswerCitation(
+          id: 'layout',
+          title: 'Tuple layout',
+          url: 'https://example.com/layout',
+          snippet: 'Fields retain their declared order.',
+        ),
+      ],
+    );
+  }
+}
+
 void main() {
+  testWidgets(
+    'Add below inserts reviewed prose at the chosen passage without a question heading and waits for Save',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1440, 1000));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final container = ProviderContainer(
+        overrides: [
+          notesProvider.overrideWith((ref) => _MemoryNotes(ref)),
+          claimReviewProvider.overrideWith((ref) => _ReadyReview(ref)),
+        ],
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: NoteEditorScreen(noteId: 'one', embedded: true),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final target = find.descendant(
+        of: find.byKey(const ValueKey('note-passage-1')),
+        matching: find.byTooltip('Add information below this passage'),
+      );
+      await tester.tap(target);
+      await tester.pumpAndSettle();
+      expect(find.text('After selected passage'), findsWidgets);
+      final add = find.byKey(const Key('generate-claim-draft-button'));
+      await tester.ensureVisible(add);
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+      final reader = tester.widget<NoteReadingView>(
+        find.byType(NoteReadingView).first,
+      );
+      expect(
+        reader.content.indexOf('A tuple keeps'),
+        greaterThan(reader.content.indexOf('Scalar')),
+      );
+      expect(
+        reader.content.indexOf('A tuple keeps'),
+        lessThan(reader.content.indexOf('## Compound values')),
+      );
+      expect(reader.content, isNot(contains('# Tuple layout')));
+      expect(reader.content, isNot(contains('## New knowledge')));
+      expect(reader.content, contains('https://example.com/layout'));
+      expect(NoteSourceDocument.sources(reader.content).length, 2);
+      expect(
+        container.read(notesProvider).value!.first.content,
+        isNot(contains('A tuple keeps')),
+      );
+      await tester.tap(find.widgetWithText(TextButton, 'Save'));
+      await tester.pumpAndSettle();
+      expect(
+        container.read(notesProvider).value!.first.content,
+        contains('A tuple keeps'),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('saved Markdown renders and source survives reopening', (
     tester,
   ) async {
@@ -72,7 +179,12 @@ void main() {
     await tester.pump();
     expect(find.text('# Types'), findsNothing);
     expect(find.text('Types'), findsOneWidget);
-    await tester.tap(find.text('Source'));
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer(location: Offset.zero);
+    addTearDown(mouse.removePointer);
+    await mouse.moveTo(
+      tester.getCenter(find.byKey(const ValueKey('note-passage-1'))),
+    );
     await tester.pump();
     expect(find.byKey(const Key('saved-note-source-preview')), findsOneWidget);
     expect(find.text('Rust reference'), findsOneWidget);
@@ -109,7 +221,9 @@ void main() {
         endsWith('addition '),
       );
       await tester.pump();
-      await tester.tap(find.text('Second note'));
+      await tester.tap(find.byKey(const Key('notebook-switcher')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Second note').last);
       await tester.pumpAndSettle();
       expect(
         find.descendant(
@@ -129,7 +243,9 @@ void main() {
         find.textContaining('My unsaved addition', findRichText: true),
         findsWidgets,
       );
-      await tester.tap(find.text('Second note'));
+      await tester.tap(find.byKey(const Key('notebook-switcher')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Second note').last);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Discard'));
       await tester.pumpAndSettle();
@@ -248,7 +364,7 @@ void main() {
             ),
           );
       await tester.pumpAndSettle();
-      expect(find.byType(NoteReadingView), findsOneWidget);
+      expect(find.byType(NoteReadingView), findsNWidgets(2));
       if (output != null) {
         Future<void> capturePreview(String filename) async {
           final boundary =
@@ -267,17 +383,44 @@ void main() {
         }
 
         await capturePreview('notebook-workspace.png');
-        await tester.tap(
-          find.descendant(
-            of: find.byType(NoteReadingView),
-            matching: find.text('Source'),
+        final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+        await mouse.addPointer(location: Offset.zero);
+        addTearDown(mouse.removePointer);
+        final mainReader = find.byType(NoteReadingView).first;
+        await mouse.moveTo(
+          tester.getCenter(
+            find.descendant(
+              of: mainReader,
+              matching: find.byKey(const ValueKey('note-passage-1')),
+            ),
           ),
         );
         await tester.pumpAndSettle();
-        await capturePreview('notebook-sources-workspace.png');
-        await tester.tap(find.byTooltip('Close source'));
+        expect(find.byKey(const Key('workspace-evidence')), findsOneWidget);
+        await tester.tap(find.byKey(const Key('ask-question-field')));
+        await tester.enterText(
+          find.byKey(const Key('ask-question-field')),
+          'How are tuples laid out?',
+        );
         await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const ValueKey('note-passage-1')));
+        expect(
+          find.textContaining('explanation.', findRichText: true),
+          findsWidgets,
+        );
+        final evidenceRect = tester.getRect(
+          find.byKey(const Key('workspace-evidence')),
+        );
+        final questionRect = tester.getRect(
+          find.byKey(const Key('ask-question-field')),
+        );
+        expect(evidenceRect.overlaps(questionRect), isFalse);
+        await capturePreview('notebook-sources-workspace.png');
+        await tester.tap(
+          find.descendant(
+            of: find.byType(NoteReadingView).first,
+            matching: find.byKey(const ValueKey('note-passage-1')),
+          ),
+        );
         await tester.pumpAndSettle();
         await capturePreview('notebook-editing-workspace.png');
         await tester.testTextInput.receiveAction(TextInputAction.done);
@@ -288,7 +431,7 @@ void main() {
       await tester.tap(insert);
       await tester.pumpAndSettle();
       final reader = tester.widget<NoteReadingView>(
-        find.byType(NoteReadingView),
+        find.byType(NoteReadingView).first,
       );
       expect(reader.content, contains('## Tuples'));
       expect(reader.content, contains('[Source](https://example.com/types)'));
