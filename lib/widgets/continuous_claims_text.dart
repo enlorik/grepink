@@ -100,6 +100,13 @@ class _ContinuousClaimsTextState extends State<ContinuousClaimsText> {
         return;
       }
       if (node is! md.Element) return;
+      if (node.tag == 'a' &&
+          RegExp(
+            r'^Source(?: \d+)?$',
+            caseSensitive: false,
+          ).hasMatch(node.textContent.trim())) {
+        return;
+      }
       var next = current;
       if (node.tag == 'strong') {
         next = next.copyWith(fontWeight: FontWeight.w600);

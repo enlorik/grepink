@@ -11,6 +11,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import 'claim_source_preview.dart';
 import 'continuous_claims_text.dart';
+import 'evidence_workspace.dart';
 
 /// Above this many items, the "Already in your notes" section starts
 /// collapsed so a long list of known claims doesn't push the useful
@@ -28,6 +29,7 @@ class ClaimReviewGroupsPanel extends StatefulWidget {
   final String? providerLabel;
   final List<GroundedAnswerCitation> citations;
   final bool inlineSources;
+  final EvidenceController? evidence;
 
   const ClaimReviewGroupsPanel({
     super.key,
@@ -37,6 +39,7 @@ class ClaimReviewGroupsPanel extends StatefulWidget {
     this.providerLabel,
     this.citations = const [],
     this.inlineSources = false,
+    this.evidence,
   });
 
   @override
@@ -71,6 +74,7 @@ class _ClaimReviewGroupsPanelState extends State<ClaimReviewGroupsPanel> {
   }
 
   void _leave() {
+    if (widget.evidence != null) return;
     _hideTimer?.cancel();
     if (!_pinned) {
       _hideTimer = Timer(const Duration(milliseconds: 250), () {
@@ -83,6 +87,22 @@ class _ClaimReviewGroupsPanelState extends State<ClaimReviewGroupsPanel> {
     _hideTimer?.cancel();
     final changed = _activeId != item.id;
     _activate(item);
+    if (widget.evidence != null) {
+      widget.evidence!.inspect(
+        sourcePlainText(item.text),
+        claimSourcePreviews(item, widget.citations)
+            .map(
+              (s) => GroundedAnswerCitation(
+                id: s.url,
+                title: s.title,
+                url: s.url,
+                snippet: s.excerpt,
+              ),
+            )
+            .toList(),
+      );
+      return;
+    }
     if (_dismissedId != item.id) _showPreview();
     if (changed) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -101,6 +121,10 @@ class _ClaimReviewGroupsPanelState extends State<ClaimReviewGroupsPanel> {
   }
 
   void _scrollSource(PointerSignalEvent event) {
+    if (widget.evidence != null) {
+      widget.evidence!.wheel(event);
+      return;
+    }
     if (event is! PointerScrollEvent ||
         !_previewVisible ||
         !_sourceScroll.hasClients ||
@@ -112,9 +136,10 @@ class _ClaimReviewGroupsPanelState extends State<ClaimReviewGroupsPanel> {
       if (!mounted || !_sourceScroll.hasClients) return;
       final position = _sourceScroll.position;
       _sourceScroll.jumpTo(
-          (position.pixels + (signal as PointerScrollEvent).scrollDelta.dy)
-              .clamp(position.minScrollExtent, position.maxScrollExtent)
-              .toDouble());
+        (position.pixels + (signal as PointerScrollEvent).scrollDelta.dy)
+            .clamp(position.minScrollExtent, position.maxScrollExtent)
+            .toDouble(),
+      );
     });
   }
 
@@ -122,64 +147,81 @@ class _ClaimReviewGroupsPanelState extends State<ClaimReviewGroupsPanel> {
     final current = active ?? items.first;
     final index = items.indexWhere((item) => item.id == current.id);
     final group = widget.groups.firstWhere(
-        (group) => group.items.any((item) => item.id == current.id));
+      (group) => group.items.any((item) => item.id == current.id),
+    );
     void navigate(int offset) => _hover(items[(index + offset) % items.length]);
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
           'Click a sentence to ignore it; click again to include it. Hover for sources and scroll to read them.',
-          style: AppTextStyles.bodySmall),
-      const SizedBox(height: 12),
-      ContinuousClaimsText(
-        items: items,
-        selectedIds: widget.selectedIds,
-        activeId: active?.id,
-        onActivate: _hover,
-        onToggle: widget.onToggle,
-        onLeave: _leave,
-        onPointerSignal: _scrollSource,
-      ),
-      const SizedBox(height: 12),
-      Wrap(
+          style: AppTextStyles.bodySmall,
+        ),
+        const SizedBox(height: 12),
+        ContinuousClaimsText(
+          items: items,
+          selectedIds: widget.selectedIds,
+          activeId: active?.id,
+          onActivate: _hover,
+          onToggle: widget.onToggle,
+          onLeave: _leave,
+          onPointerSignal: _scrollSource,
+        ),
+        const SizedBox(height: 12),
+        Wrap(
           crossAxisAlignment: WrapCrossAlignment.center,
           spacing: 8,
           children: [
             IconButton(
-                key: const Key('previous-inline-claim'),
-                tooltip: 'Previous claim',
-                onPressed: () => navigate(-1),
-                icon: const Icon(Icons.chevron_left)),
-            Text('${index + 1}/${items.length} · ${group.label}',
-                key: const Key('active-claim-status'),
-                style: AppTextStyles.bodySmall),
+              key: const Key('previous-inline-claim'),
+              tooltip: 'Previous claim',
+              onPressed: () => navigate(-1),
+              icon: const Icon(Icons.chevron_left),
+            ),
+            Text(
+              '${index + 1}/${items.length} · ${group.label}',
+              key: const Key('active-claim-status'),
+              style: AppTextStyles.bodySmall,
+            ),
             TextButton(
-                key: const Key('toggle-active-claim'),
-                onPressed: current.canBeSaved
-                    ? () => widget.onToggle(current.id)
-                    : null,
-                child: Text(current.canBeSaved
+              key: const Key('toggle-active-claim'),
+              onPressed: current.canBeSaved
+                  ? () => widget.onToggle(current.id)
+                  : null,
+              child: Text(
+                current.canBeSaved
                     ? (widget.selectedIds.contains(current.id)
-                        ? 'Ignore'
-                        : 'Include')
-                    : 'Not eligible to add')),
+                          ? 'Ignore'
+                          : 'Include')
+                    : 'Not eligible to add',
+              ),
+            ),
             TextButton(
-                key: const Key('inline-claim-sources'),
-                onPressed: () {
-                  _dismissedId = null;
-                  _hover(current);
-                  setState(() => _pinned = true);
-                },
-                child: Text(
-                    '${claimSourcePreviews(current, widget.citations).length} sources')),
+              key: const Key('inline-claim-sources'),
+              onPressed: () {
+                _dismissedId = null;
+                _hover(current);
+                setState(() => _pinned = true);
+              },
+              child: Text(
+                '${claimSourcePreviews(current, widget.citations).length} sources',
+              ),
+            ),
             IconButton(
-                key: const Key('next-inline-claim'),
-                tooltip: 'Next claim',
-                onPressed: () => navigate(1),
-                icon: const Icon(Icons.chevron_right)),
-          ]),
-      if (current.reason.trim().isNotEmpty)
-        ClaimFormattedText(
-            data: current.reason, style: AppTextStyles.bodySmall),
-    ]);
+              key: const Key('next-inline-claim'),
+              tooltip: 'Next claim',
+              onPressed: () => navigate(1),
+              icon: const Icon(Icons.chevron_right),
+            ),
+          ],
+        ),
+        if (current.reason.trim().isNotEmpty)
+          ClaimFormattedText(
+            data: current.reason,
+            style: AppTextStyles.bodySmall,
+          ),
+      ],
+    );
   }
 
   void _activate(ClaimReviewItem item) {
@@ -203,8 +245,9 @@ class _ClaimReviewGroupsPanelState extends State<ClaimReviewGroupsPanel> {
     final selectedIds = widget.selectedIds;
     final onToggle = widget.onToggle;
     final providerLabel = widget.providerLabel;
-    final visibleGroups =
-        groups.where((group) => group.items.isNotEmpty).toList();
+    final visibleGroups = groups
+        .where((group) => group.items.isNotEmpty)
+        .toList();
 
     if (visibleGroups.isEmpty) {
       return const SizedBox.shrink();
@@ -213,8 +256,9 @@ class _ClaimReviewGroupsPanelState extends State<ClaimReviewGroupsPanel> {
     final ordered =
         groups.expand((group) => group.items).toList().asMap().entries.toList()
           ..sort((a, b) {
-            final order = (a.value.sourceOrder ?? a.key)
-                .compareTo(b.value.sourceOrder ?? b.key);
+            final order = (a.value.sourceOrder ?? a.key).compareTo(
+              b.value.sourceOrder ?? b.key,
+            );
             return order == 0 ? a.key.compareTo(b.key) : order;
           });
     final items = ordered.map((entry) => entry.value).toList();
@@ -252,16 +296,17 @@ class _ClaimReviewGroupsPanelState extends State<ClaimReviewGroupsPanel> {
                     },
                     child: Text(_continuous ? 'Detailed list' : 'Reading view'),
                   ),
-                  TextButton.icon(
-                    key: const Key('pin-source-preview'),
-                    onPressed: _togglePreview,
-                    icon: Icon(
-                      _pinned ? Icons.push_pin : Icons.push_pin_outlined,
+                  if (widget.evidence == null)
+                    TextButton.icon(
+                      key: const Key('pin-source-preview'),
+                      onPressed: _togglePreview,
+                      icon: Icon(
+                        _pinned ? Icons.push_pin : Icons.push_pin_outlined,
+                      ),
+                      label: Text(
+                        _pinned ? 'Close source pane' : 'Keep sources open',
+                      ),
                     ),
-                    label: Text(
-                      _pinned ? 'Close source pane' : 'Keep sources open',
-                    ),
-                  ),
                 ],
               ),
               if (providerLabel != null) ...[
@@ -273,126 +318,152 @@ class _ClaimReviewGroupsPanelState extends State<ClaimReviewGroupsPanel> {
                 ),
               ],
               const SizedBox(height: 12),
-              LayoutBuilder(builder: (context, constraints) {
-                final docked = _continuous &&
-                    constraints.maxWidth >= 960 &&
-                    MediaQuery.textScalerOf(context).scale(16) <= 24;
-                const sourceWidth = 340.0;
-                const gutter = 24.0;
-                final readingWidth = docked
-                    ? constraints.maxWidth - sourceWidth - gutter
-                    : math.min(740.0, constraints.maxWidth);
-                if (widget.inlineSources) {
-                  return Column(
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final docked =
+                      _continuous &&
+                      constraints.maxWidth >= 960 &&
+                      MediaQuery.textScalerOf(context).scale(16) <= 24;
+                  const sourceWidth = 340.0;
+                  const gutter = 24.0;
+                  final readingWidth = docked
+                      ? constraints.maxWidth - sourceWidth - gutter
+                      : math.min(740.0, constraints.maxWidth);
+                  if (widget.evidence != null)
+                    return _readingView(items, active);
+                  if (widget.inlineSources) {
+                    return Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         _readingView(items, active),
                         if (_previewVisible) ...[
                           const SizedBox(height: 16),
                           SizedBox(
-                              height: 260,
-                              child: SingleChildScrollView(
-                                key: const Key('source-preview-scroll'),
-                                controller: _sourceScroll,
-                                child: ClaimSourcePreviewPane(
-                                    item: active,
-                                    citations: widget.citations,
-                                    onClose: _closePreview,
-                                    docked: true),
-                              )),
+                            height: 260,
+                            child: SingleChildScrollView(
+                              key: const Key('source-preview-scroll'),
+                              controller: _sourceScroll,
+                              child: ClaimSourcePreviewPane(
+                                item: active,
+                                citations: widget.citations,
+                                onClose: _closePreview,
+                                docked: true,
+                              ),
+                            ),
+                          ),
                         ],
-                      ]);
-                }
-                return OverlayPortal.overlayChildLayoutBuilder(
-                  controller: _previewController,
-                  overlayChildBuilder: (context, info) {
-                    final media = MediaQuery.of(context);
-                    final size = info.overlaySize;
-                    final origin = MatrixUtils.transformPoint(
-                        info.childPaintTransform, Offset.zero);
-                    final bottom =
-                        80 + media.padding.bottom + media.viewInsets.bottom;
-                    final safeTop =
-                        math.min(96.0 + media.padding.top, size.height * .25);
-                    final top = origin.dy
-                        .clamp(safeTop,
-                            math.max(safeTop, size.height - bottom - 160))
-                        .toDouble();
-                    final height = docked
-                        ? math.min(
-                            640.0,
-                            math.max(
-                                0.0,
-                                math.min(size.height - bottom,
-                                        origin.dy + info.childSize.height) -
-                                    top))
-                        : math.max(
-                            0.0,
-                            math.min(
-                                size.height * .45, size.height - bottom - 16));
-                    Widget preview = MouseRegion(
-                      onEnter: (_) => _hideTimer?.cancel(),
-                      onExit: (_) => _leave(),
-                      child: SingleChildScrollView(
-                        key: const Key('source-preview-scroll'),
-                        controller: _sourceScroll,
-                        child: ClaimSourcePreviewPane(
-                          item: active,
-                          citations: widget.citations,
-                          onClose: _closePreview,
-                          docked: docked,
-                        ),
-                      ),
+                      ],
                     );
-                    if (docked) {
-                      preview = DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surface,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .primary
-                                  .withAlpha(60)),
+                  }
+                  return OverlayPortal.overlayChildLayoutBuilder(
+                    controller: _previewController,
+                    overlayChildBuilder: (context, info) {
+                      final media = MediaQuery.of(context);
+                      final size = info.overlaySize;
+                      final origin = MatrixUtils.transformPoint(
+                        info.childPaintTransform,
+                        Offset.zero,
+                      );
+                      final bottom =
+                          80 + media.padding.bottom + media.viewInsets.bottom;
+                      final safeTop = math.min(
+                        96.0 + media.padding.top,
+                        size.height * .25,
+                      );
+                      final top = origin.dy
+                          .clamp(
+                            safeTop,
+                            math.max(safeTop, size.height - bottom - 160),
+                          )
+                          .toDouble();
+                      final height = docked
+                          ? math.min(
+                              640.0,
+                              math.max(
+                                0.0,
+                                math.min(
+                                      size.height - bottom,
+                                      origin.dy + info.childSize.height,
+                                    ) -
+                                    top,
+                              ),
+                            )
+                          : math.max(
+                              0.0,
+                              math.min(
+                                size.height * .45,
+                                size.height - bottom - 16,
+                              ),
+                            );
+                      Widget preview = MouseRegion(
+                        onEnter: (_) => _hideTimer?.cancel(),
+                        onExit: (_) => _leave(),
+                        child: SingleChildScrollView(
+                          key: const Key('source-preview-scroll'),
+                          controller: _sourceScroll,
+                          child: ClaimSourcePreviewPane(
+                            item: active,
+                            citations: widget.citations,
+                            onClose: _closePreview,
+                            docked: docked,
+                          ),
                         ),
-                        child: Padding(
+                      );
+                      if (docked) {
+                        preview = DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.surface,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.primary.withAlpha(60),
+                            ),
+                          ),
+                          child: Padding(
                             padding: const EdgeInsets.all(1),
                             child: ClipRRect(
-                                borderRadius: BorderRadius.circular(11),
-                                child: preview)),
+                              borderRadius: BorderRadius.circular(11),
+                              child: preview,
+                            ),
+                          ),
+                        );
+                      }
+                      return Positioned(
+                        key: Key(
+                          docked
+                              ? 'docked-source-preview'
+                              : 'compact-source-preview',
+                        ),
+                        left: docked ? origin.dx + readingWidth + gutter : null,
+                        right: docked ? null : 16,
+                        top: docked ? top : null,
+                        bottom: docked ? null : bottom,
+                        width: docked
+                            ? sourceWidth
+                            : math.max(0, math.min(380.0, size.width - 32)),
+                        child: ConstrainedBox(
+                          key: const Key('source-preview-frame'),
+                          constraints: BoxConstraints(maxHeight: height),
+                          child: preview,
+                        ),
                       );
-                    }
-                    return Positioned(
-                      key: Key(docked
-                          ? 'docked-source-preview'
-                          : 'compact-source-preview'),
-                      left: docked ? origin.dx + readingWidth + gutter : null,
-                      right: docked ? null : 16,
-                      top: docked ? top : null,
-                      bottom: docked ? null : bottom,
-                      width: docked
-                          ? sourceWidth
-                          : math.max(0, math.min(380.0, size.width - 32)),
-                      child: ConstrainedBox(
-                        key: const Key('source-preview-frame'),
-                        constraints: BoxConstraints(maxHeight: height),
-                        child: preview,
-                      ),
-                    );
-                  },
-                  child: _continuous
-                      ? ConstrainedBox(
-                          constraints:
-                              BoxConstraints(minHeight: docked ? 320 : 0),
-                          child: Row(
+                    },
+                    child: _continuous
+                        ? ConstrainedBox(
+                            constraints: BoxConstraints(
+                              minHeight: docked ? 320 : 0,
+                            ),
+                            child: Row(
                               mainAxisAlignment: docked
                                   ? MainAxisAlignment.start
                                   : MainAxisAlignment.center,
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 SizedBox(
-                                    width: readingWidth,
-                                    child: _readingView(items, active)),
+                                  width: readingWidth,
+                                  child: _readingView(items, active),
+                                ),
                                 if (docked) ...[
                                   const SizedBox(width: gutter),
                                   SizedBox(
@@ -407,10 +478,12 @@ class _ClaimReviewGroupsPanelState extends State<ClaimReviewGroupsPanel> {
                                     ),
                                   ),
                                 ],
-                              ]))
-                      : Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
+                              ],
+                            ),
+                          )
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
                               for (final group in visibleGroups) ...[
                                 _ClaimReviewGroupSection(
                                   group: group,
@@ -424,10 +497,12 @@ class _ClaimReviewGroupsPanelState extends State<ClaimReviewGroupsPanel> {
                                   },
                                 ),
                                 const SizedBox(height: 16),
-                              ]
-                            ]),
-                );
-              }),
+                              ],
+                            ],
+                          ),
+                  );
+                },
+              ),
             ],
           ),
         ),
@@ -441,30 +516,34 @@ class _SourceWorkspacePlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        key: const Key('source-workspace-placeholder'),
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: AppColors.aiResponseBackground.withAlpha(100),
-          border: Border.all(color: AppColors.dividerBorder),
-          borderRadius: BorderRadius.circular(12),
+    key: const Key('source-workspace-placeholder'),
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: AppColors.aiResponseBackground.withAlpha(100),
+      border: Border.all(color: AppColors.dividerBorder),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: const Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(Icons.menu_book_outlined, size: 20, color: AppColors.deepAction),
+        SizedBox(height: 12),
+        Text(
+          'Sources',
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
         ),
-        child: const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(Icons.menu_book_outlined,
-                  size: 20, color: AppColors.deepAction),
-              SizedBox(height: 12),
-              Text('Sources',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-              SizedBox(height: 6),
-              Text(
-                  'Hover a sentence or use its Sources button to read references here.',
-                  style: TextStyle(
-                      fontSize: 14,
-                      height: 1.5,
-                      color: AppColors.secondaryText)),
-            ]),
-      );
+        SizedBox(height: 6),
+        Text(
+          'Hover a sentence or use its Sources button to read references here.',
+          style: TextStyle(
+            fontSize: 14,
+            height: 1.5,
+            color: AppColors.secondaryText,
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _ClaimReviewGroupSection extends StatelessWidget {
@@ -648,8 +727,9 @@ class _ClaimReviewItemTile extends StatelessWidget {
   Widget? _buildSubtitle() {
     final lines = <Widget>[];
     if (item.reason.trim().isNotEmpty) {
-      lines.add(ClaimFormattedText(
-          data: item.reason, style: AppTextStyles.bodySmall));
+      lines.add(
+        ClaimFormattedText(data: item.reason, style: AppTextStyles.bodySmall),
+      );
     }
     // Only alreadyKnown and betterSource results have confirmed local matches.
     // For newClaim and others the dedup service may return a low-similarity
@@ -657,7 +737,7 @@ class _ClaimReviewItemTile extends StatelessWidget {
     // so showing "Matches your notes" there would be misleading.
     final isConfirmedMatch =
         item.classification == ClaimNoveltyClassification.alreadyKnown ||
-            item.classification == ClaimNoveltyClassification.betterSource;
+        item.classification == ClaimNoveltyClassification.betterSource;
     if (isConfirmedMatch && item.matchedLocalEvidenceIds.isNotEmpty) {
       final matches = <String>[];
       for (var i = 0; i < item.matchedLocalEvidenceIds.length; i++) {
@@ -730,7 +810,9 @@ class _ClaimReviewItemTile extends StatelessWidget {
                   onChanged: item.canBeSaved ? (_) => onToggle() : null,
                   controlAffinity: ListTileControlAffinity.leading,
                   title: ClaimFormattedText(
-                      data: item.text, style: AppTextStyles.bodyMedium),
+                    data: item.text,
+                    style: AppTextStyles.bodyMedium,
+                  ),
                   subtitle: _buildSubtitle(),
                 ),
                 Padding(

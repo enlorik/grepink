@@ -9,6 +9,7 @@ import '../services/note_document_blocks.dart';
 import '../services/markdown_list_lines.dart';
 import '../services/source_page_loader.dart';
 import 'source_page_reader.dart';
+import 'evidence_workspace.dart';
 import '../services/note_source_document.dart';
 import '../theme/app_colors.dart';
 import 'claim_source_preview.dart';
@@ -20,12 +21,16 @@ class NoteReadingView extends StatefulWidget {
   final bool editable;
   final ValueChanged<String>? onChanged;
   final SourcePageLoader? sourceLoader;
+  final EvidenceController? evidence;
+  final ValueChanged<int>? onAddBelow;
   const NoteReadingView({
     super.key,
     required this.content,
     this.editable = false,
     this.onChanged,
     this.sourceLoader,
+    this.evidence,
+    this.onAddBelow,
   });
   @override
   State<NoteReadingView> createState() => _NoteReadingViewState();
@@ -123,6 +128,23 @@ class _NoteReadingViewState extends State<NoteReadingView> {
   void _inspect(List<String> urls, {String? selected, String? passage}) {
     if (urls.isEmpty) return;
     final saved = {for (final c in _noteSources()) c.url: c};
+    if (widget.evidence != null) {
+      widget.evidence!.inspect(
+        passage ?? _passageText,
+        urls
+            .map(
+              (url) =>
+                  saved[url] ??
+                  GroundedAnswerCitation(
+                    id: url,
+                    title: Uri.parse(url).host,
+                    url: url,
+                  ),
+            )
+            .toList(),
+      );
+      return;
+    }
     final index = selected == null ? 0 : urls.indexOf(selected);
     if (_sources.map((c) => c.url).join('\n') == urls.join('\n') &&
         selected == null &&
@@ -148,6 +170,10 @@ class _NoteReadingViewState extends State<NoteReadingView> {
   }
 
   void _wheel(PointerSignalEvent event) {
+    if (widget.evidence != null) {
+      widget.evidence!.wheel(event);
+      return;
+    }
     if (event is! PointerScrollEvent ||
         !_sourceScroll.hasClients ||
         _sourceScroll.position.maxScrollExtent <= 0) {
@@ -334,6 +360,20 @@ class _NoteReadingViewState extends State<NoteReadingView> {
       );
     }
     final indent = originalList?.indent ?? 0;
+    if (canEdit && widget.onAddBelow != null) {
+      content = Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: content),
+          IconButton(
+            tooltip: 'Add information below this passage',
+            visualDensity: VisualDensity.compact,
+            onPressed: () => widget.onAddBelow!(block.end),
+            icon: const Icon(Icons.add, size: 16),
+          ),
+        ],
+      );
+    }
     return MouseRegion(
       onEnter: (_) => _inspect(urls, passage: sourcePlainText(body)),
       onHover: (_) => _inspect(urls, passage: sourcePlainText(body)),
@@ -534,7 +574,8 @@ class _NoteReadingViewState extends State<NoteReadingView> {
                       children: [
                         for (var i = 0; i < blocks.length; i++)
                           _passage(blocks[i], i),
-                        if (_noteSources().isNotEmpty)
+                        if (widget.evidence == null &&
+                            _noteSources().isNotEmpty)
                           Align(
                             alignment: Alignment.centerLeft,
                             child: TextButton.icon(
@@ -557,7 +598,7 @@ class _NoteReadingViewState extends State<NoteReadingView> {
         );
         return SizedBox(
           height: height,
-          child: _sources.isEmpty
+          child: widget.evidence != null || _sources.isEmpty
               ? article
               : constraints.maxWidth >= 850
               ? Row(
@@ -590,19 +631,12 @@ class _SourceLinkBuilder extends MarkdownElementBuilder {
     final href = element.attributes['href'];
     if (href == null) return null;
     final label = element.textContent;
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => inspect(href, label),
-      child: InkWell(
-        onTap: () => inspect(href, label),
-        child: Text(
-          label,
-          style: (preferredStyle ?? const TextStyle()).copyWith(
-            color: AppColors.primaryAction,
-            decoration: TextDecoration.underline,
-          ),
-        ),
-      ),
-    );
+    if (RegExp(
+      r'^Source(?: \d+)?$',
+      caseSensitive: false,
+    ).hasMatch(label.trim())) {
+      return const SizedBox.shrink();
+    }
+    return Text(label, style: preferredStyle);
   }
 }
