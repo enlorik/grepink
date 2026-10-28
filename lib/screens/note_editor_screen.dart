@@ -5,6 +5,8 @@ import '../models/note.dart';
 import '../models/grounded_answer.dart';
 import '../services/note_source_document.dart';
 import '../widgets/note_reading_view.dart';
+import '../widgets/evidence_workspace.dart';
+import '../services/note_addition.dart';
 import 'search_screen.dart';
 import '../providers/notes_provider.dart';
 import '../services/database_service.dart';
@@ -35,6 +37,7 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   bool _showMetadata = false;
   bool _asking = false;
   int _insertOffset = -1;
+  final _evidence = EvidenceController();
   List<GroundedAnswerCitation> _sources = [];
   String get _documentContent {
     final metadata = NoteSourceDocument.encode(_sources);
@@ -70,6 +73,7 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   void didUpdateWidget(NoteEditorScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.noteId != widget.noteId) {
+      _evidence.clear();
       _originalNote = null;
       _sources = [];
       _titleController.clear();
@@ -123,9 +127,12 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     _sources = byUrl.values.toList();
     final updated = insertNoteDraft(
       _contentController.text,
-      NoteSourceDocument.withoutMetadata(markdown),
+      noteAdditionBody(markdown),
       _insertOffset,
     );
+    if (_titleController.text.trim().isEmpty) {
+      _titleController.text = noteTopicTitle('', markdown);
+    }
     _contentController.text = updated;
     setState(() => _showMetadata = false);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -137,6 +144,7 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
 
   @override
   void dispose() {
+    _evidence.dispose();
     _titleController.dispose();
     _contentController.removeListener(_contentChanged);
     _contentController.dispose();
@@ -348,6 +356,11 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                             child: NoteReadingView(
                               content: _documentContent,
                               editable: true,
+                              evidence: _evidence,
+                              onAddBelow: (offset) => setState(() {
+                                _insertOffset = offset;
+                                _asking = true;
+                              }),
                               onChanged: (value) {
                                 _contentController.text =
                                     NoteSourceDocument.withoutMetadata(
@@ -379,7 +392,9 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                         ],
                       ),
                     );
-                    if (!_asking) return note;
+                    // One shared inspector serves both note and answer, and stays
+                    // mounted while the question field receives focus.
+
                     final questions = Column(
                       children: [
                         Padding(
@@ -410,45 +425,89 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                             decoration: const InputDecoration(
                               labelText: 'Insert reviewed answer',
                             ),
-                            items: noteInsertionTargets(_contentController.text)
-                                .map(
-                                  (target) => DropdownMenuItem(
-                                    value: target.offset,
-                                    child: Text(
-                                      target.offset < 0
-                                          ? target.label
-                                          : 'After: ${target.label}',
-                                      overflow: TextOverflow.ellipsis,
+                            items: [
+                              if (_insertOffset >= 0 &&
+                                  !noteInsertionTargets(
+                                    _contentController.text,
+                                  ).any((t) => t.offset == _insertOffset))
+                                DropdownMenuItem(
+                                  value: _insertOffset,
+                                  child: const Text('After selected passage'),
+                                ),
+                              ...noteInsertionTargets(_contentController.text)
+                                  .map(
+                                    (target) => DropdownMenuItem(
+                                      value: target.offset,
+                                      child: Text(
+                                        target.offset < 0
+                                            ? target.label
+                                            : 'After: ${target.label}',
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
                                     ),
-                                  ),
-                                )
-                                .toList(),
+                                  )
+                                  .toList(),
+                            ],
                             onChanged: (value) =>
                                 setState(() => _insertOffset = value ?? -1),
                           ),
                         ),
                         Expanded(
-                          child: SearchScreen(onInsertDraft: _insertDraft),
+                          child: SearchScreen(
+                            onInsertDraft: _insertDraft,
+                            evidence: _evidence,
+                          ),
                         ),
                       ],
                     );
-                    return constraints.maxWidth >= 1050 &&
-                            MediaQuery.textScalerOf(context).scale(1) <= 1.5
-                        ? Row(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Expanded(child: note),
-                              const VerticalDivider(width: 1),
-                              SizedBox(width: 440, child: questions),
-                            ],
-                          )
-                        : Column(
-                            children: [
-                              Expanded(child: note),
-                              const Divider(height: 1),
-                              Expanded(child: questions),
-                            ],
-                          );
+                    return ValueListenableBuilder<EvidenceSelection?>(
+                      valueListenable: _evidence,
+                      builder: (context, evidence, _) {
+                        final showEvidence = _asking || evidence != null;
+                        final sideBySide =
+                            constraints.maxWidth >= 1180 &&
+                            MediaQuery.textScalerOf(context).scale(1) <= 1.5;
+                        Widget work = !_asking
+                            ? note
+                            : sideBySide
+                            ? Row(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Expanded(child: note),
+                                  const VerticalDivider(width: 1),
+                                  SizedBox(width: 360, child: questions),
+                                ],
+                              )
+                            : Column(
+                                children: [
+                                  Expanded(child: note),
+                                  const Divider(height: 1),
+                                  Expanded(child: questions),
+                                ],
+                              );
+                        if (!showEvidence) return work;
+                        final pane = EvidencePane(controller: _evidence);
+                        return constraints.maxWidth >= 860
+                            ? Row(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Expanded(child: work),
+                                  SizedBox(width: 300, child: pane),
+                                ],
+                              )
+                            : Column(
+                                children: [
+                                  Expanded(child: work),
+                                  SizedBox(
+                                    height: constraints.maxHeight < 540
+                                        ? 150
+                                        : 220,
+                                    child: pane,
+                                  ),
+                                ],
+                              );
+                      },
+                    );
                   },
                 ),
               ),

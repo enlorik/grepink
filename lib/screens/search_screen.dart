@@ -26,10 +26,13 @@ import '../widgets/note_draft_review_panel.dart';
 import '../widgets/claim_review_groups_panel.dart';
 import '../widgets/claim_draft_preview_panel.dart';
 import '../services/provider_name_formatter.dart';
+import '../widgets/evidence_workspace.dart';
+import '../widgets/note_reading_view.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
   final ValueChanged<String>? onInsertDraft;
-  const SearchScreen({super.key, this.onInsertDraft});
+  final EvidenceController? evidence;
+  const SearchScreen({super.key, this.onInsertDraft, this.evidence});
 
   @override
   ConsumerState<SearchScreen> createState() => _SearchScreenState();
@@ -41,6 +44,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   final TextEditingController _askController = TextEditingController();
   final FocusNode _askFocusNode = FocusNode();
   int _askSequence = 0;
+  final _localEvidence = EvidenceController();
+  EvidenceController get _evidence => widget.evidence ?? _localEvidence;
 
   @override
   void initState() {
@@ -52,6 +57,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   @override
   void dispose() {
+    _localEvidence.dispose();
     _searchController.dispose();
     _focusNode.dispose();
     _askController.dispose();
@@ -100,7 +106,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       await ref.read(claimReviewProvider.notifier).runReview(question);
       if (!mounted || askId != _askSequence) return;
       final claimSt = ref.read(claimReviewProvider);
-      final needsFallback = claimSt.status == ClaimReviewSessionStatus.error ||
+      final needsFallback =
+          claimSt.status == ClaimReviewSessionStatus.error ||
           claimSt.status == ClaimReviewSessionStatus.providerNotConfigured ||
           claimSt.hasNoAnswer;
       if (needsFallback && hasRealWriter) {
@@ -152,12 +159,21 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   void _generateClaimDraft() {
-    ref.read(claimReviewProvider.notifier).generateDraft();
+    final notifier = ref.read(claimReviewProvider.notifier);
+    notifier.generateDraft();
+    if (widget.onInsertDraft != null) {
+      final draft = ref.read(claimReviewProvider).draft;
+      if (draft?.shouldSave == true) {
+        widget.onInsertDraft!(draft!.markdownContent);
+        notifier.reset();
+      }
+    }
   }
 
   Future<void> _saveClaimDraftAsNewNote() async {
-    final outcome =
-        await ref.read(claimReviewProvider.notifier).saveAsNewNote();
+    final outcome = await ref
+        .read(claimReviewProvider.notifier)
+        .saveAsNewNote();
     if (outcome != ClaimDraftSaveOutcome.success) return;
 
     await ref.read(refreshNotesProvider)();
@@ -187,15 +203,16 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   Future<void> _saveAsNewNote() async {
-    final note =
-        await ref.read(noteDraftReviewProvider.notifier).saveAsNewNote();
+    final note = await ref
+        .read(noteDraftReviewProvider.notifier)
+        .saveAsNewNote();
     if (note == null) return;
 
     await ref.read(refreshNotesProvider)();
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Draft saved successfully.')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Draft saved successfully.')));
   }
 
   Future<void> _appendToExistingNote() async {
@@ -211,8 +228,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       return;
     }
 
-    final note =
-        await ref.read(noteDraftReviewProvider.notifier).appendToExistingNote();
+    final note = await ref
+        .read(noteDraftReviewProvider.notifier)
+        .appendToExistingNote();
     if (note == null) return;
 
     await ref.read(refreshNotesProvider)();
@@ -257,35 +275,37 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           ),
         ),
         child: SafeArea(
-          child: Column(
-            children: [
-              if (widget.onInsertDraft == null) _buildHeader(context),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildAskSection(
-                        knowledgeState: knowledgeState,
-                        reviewState: reviewState,
-                        availableNotes: allNotes,
-                        claimReviewState: claimReviewState,
-                      ),
-                      const SizedBox(height: 24),
-                      if (widget.onInsertDraft == null && searchState.isEmpty)
-                        _buildEmptyState(
-                          reviewState.noteDraft == null
-                              ? recentNotes
-                              : const <Note>[],
-                        )
-                      else if (widget.onInsertDraft == null)
-                        _buildResults(searchState),
-                    ],
+          child: _withEvidence(
+            Column(
+              children: [
+                if (widget.onInsertDraft == null) _buildHeader(context),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildAskSection(
+                          knowledgeState: knowledgeState,
+                          reviewState: reviewState,
+                          availableNotes: allNotes,
+                          claimReviewState: claimReviewState,
+                        ),
+                        const SizedBox(height: 24),
+                        if (widget.onInsertDraft == null && searchState.isEmpty)
+                          _buildEmptyState(
+                            reviewState.noteDraft == null
+                                ? recentNotes
+                                : const <Note>[],
+                          )
+                        else if (widget.onInsertDraft == null)
+                          _buildResults(searchState),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -301,13 +321,44 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     );
   }
 
+  Widget _withEvidence(Widget work) {
+    if (widget.evidence != null) return work;
+    return ValueListenableBuilder<EvidenceSelection?>(
+      valueListenable: _evidence,
+      builder: (context, selection, _) => selection == null
+          ? work
+          : LayoutBuilder(
+              builder: (context, box) {
+                final pane = EvidencePane(controller: _evidence);
+                return box.maxWidth >= 860
+                    ? Row(
+                        children: [
+                          Expanded(child: work),
+                          SizedBox(width: 300, child: pane),
+                        ],
+                      )
+                    : Column(
+                        children: [
+                          Expanded(child: work),
+                          SizedBox(
+                            height: box.maxHeight < 540 ? 150 : 220,
+                            child: pane,
+                          ),
+                        ],
+                      );
+              },
+            ),
+    );
+  }
+
   Widget _buildAskSection({
     required KnowledgeIngestionState knowledgeState,
     required NoteDraftReviewState reviewState,
     required List<Note> availableNotes,
     required ClaimReviewSessionState claimReviewState,
   }) {
-    final askDisabled = knowledgeState.isLoading ||
+    final askDisabled =
+        knowledgeState.isLoading ||
         claimReviewState.isLoading ||
         claimReviewState.isSaveInFlight ||
         claimReviewState.appendStatus == ClaimDraftAppendStatus.appending;
@@ -327,10 +378,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                  widget.onInsertDraft == null
-                      ? 'Grow your notes'
-                      : 'Ask about your note',
-                  style: AppTextStyles.titleLarge),
+                widget.onInsertDraft == null
+                    ? 'Grow your notes'
+                    : 'Ask about your note',
+                style: AppTextStyles.titleLarge,
+              ),
               const SizedBox(height: 8),
               Text(
                 widget.onInsertDraft == null
@@ -354,18 +406,21 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   fillColor: AppColors.aiResponseBackground,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide:
-                        const BorderSide(color: AppColors.dividerBorder),
+                    borderSide: const BorderSide(
+                      color: AppColors.dividerBorder,
+                    ),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide:
-                        const BorderSide(color: AppColors.dividerBorder),
+                    borderSide: const BorderSide(
+                      color: AppColors.dividerBorder,
+                    ),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide:
-                        const BorderSide(color: AppColors.primaryAccent),
+                    borderSide: const BorderSide(
+                      color: AppColors.primaryAccent,
+                    ),
                   ),
                 ),
               ),
@@ -430,7 +485,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         ],
         if (widget.onInsertDraft != null && reviewState.noteDraft != null) ...[
           const SizedBox(height: 12),
-          MarkdownBody(data: reviewState.noteDraft!.markdownContent),
+          SizedBox(
+            height: 260,
+            child: NoteReadingView(
+              content: reviewState.noteDraft!.markdownContent,
+              evidence: _evidence,
+            ),
+          ),
           FilledButton.icon(
             onPressed: () {
               widget.onInsertDraft!(reviewState.noteDraft!.markdownContent);
@@ -455,11 +516,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           NoteDraftReviewPanel(
             noteDraft: reviewState.noteDraft!,
             onSaveAsNewNote: _saveAsNewNote,
-            onAppendToExistingNote: claimReviewState.appendStatus !=
+            onAppendToExistingNote:
+                claimReviewState.appendStatus !=
                     ClaimDraftAppendStatus.appending
                 ? _appendToExistingNote
                 : null,
-            onDiscard: claimReviewState.appendStatus !=
+            onDiscard:
+                claimReviewState.appendStatus !=
                     ClaimDraftAppendStatus.appending
                 ? _discardDraft
                 : null,
@@ -541,44 +604,54 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             claimReviewState.selection != null) ...[
           const SizedBox(height: 16),
           ClaimReviewGroupsPanel(
+            evidence: _evidence,
             inlineSources: widget.onInsertDraft != null,
             groups: claimReviewState.groups,
             citations: claimReviewState.citations,
             selectedIds: claimReviewState.selection!.selectedIds,
             onToggle: _toggleClaim,
-            providerLabel:
-                safeProviderDisplayName(claimReviewState.providerName),
+            providerLabel: safeProviderDisplayName(
+              claimReviewState.providerName,
+            ),
           ),
           const SizedBox(height: 12),
-          Builder(builder: (context) {
-            final selection = claimReviewState.selection!;
-            final hasSaveableClaims =
-                selection.allItems.any((i) => i.canBeSaved);
-            final hasSelectedSaveableClaims =
-                selection.selectedSaveableItems.isNotEmpty;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                FilledButton.icon(
-                  key: const Key('generate-claim-draft-button'),
-                  onPressed:
-                      hasSelectedSaveableClaims ? _generateClaimDraft : null,
-                  icon: const Icon(Icons.description_outlined),
-                  label: const Text('Generate draft'),
-                ),
-                if (!hasSelectedSaveableClaims) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    key: const Key('generate-draft-disabled-helper'),
-                    hasSaveableClaims
-                        ? 'Select at least one claim to generate a draft. Contradictions are not selected by default.'
-                        : 'No claims in this review can be added to a draft.',
-                    style: AppTextStyles.bodySmall,
+          Builder(
+            builder: (context) {
+              final selection = claimReviewState.selection!;
+              final hasSaveableClaims = selection.allItems.any(
+                (i) => i.canBeSaved,
+              );
+              final hasSelectedSaveableClaims =
+                  selection.selectedSaveableItems.isNotEmpty;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  FilledButton.icon(
+                    key: const Key('generate-claim-draft-button'),
+                    onPressed: hasSelectedSaveableClaims
+                        ? _generateClaimDraft
+                        : null,
+                    icon: const Icon(Icons.description_outlined),
+                    label: Text(
+                      widget.onInsertDraft == null
+                          ? 'Generate draft'
+                          : 'Add selected passages',
+                    ),
                   ),
+                  if (!hasSelectedSaveableClaims) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      key: const Key('generate-draft-disabled-helper'),
+                      hasSaveableClaims
+                          ? 'Select at least one claim to generate a draft. Contradictions are not selected by default.'
+                          : 'No claims in this review can be added to a draft.',
+                      style: AppTextStyles.bodySmall,
+                    ),
+                  ],
                 ],
-              ],
-            );
-          }),
+              );
+            },
+          ),
         ],
         if (claimReviewState.draftGenerationErrorMessage != null) ...[
           const SizedBox(height: 12),
@@ -592,7 +665,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             claimReviewState.draft != null &&
             claimReviewState.draft!.shouldSave) ...[
           const SizedBox(height: 16),
-          MarkdownBody(data: claimReviewState.draft!.markdownContent),
+          SizedBox(
+            height: 260,
+            child: NoteReadingView(
+              content: claimReviewState.draft!.markdownContent,
+              evidence: _evidence,
+            ),
+          ),
           FilledButton.icon(
             key: const Key('insert-reviewed-draft'),
             onPressed: () {
@@ -609,7 +688,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             draft: claimReviewState.draft!,
             saveStatus: claimReviewState.saveStatus,
             saveErrorMessage: claimReviewState.saveErrorMessage,
-            onSaveAsNewNote: claimReviewState.draft!.shouldSave &&
+            onSaveAsNewNote:
+                claimReviewState.draft!.shouldSave &&
                     claimReviewState.saveStatus !=
                         ClaimDraftSaveStatus.saving &&
                     !claimReviewState.isDraftAlreadySaved &&
@@ -623,7 +703,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             onTargetNoteSelected: _selectClaimDraftTargetNote,
             appendStatus: claimReviewState.appendStatus,
             appendErrorMessage: claimReviewState.appendErrorMessage,
-            onAppendToExistingNote: claimReviewState.draft!.shouldSave &&
+            onAppendToExistingNote:
+                claimReviewState.draft!.shouldSave &&
                     !claimReviewState.isDraftAlreadySaved &&
                     claimReviewState.saveStatus !=
                         ClaimDraftSaveStatus.saving &&
@@ -656,7 +737,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           const SizedBox(height: 12),
           TextButton(
             key: const Key('discard-claim-review-button'),
-            onPressed: claimReviewState.isSaveInFlight ||
+            onPressed:
+                claimReviewState.isSaveInFlight ||
                     claimReviewState.appendStatus ==
                         ClaimDraftAppendStatus.appending
                 ? null
@@ -717,10 +799,17 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           const SizedBox(height: 32),
           Text('RECENT NOTES', style: AppTextStyles.excerptSource),
           const SizedBox(height: 12),
-          ...recentNotes.take(5).toList().asMap().entries.map((e) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: NoteCard(note: e.value, index: e.key),
-              )),
+          ...recentNotes
+              .take(5)
+              .toList()
+              .asMap()
+              .entries
+              .map(
+                (e) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: NoteCard(note: e.value, index: e.key),
+                ),
+              ),
         ],
       ],
     );
@@ -805,17 +894,17 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     ],
                   )
                 : aiResponse != null
-                    ? MarkdownBody(
-                        data: aiResponse,
-                        styleSheet: MarkdownStyleSheet(
-                          p: AppTextStyles.aiResponse,
-                          code: AppTextStyles.codeBlock,
-                        ),
-                      )
-                    : Text(
-                        'Set your API key in Settings to enable AI responses.',
-                        style: AppTextStyles.bodyMedium,
-                      ),
+                ? MarkdownBody(
+                    data: aiResponse,
+                    styleSheet: MarkdownStyleSheet(
+                      p: AppTextStyles.aiResponse,
+                      code: AppTextStyles.codeBlock,
+                    ),
+                  )
+                : Text(
+                    'Set your API key in Settings to enable AI responses.',
+                    style: AppTextStyles.bodyMedium,
+                  ),
           ),
         ],
         if (memoryResults.isEmpty && noteResults.isEmpty && !isSearching) ...[
@@ -823,8 +912,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           Center(
             child: Column(
               children: [
-                const Icon(Icons.search_off,
-                    size: 48, color: AppColors.placeholderText),
+                const Icon(
+                  Icons.search_off,
+                  size: 48,
+                  color: AppColors.placeholderText,
+                ),
                 const SizedBox(height: 12),
                 Text('No results found', style: AppTextStyles.titleMedium),
                 const SizedBox(height: 4),
@@ -865,8 +957,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             isExpanded: true,
             decoration: const InputDecoration(
               border: OutlineInputBorder(),
-              contentPadding:
-                  EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 10,
+              ),
             ),
             hint: const Text('Select a target note'),
             items: availableNotes
@@ -915,10 +1009,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         Container(
           width: 8,
           height: 8,
-          decoration: BoxDecoration(
-            color: dotColor,
-            shape: BoxShape.circle,
-          ),
+          decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
         ),
         const SizedBox(width: 8),
         Text(title, style: AppTextStyles.excerptSource),

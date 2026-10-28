@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../models/note.dart';
-import '../services/note_source_document.dart';
-import '../widgets/claim_source_preview.dart';
 import 'note_editor_screen.dart';
 import '../providers/notes_provider.dart';
 import '../theme/app_colors.dart';
@@ -77,8 +75,10 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
                 child: Row(
                   children: [
                     Expanded(
-                      child:
-                          Text('Grepink', style: AppTextStyles.displayMedium),
+                      child: Text(
+                        'Grepink',
+                        style: AppTextStyles.displayMedium,
+                      ),
                     ),
                     IconButton(
                       tooltip: 'New note',
@@ -86,8 +86,10 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
                       icon: const Icon(Icons.add, color: AppColors.deepAction),
                     ),
                     IconButton(
-                      icon:
-                          const Icon(Icons.search, color: AppColors.deepAction),
+                      icon: const Icon(
+                        Icons.search,
+                        color: AppColors.deepAction,
+                      ),
                       onPressed: () => context.push('/search'),
                     ),
                   ],
@@ -99,18 +101,23 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
                     : notesAsync.when(
                         loading: () => const Center(
                           child: CircularProgressIndicator(
-                              color: AppColors.primaryAction),
+                            color: AppColors.primaryAction,
+                          ),
                         ),
                         error: (e, _) => Center(
-                          child: Text('Error loading notes',
-                              style: AppTextStyles.bodyMedium),
+                          child: Text(
+                            'Error loading notes',
+                            style: AppTextStyles.bodyMedium,
+                          ),
                         ),
                         data: (_) {
                           if (pinnedNotes.isEmpty && unpinnedNotes.isEmpty) {
                             return _buildEmptyState();
                           }
-                          return _buildNotebook(
-                              [...pinnedNotes, ...unpinnedNotes]);
+                          return _buildNotebook([
+                            ...pinnedNotes,
+                            ...unpinnedNotes,
+                          ]);
                         },
                       ),
               ),
@@ -120,9 +127,7 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
       ),
       floatingActionButton: _visibleNotes.isNotEmpty
           ? null
-          : GrepinkFab(
-              onPressed: () => context.push('/note/new'),
-            ),
+          : GrepinkFab(onPressed: () => context.push('/note/new')),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       bottomNavigationBar: GrepinkBottomNav(
         currentIndex: _navIndex,
@@ -132,104 +137,83 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
   }
 
   Widget _buildNotebook(List<Note> notes) {
-    return LayoutBuilder(builder: (context, constraints) {
-      final wide = constraints.maxWidth >= 900;
-      if (wide) _selectedId ??= notes.first.id;
-      final active = notes.where((n) => n.id == _selectedId);
-      final selected = active.isEmpty ? notes.first : active.first;
-      final editor = NoteEditorScreen(
-          key: _editorKey, noteId: selected.id, embedded: true);
-      final list = ListView(
-        padding: const EdgeInsets.all(12),
-        children: [
-          for (final note in notes)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                selected:
-                    (wide || _selectedId != null) && note.id == selected.id,
-                selectedTileColor: AppColors.surface,
-                selectedColor: AppColors.deepAction,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-                title: Text(note.isPinned ? '• ${note.title}' : note.title,
-                    style: AppTextStyles.titleMedium,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis),
-                subtitle: Text(
-                    sourcePlainText(
-                            NoteSourceDocument.withoutMetadata(note.content))
-                        .split('\n')
-                        .where((l) => l.trim().isNotEmpty)
-                        .take(2)
-                        .join(' '),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis),
-                onTap: () => _selectNote(note.id),
-                trailing: PopupMenuButton<String>(
-                  tooltip: 'Note actions',
-                  onSelected: (action) async {
-                    if (action == 'pin') {
-                      await ref.read(notesProvider.notifier).togglePin(note.id);
-                    }
-                    if (action == 'delete' &&
-                        context.mounted &&
-                        await _showDeleteConfirm(context)) {
-                      if (note.id == selected.id &&
-                          _editorKey.currentState != null &&
-                          !await _editorKey.currentState!.confirmLeave()) {
-                        return;
-                      }
-                      await _deleteNote(note.id);
-                    }
-                  },
-                  itemBuilder: (_) => [
-                    PopupMenuItem(
-                        value: 'pin',
-                        child: Text(note.isPinned ? 'Unpin' : 'Pin')),
-                    const PopupMenuItem(value: 'delete', child: Text('Delete')),
-                  ],
+    _selectedId ??= notes.first.id;
+    final active = notes.where((n) => n.id == _selectedId);
+    final selected = active.isEmpty ? notes.first : active.first;
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 12, 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 480),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        key: const Key('notebook-switcher'),
+                        value: selected.id,
+                        isExpanded: true,
+                        menuMaxHeight: 420,
+                        borderRadius: BorderRadius.circular(16),
+                        items: notes
+                            .map(
+                              (note) => DropdownMenuItem(
+                                value: note.id,
+                                child: Text(
+                                  note.isPinned
+                                      ? '• ${note.title}'
+                                      : note.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (id) {
+                          if (id != null) _selectNote(id);
+                        },
+                      ),
+                    ),
+                  ),
                 ),
               ),
-            ),
-        ],
-      );
-      if (wide) {
-        return Row(children: [
-          SizedBox(
-              width: 260,
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                        padding: const EdgeInsets.fromLTRB(24, 20, 12, 4),
-                        child: Text('YOUR NOTES · ${notes.length}',
-                            style: AppTextStyles.excerptSource)),
-                    Expanded(child: list)
-                  ])),
-          const VerticalDivider(width: 1),
-          Expanded(child: editor)
-        ]);
-      }
-      if (_selectedId == null) return list;
-      return Column(children: [
-        Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-                onPressed: () async {
-                  if (_editorKey.currentState != null &&
-                      !await _editorKey.currentState!.confirmLeave()) {
-                    return;
+              PopupMenuButton<String>(
+                tooltip: 'Note actions',
+                onSelected: (action) async {
+                  if (action == 'pin')
+                    await ref
+                        .read(notesProvider.notifier)
+                        .togglePin(selected.id);
+                  if (action == 'delete' && await _showDeleteConfirm(context)) {
+                    if (_editorKey.currentState != null &&
+                        !await _editorKey.currentState!.confirmLeave())
+                      return;
+                    await _deleteNote(selected.id);
                   }
-                  if (mounted) setState(() => _selectedId = null);
                 },
-                icon: const Icon(Icons.arrow_back),
-                label: const Text('All notes'))),
-        Expanded(child: editor),
-      ]);
-    });
+                itemBuilder: (_) => [
+                  PopupMenuItem(
+                    value: 'pin',
+                    child: Text(selected.isPinned ? 'Unpin' : 'Pin'),
+                  ),
+                  const PopupMenuItem(value: 'delete', child: Text('Delete')),
+                ],
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: NoteEditorScreen(
+            key: _editorKey,
+            noteId: selected.id,
+            embedded: true,
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildEmptyState() {
@@ -240,16 +224,16 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
           const SizedBox(
             width: 80,
             height: 80,
-            child: Icon(Icons.lightbulb_outline,
-                size: 80, color: AppColors.primaryAccent),
+            child: Icon(
+              Icons.lightbulb_outline,
+              size: 80,
+              color: AppColors.primaryAccent,
+            ),
           ),
           const SizedBox(height: 24),
           Text('Your mind is blank...', style: AppTextStyles.titleLarge),
           const SizedBox(height: 8),
-          Text(
-            'Tap + to add your first note',
-            style: AppTextStyles.bodyMedium,
-          ),
+          Text('Tap + to add your first note', style: AppTextStyles.bodyMedium),
         ],
       ),
     );
@@ -260,8 +244,10 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('Delete note?', style: AppTextStyles.titleMedium),
-        content:
-            Text('This cannot be undone.', style: AppTextStyles.bodyMedium),
+        content: Text(
+          'This cannot be undone.',
+          style: AppTextStyles.bodyMedium,
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -269,8 +255,10 @@ class _NotesListScreenState extends ConsumerState<NotesListScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child:
-                const Text('Delete', style: TextStyle(color: AppColors.error)),
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: AppColors.error),
+            ),
           ),
         ],
       ),
