@@ -25,6 +25,10 @@ String noteTopicTitle(String question, String markdown) {
     ),
     '',
   );
+  topic = topic.replaceFirst(
+    RegExp(r'^(?:what|who|why)\s+', caseSensitive: false),
+    '',
+  );
   topic = topic.replaceFirst(RegExp(r'\s+work\??$', caseSensitive: false), '');
   topic = topic
       .replaceAll(RegExp(r'[?*_`#]'), '')
