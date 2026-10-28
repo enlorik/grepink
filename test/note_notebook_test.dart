@@ -106,6 +106,8 @@ void main() {
     testWidgets(
       'research and evidence stay usable at width $width with the keyboard open',
       (tester) async {
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetDevicePixelRatio);
         await tester.binding.setSurfaceSize(Size(width, 780));
         addTearDown(() => tester.binding.setSurfaceSize(null));
         addTearDown(tester.view.resetViewInsets);
@@ -132,6 +134,7 @@ void main() {
         await tester.enterText(field, 'Keep this question while resizing');
         tester.view.viewInsets = const FakeViewPadding(bottom: 260);
         await tester.pumpAndSettle();
+        expect(find.byType(NoteReadingView), findsNothing);
         expect(
           tester.widget<TextField>(field).controller!.text,
           'Keep this question while resizing',
@@ -148,6 +151,14 @@ void main() {
               ),
           isFalse,
         );
+        final quote = tester.getRect(
+          find.textContaining('explanation.', findRichText: true).first,
+        );
+        final pane = tester.getRect(
+          find.byKey(const Key('workspace-evidence')),
+        );
+        expect(quote.bottom, lessThanOrEqualTo(pane.bottom));
+        expect(quote.top, greaterThanOrEqualTo(pane.top));
         expect(tester.takeException(), isNull);
       },
     );
