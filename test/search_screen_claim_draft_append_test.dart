@@ -1,3 +1,4 @@
+import 'package:grepink/services/note_source_document.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -1878,7 +1879,8 @@ void main() {
       await _tapAppend(tester);
 
       expect(repo.updatedNotes, hasLength(1));
-      expect(repo.updatedNotes.first.content, contains('$claimTitle — $url'));
+      expect(repo.updatedNotes.first.content, contains(url));
+      expect(NoteSourceDocument.sources(repo.updatedNotes.first.content).single.title, claimTitle);
     });
   });
 }
