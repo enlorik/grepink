@@ -42,6 +42,8 @@ class _NoteReadingViewState extends State<NoteReadingView> {
   final _editorFocus = FocusNode();
   String _editPrefix = '', _editLinks = '', _passageText = '';
   int _editGeneration = 0;
+  int? _hotBlock;
+  bool _hasMouse = false;
 
   @override
   void initState() {
@@ -365,17 +367,37 @@ class _NoteReadingViewState extends State<NoteReadingView> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(child: content),
-          IconButton(
-            tooltip: 'Add information below this passage',
-            visualDensity: VisualDensity.compact,
-            onPressed: () => widget.onAddBelow!(block.end),
-            icon: const Icon(Icons.add, size: 16),
+          Focus(
+            onFocusChange: (focused) {
+              if (mounted && focused) setState(() => _hotBlock = block.start);
+            },
+            child: Opacity(
+              opacity: !_hasMouse || _hotBlock == block.start ? 1 : 0,
+              child: IconButton(
+                tooltip: 'Add information below this passage',
+                visualDensity: VisualDensity.compact,
+                onPressed: () => widget.onAddBelow!(block.end),
+                icon: const Icon(Icons.add, size: 16),
+              ),
+            ),
           ),
         ],
       );
     }
     return MouseRegion(
-      onEnter: (_) => _inspect(urls, passage: sourcePlainText(body)),
+      onEnter: (event) {
+        if (event.kind == PointerDeviceKind.mouse && mounted) {
+          setState(() {
+            _hasMouse = true;
+            _hotBlock = block.start;
+          });
+        }
+        _inspect(urls, passage: sourcePlainText(body));
+      },
+      onExit: (_) {
+        if (mounted && _hotBlock == block.start)
+          setState(() => _hotBlock = null);
+      },
       onHover: (_) => _inspect(urls, passage: sourcePlainText(body)),
       cursor: canEdit ? SystemMouseCursors.text : MouseCursor.defer,
       child: Listener(
