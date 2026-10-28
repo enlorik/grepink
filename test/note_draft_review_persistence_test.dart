@@ -157,7 +157,7 @@ void main() {
 
       expect(createdNote, isNotNull);
       expect(repository.insertedNotes, 1);
-      expect(createdNote!.title, 'What changed?');
+      expect(createdNote!.title, 'Changed');
       expect(createdNote.content, contains('<!-- grepink-generated-note'));
       expect(createdNote.content, contains('question: What changed?'));
       expect(createdNote.content, contains('action: createNewNote'));

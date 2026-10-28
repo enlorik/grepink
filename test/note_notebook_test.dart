@@ -4,7 +4,6 @@ import 'package:grepink/models/claim_review_item.dart';
 import 'package:grepink/models/claim_deduplication_result.dart';
 import 'dart:io';
 import 'package:flutter/gestures.dart';
-import 'package:grepink/widgets/evidence_workspace.dart';
 import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -63,7 +62,7 @@ class _MemoryNotes extends NotesNotifier {
 }
 
 class _ReadyReview extends ClaimReviewNotifier {
-  _ReadyReview(Ref ref) : super(ref) {
+  _ReadyReview(super.ref) {
     const item = ClaimReviewItem(
       id: 'new',
       text: 'A tuple keeps the order of its fields.',
