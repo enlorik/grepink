@@ -329,8 +329,9 @@ class _ClaimReviewGroupsPanelState extends State<ClaimReviewGroupsPanel> {
                   final readingWidth = docked
                       ? constraints.maxWidth - sourceWidth - gutter
                       : math.min(740.0, constraints.maxWidth);
-                  if (widget.evidence != null)
+                  if (widget.evidence != null) {
                     return _readingView(items, active);
+                  }
                   if (widget.inlineSources) {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
