@@ -3,6 +3,7 @@ import '../models/claim_review_item.dart';
 import '../models/grounded_answer.dart';
 import 'note_source_document.dart';
 import 'markdown_list_lines.dart';
+import 'note_addition.dart';
 
 class ClaimDraftResult {
   final String markdownContent;
@@ -89,7 +90,10 @@ class SelectedClaimsDraftBuilder {
     final buf = StringBuffer();
 
     // Title
-    final title = question.trim().isEmpty ? 'Research notes' : question;
+    final title = noteTopicTitle(
+      question,
+      saveable.map((item) => item.text).join('\n'),
+    );
     buf.writeln('# $title');
     buf.writeln();
 
