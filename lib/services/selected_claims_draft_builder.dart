@@ -162,7 +162,15 @@ class SelectedClaimsDraftBuilder {
     }
 
     final sourceMetadata = NoteSourceDocument.encode(
-      citations.where((c) => usedUrls.contains(c.url)),
+      usedUrls.map(
+        (url) =>
+            citations.where((c) => c.url == url).firstOrNull ??
+            GroundedAnswerCitation(
+              id: url,
+              title: titleByUrl[url] ?? url,
+              url: url,
+            ),
+      ),
     );
     if (sourceMetadata.isNotEmpty) {
       buf.writeln();
