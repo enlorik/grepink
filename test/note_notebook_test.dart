@@ -102,6 +102,57 @@ class _ReadyReview extends ClaimReviewNotifier {
 }
 
 void main() {
+  for (final width in [430.0, 900.0]) {
+    testWidgets(
+      'research and evidence stay usable at width $width with the keyboard open',
+      (tester) async {
+        await tester.binding.setSurfaceSize(Size(width, 780));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        addTearDown(tester.view.resetViewInsets);
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [notesProvider.overrideWith((ref) => _MemoryNotes(ref))],
+            child: const MaterialApp(
+              home: NoteEditorScreen(noteId: 'one', embedded: true),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+        await mouse.addPointer(location: Offset.zero);
+        addTearDown(mouse.removePointer);
+        await mouse.moveTo(
+          tester.getCenter(find.byKey(const ValueKey('note-passage-1'))),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Ask'));
+        await tester.pumpAndSettle();
+        final field = find.byKey(const Key('ask-question-field'));
+        await tester.ensureVisible(field);
+        await tester.enterText(field, 'Keep this question while resizing');
+        tester.view.viewInsets = const FakeViewPadding(bottom: 260);
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<TextField>(field).controller!.text,
+          'Keep this question while resizing',
+        );
+        expect(
+          find.textContaining('explanation.', findRichText: true),
+          findsWidgets,
+        );
+        expect(
+          tester
+              .getRect(field)
+              .overlaps(
+                tester.getRect(find.byKey(const Key('workspace-evidence'))),
+              ),
+          isFalse,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets(
     'Add below inserts reviewed prose at the chosen passage without a question heading and waits for Save',
     (tester) async {
