@@ -193,7 +193,7 @@ void main() {
             body: NoteReadingView(
               sourceLoader: loader,
               content:
-                  '- One [Source](https://example.com/a)\n- Two [Source](https://example.com/b)',
+                  '- First supporting sentence [Source](https://example.com/a)\n- Second supporting sentence [Source](https://example.com/b)',
             ),
           ),
         ),
@@ -211,13 +211,19 @@ void main() {
       await tester.pump();
       b.complete(
         const SourcePage('Second page', [
-          SourcePageSection('Second evidence', 'Second evidence'),
+          SourcePageSection(
+            'Second supporting sentence',
+            'Second supporting sentence',
+          ),
         ]),
       );
       await tester.pumpAndSettle();
       a.complete(
         const SourcePage('Old page', [
-          SourcePageSection('Old evidence', 'Old evidence'),
+          SourcePageSection(
+            'First supporting sentence',
+            'First supporting sentence',
+          ),
         ]),
       );
       await tester.pumpAndSettle();
