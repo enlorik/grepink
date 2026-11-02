@@ -6,6 +6,8 @@ import '../models/grounded_answer.dart';
 import '../services/note_source_document.dart';
 import '../widgets/note_reading_view.dart';
 import '../widgets/evidence_workspace.dart';
+import '../services/source_page_loader.dart';
+import '../services/source_image_loader.dart';
 import '../services/note_addition.dart';
 import 'search_screen.dart';
 import '../providers/notes_provider.dart';
@@ -17,8 +19,16 @@ import '../widgets/tag_chip.dart';
 class NoteEditorScreen extends ConsumerStatefulWidget {
   final String? noteId;
   final bool embedded;
+  final SourcePageLoader? sourceLoader;
+  final SourceImageLoader? imageLoader;
 
-  const NoteEditorScreen({super.key, this.noteId, this.embedded = false});
+  const NoteEditorScreen({
+    super.key,
+    this.noteId,
+    this.embedded = false,
+    this.sourceLoader,
+    this.imageLoader,
+  });
 
   @override
   ConsumerState<NoteEditorScreen> createState() => NoteEditorScreenState();
@@ -121,9 +131,12 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   }
 
   void _insertDraft(String markdown) {
-    final byUrl = {for (final source in _sources) source.url: source};
+    final byUrl = {
+      for (final source in _sources)
+        NoteSourceDocument.identity(source): source,
+    };
     for (final source in NoteSourceDocument.sources(markdown)) {
-      byUrl[source.url] = source;
+      byUrl[NoteSourceDocument.identity(source)] = source;
     }
     _sources = byUrl.values.toList();
     final updated = insertNoteDraft(
@@ -135,7 +148,10 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       _titleController.text = noteTopicTitle('', markdown);
     }
     _contentController.text = updated;
-    setState(() => _showMetadata = false);
+    setState(() {
+      _showMetadata = false;
+      _asking = false;
+    });
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Inserted into your draft; Save to keep it.'),
@@ -342,6 +358,7 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                   builder: (context, constraints) {
                     final compactResearch = constraints.maxHeight < 600;
                     final note = ColoredBox(
+                      key: const Key('original-note-document'),
                       color: AppColors.surface,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -398,12 +415,13 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                     // mounted while the question field receives focus.
 
                     final questions = Column(
+                      key: const Key('research-workspace'),
                       children: [
                         Padding(
                           padding: const EdgeInsets.all(12),
                           child: Row(
                             children: [
-                              const Expanded(child: Text('Research')),
+                              const Expanded(child: Text('Research workspace')),
                               IconButton(
                                 tooltip: 'Close questions',
                                 onPressed: () =>
@@ -468,37 +486,21 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                       valueListenable: _evidence,
                       builder: (context, evidence, _) {
                         final showEvidence = _asking || evidence != null;
-                        final sideBySide =
-                            constraints.maxWidth >= 1180 &&
-                            MediaQuery.textScalerOf(context).scale(1) <= 1.5;
-                        Widget work = !_asking
-                            ? note
-                            : compactResearch
-                            ? questions
-                            : sideBySide
-                            ? Row(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  Expanded(child: note),
-                                  const VerticalDivider(width: 1),
-                                  SizedBox(width: 360, child: questions),
-                                ],
-                              )
-                            : Column(
-                                children: [
-                                  Expanded(child: note),
-                                  const Divider(height: 1),
-                                  Expanded(child: questions),
-                                ],
-                              );
+                        // Research owns the document area; there is never a
+                        // competing third column. Its draft target remains selected.
+                        final work = _asking ? questions : note;
                         if (!showEvidence) return work;
-                        final pane = EvidencePane(controller: _evidence);
+                        final pane = EvidencePane(
+                          controller: _evidence,
+                          loader: widget.sourceLoader,
+                          imageLoader: widget.imageLoader,
+                        );
                         return constraints.maxWidth >= 860
                             ? Row(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
                                   Expanded(child: work),
-                                  SizedBox(width: 300, child: pane),
+                                  SizedBox(width: 420, child: pane),
                                 ],
                               )
                             : Column(
@@ -549,7 +551,9 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
             child: Text(
               widget.noteId == null
                   ? 'New Note'
-                  : (_hasChanges ? 'Unsaved changes' : 'Saved locally'),
+                  : (_asking
+                        ? 'Research · additions go into this note'
+                        : (_hasChanges ? 'Unsaved changes' : 'Saved locally')),
               style: AppTextStyles.bodySmall,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -563,7 +567,7 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           TextButton.icon(
             onPressed: () => setState(() => _asking = !_asking),
             icon: const Icon(Icons.add_comment_outlined),
-            label: const Text('Ask'),
+            label: Text(_asking ? 'Back to note' : 'Ask'),
           ),
           TextButton(
             onPressed: _isSaving ? null : _save,
