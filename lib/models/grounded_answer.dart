@@ -50,12 +50,13 @@ class GroundedAnswerCitation {
           url == other.url &&
           startIndex == other.startIndex &&
           endIndex == other.endIndex &&
+          position == other.position &&
           snippet == other.snippet &&
           passage == other.passage;
 
   @override
   int get hashCode =>
-      Object.hash(id, url, startIndex, endIndex, snippet, passage);
+      Object.hash(id, url, startIndex, endIndex, position, snippet, passage);
 }
 
 class GroundedAnswer {
