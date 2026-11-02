@@ -173,7 +173,7 @@ void main() {
       final claims = const RuleBasedClaimExtractionService().extract(answer);
       final results =
           await TextSimilarityClaimDeduplicationService(
-            FakeTextSimilarityProvider(0.95),
+            const FakeTextSimilarityProvider(0.95),
           ).classify(claims, [
             const EvidenceItem(
               id: 'local',
