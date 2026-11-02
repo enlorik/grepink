@@ -145,7 +145,7 @@ class _SourcePageReaderState extends State<SourcePageReader> {
               onPressed: () => Clipboard.setData(
                 ClipboardData(
                   text:
-                      '${Uri.parse(widget.url).removeFragment()}#:~:text=${Uri.encodeComponent(sourceTextKey(excerpt!))}',
+                      '${Uri.parse(widget.url).removeFragment()}#:~:text=${Uri.encodeComponent(sourceTextKey(excerpt))}',
                 ),
               ),
               icon: const Icon(Icons.link, size: 16),

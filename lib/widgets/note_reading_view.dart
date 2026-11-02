@@ -12,7 +12,6 @@ import 'source_page_reader.dart';
 import 'evidence_workspace.dart';
 import '../services/note_source_document.dart';
 import '../theme/app_colors.dart';
-import 'claim_source_preview.dart';
 
 /// A document and its evidence occupy their own layout bounds, never an overlay.
 /// Passage edits are drafts; the notebook's explicit Save remains authoritative.
