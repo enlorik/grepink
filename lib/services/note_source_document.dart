@@ -12,15 +12,77 @@ class NoteSourceDocument {
     r'<!-- grepink-sources:([A-Za-z0-9+/=]+) -->',
   );
 
+  static String identity(GroundedAnswerCitation c) =>
+      jsonEncode([c.url, c.passage, c.snippet]);
+
+  static String passageKey(String text) => text
+      .replaceAll(RegExp(r'\[Source(?: \d+)?\]\((?:<[^>]+>|[^)]+)\)'), '')
+      .replaceAllMapped(RegExp(r'\[([^\]]+)\]\([^)]*\)'), (m) => m[1]!)
+      .replaceFirst(RegExp(r'^\s*(?:[-+*•]|\d+[.)])\s+'), '')
+      .replaceAllMapped(
+        RegExp(r'\*\*(.*?)\*\*|__(.*?)__|`([^`]+)`'),
+        (m) => m[1] ?? m[2] ?? m[3]!,
+      )
+      .replaceFirst(RegExp(r'^\s*#{1,6}\s+'), '')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim()
+      .toLowerCase();
+
+  static List<GroundedAnswerCitation> forPassage(
+    String content,
+    String passage,
+    List<String> urls,
+  ) {
+    final all = sources(content);
+    return [
+      for (final url in urls)
+        ...(() {
+          final matching = all
+              .where(
+                (c) =>
+                    c.url == url &&
+                    c.passage != null &&
+                    passageKey(c.passage!) == passageKey(passage),
+              )
+              .toList();
+          if (matching.isNotEmpty) return matching;
+          // Old notes have no per-claim association. Preserve their source link but
+          // let the reader locate text instead of recycling another claim's quote.
+          final legacy = all
+              .where((c) => c.url == url && c.passage == null)
+              .toList();
+          if (legacy.isNotEmpty) {
+            return legacy
+                .map(
+                  (c) => GroundedAnswerCitation(
+                    id: c.id,
+                    title: c.title,
+                    url: c.url,
+                  ),
+                )
+                .toList();
+          }
+          return [
+            GroundedAnswerCitation(
+              id: url,
+              title: Uri.tryParse(url)?.host ?? 'Source',
+              url: url,
+            ),
+          ];
+        })(),
+    ];
+  }
+
   static String encode(Iterable<GroundedAnswerCitation> citations) {
     final rows = citations
         .map(
           (c) => {
             'url': c.url,
             'title': c.title,
+            if (c.passage != null) 'passage': c.passage,
             if (c.snippet != null)
-              'snippet': c.snippet!.length > 1600
-                  ? c.snippet!.substring(0, 1600)
+              'snippet': c.snippet!.length > 4000
+                  ? c.snippet!.substring(0, 4000)
                   : c.snippet,
           },
         )
@@ -40,12 +102,14 @@ class NoteSourceDocument {
           final url = row['url'] as String;
           final uri = Uri.tryParse(url);
           if (uri == null || !['http', 'https'].contains(uri.scheme)) continue;
-          result[url] = GroundedAnswerCitation(
+          final citation = GroundedAnswerCitation(
             id: url,
             title: row['title'] is String ? row['title'] as String : uri.host,
             url: url,
             snippet: row['snippet'] is String ? row['snippet'] as String : null,
+            passage: row['passage'] is String ? row['passage'] as String : null,
           );
+          result[identity(citation)] = citation;
         }
       } catch (_) {
         // A manually edited or old metadata block must never prevent reading.

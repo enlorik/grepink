@@ -16,10 +16,69 @@ class SourcePageSection {
   const SourcePageSection(this.text, this.markdown, [this.anchor]);
 }
 
+class SourcePageImage {
+  final String url;
+  final String caption;
+  final int section;
+  const SourcePageImage(this.url, this.caption, this.section);
+}
+
+String sourceTextKey(String text) => text
+    .replaceAllMapped(RegExp(r'\[([^\]]+)\]\([^)]*\)'), (m) => m[1]!)
+    .replaceAllMapped(
+      RegExp(r'\*\*(.*?)\*\*|__(.*?)__|`([^`]+)`'),
+      (m) => m[1] ?? m[2] ?? m[3]!,
+    )
+    .replaceAll(RegExp(r'\s+'), ' ')
+    .trim()
+    .toLowerCase();
+
 class SourcePage {
   final String title;
   final List<SourcePageSection> sections;
-  const SourcePage(this.title, this.sections);
+  final List<SourcePageImage> images;
+  const SourcePage(this.title, this.sections, [this.images = const []]);
+
+  int? excerptIndex(String excerpt) {
+    final quote = sourceTextKey(excerpt);
+    if (quote.length < 12) return null;
+    for (var i = 0; i < sections.length; i++) {
+      if (sourceTextKey(sections[i].text).contains(quote)) return i;
+    }
+    final parts = sections.map((s) => sourceTextKey(s.text)).toList();
+    final at = parts.join(' ').indexOf(quote);
+    if (at >= 0) {
+      var cursor = 0;
+      for (var i = 0; i < parts.length; i++) {
+        if (cursor + parts[i].length >= at) return i;
+        cursor += parts[i].length + 1;
+      }
+    }
+    return null;
+  }
+
+  int? candidateIndex(String passage) {
+    final words = RegExp(
+      r'[a-zA-Z]{4,}',
+    ).allMatches(passage.toLowerCase()).map((m) => m[0]!).toSet();
+    final index = relevantIndex(passage);
+    final found = words
+        .where(
+          (w) => RegExp(
+            '\\b${RegExp.escape(w)}\\b',
+          ).hasMatch(sections[index].text.toLowerCase()),
+        )
+        .length;
+    return found >= 2 ? index : null;
+  }
+
+  List<SourcePageImage> imagesNear(int index) =>
+      (images.toList()..sort(
+            (a, b) =>
+                (a.section - index).abs().compareTo((b.section - index).abs()),
+          ))
+          .take(2)
+          .toList();
 
   /// Match locally; note text is never sent to the source website.
   int relevantIndex(String passage, {String? anchor}) {
@@ -217,7 +276,7 @@ class HttpSourcePageLoader implements SourcePageLoader {
                   text.substring(0, text.length.clamp(0, 24000)),
                 ),
               ])
-            : parseSourcePage(text, fallbackTitle: uri.host);
+            : parseSourcePage(text, fallbackTitle: uri.host, baseUrl: uri);
       }
       throw const SourcePageException('The website redirected too many times.');
     } finally {
@@ -240,6 +299,7 @@ class HttpSourcePageLoader implements SourcePageLoader {
 SourcePage parseSourcePage(
   String source, {
   String fallbackTitle = 'Source page',
+  Uri? baseUrl,
 }) {
   final document = html.parse(source);
   final title = document.querySelector('title')?.text.trim();
@@ -253,6 +313,8 @@ SourcePage parseSourcePage(
       document.querySelector('article') ??
       document.body;
   final sections = <SourcePageSection>[];
+  final images = <SourcePageImage>[];
+  final seenImages = <String>{};
   var characters = 0;
   String inline(dom.Node node) {
     if (node is dom.Text) {
@@ -305,8 +367,45 @@ SourcePage parseSourcePage(
     return value;
   }
 
+  void addImage(dom.Element image) {
+    if (images.length >= 8) return;
+    final raw = image.attributes['data-src'] ?? image.attributes['src'];
+    if (raw == null) return;
+    final uri = baseUrl?.resolve(raw) ?? Uri.tryParse(raw);
+    if (uri == null || !HttpSourcePageLoader.isPublicPage(uri)) return;
+    final label =
+        (image.parent?.localName == 'figure'
+            ? image.parent?.querySelector('figcaption')?.text
+            : null) ??
+        image.attributes['alt'] ??
+        '';
+    final width = int.tryParse(image.attributes['width'] ?? '');
+    final height = int.tryParse(image.attributes['height'] ?? '');
+    if (label.trim().isEmpty ||
+        (width != null && width < 120) ||
+        (height != null && height < 80) ||
+        RegExp(
+          r'logo|avatar|icon|pixel|tracking|badge',
+          caseSensitive: false,
+        ).hasMatch('$raw $label')) {
+      return;
+    }
+    if (!seenImages.add(uri.toString())) return;
+    images.add(
+      SourcePageImage(
+        uri.toString(),
+        label.trim().substring(0, label.trim().length.clamp(0, 240)),
+        sections.length,
+      ),
+    );
+  }
+
   void visit(dom.Element element) {
     if (characters >= 24000 || sections.length >= 180) return;
+    if (element.localName == 'img') {
+      addImage(element);
+      return;
+    }
     if (const {
       'h1',
       'h2',
@@ -321,6 +420,9 @@ SourcePage parseSourcePage(
       'blockquote',
       'table',
     }.contains(element.localName)) {
+      for (final image in element.querySelectorAll('img')) {
+        addImage(image);
+      }
       final text = element.text.replaceAll(RegExp(r'\s+'), ' ').trim();
       final rendered = block(element);
       if (text.isNotEmpty) {
@@ -347,5 +449,6 @@ SourcePage parseSourcePage(
   return SourcePage(
     title?.isNotEmpty == true ? title! : fallbackTitle,
     List.unmodifiable(sections),
+    List.unmodifiable(images),
   );
 }

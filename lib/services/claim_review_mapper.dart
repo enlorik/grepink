@@ -61,7 +61,8 @@ class ClaimReviewMapper {
 
   /// Builds a [ClaimReviewSelectionState] with defaults applied.
   ClaimReviewSelectionState toSelectionState(
-      GroundedClaimIngestionResult ingestion) {
+    GroundedClaimIngestionResult ingestion,
+  ) {
     final groups = toGroups(ingestion);
     final all = groups.expand((g) => g.items).toList();
     final defaultSelected = all
@@ -87,12 +88,16 @@ class ClaimReviewMapper {
         classification: r.classification,
         citationUrls: List.unmodifiable(r.citationUrls),
         citationTitles: List.unmodifiable(r.claim.citationTitles),
+        evidence: r.claim.evidence,
+        evidenceMapped: r.claim.evidenceMapped,
         selectedByDefault: selectedByDefault,
         reason: r.reason,
-        matchedLocalEvidenceIds:
-            List.unmodifiable(r.matchedLocalEvidence.map((e) => e.id)),
-        matchedLocalEvidenceTitles:
-            List.unmodifiable(r.matchedLocalEvidence.map((e) => e.title)),
+        matchedLocalEvidenceIds: List.unmodifiable(
+          r.matchedLocalEvidence.map((e) => e.id),
+        ),
+        matchedLocalEvidenceTitles: List.unmodifiable(
+          r.matchedLocalEvidence.map((e) => e.title),
+        ),
         canBeSaved: canBeSaved,
       );
     }).toList();

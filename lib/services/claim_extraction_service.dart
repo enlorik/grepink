@@ -78,43 +78,28 @@ class RuleBasedClaimExtractionService implements ClaimExtractionService {
       final List<String> citationTitles;
       final bool uncertain;
 
-      if (!hasOffsets) {
-        // No citation offset data — attach all citations and mark uncertain.
-        // When citations are present, uncertainty prevents saving without a
-        // verifiable source. When there are no citations at all, marking uncertain
-        // ensures claims from unannotated answers are not saved as sourced facts.
-        citationUrls = List.unmodifiable(
-          allCitations.map((c) => c.url).toList(),
-        );
-        citationTitles = List.unmodifiable(
-          allCitations.map((c) => c.title).toList(),
-        );
-        uncertain = true;
-      } else {
-        final overlapping = allCitations.where((c) {
-          if (c.startIndex == null || c.endIndex == null) return false;
-          return c.startIndex! < sentenceEnd && c.endIndex! > sentenceStart;
-        }).toList();
-        if (overlapping.isNotEmpty) {
-          citationUrls = List.unmodifiable(
-            overlapping.map((c) => c.url).toList(),
-          );
-          citationTitles = List.unmodifiable(
-            overlapping.map((c) => c.title).toList(),
-          );
-          uncertain = false;
-        } else {
-          // No citation range covers this sentence; attach all citations
-          // conservatively so saved claims still carry a source URL.
-          citationUrls = List.unmodifiable(
-            allCitations.map((c) => c.url).toList(),
-          );
-          citationTitles = List.unmodifiable(
-            allCitations.map((c) => c.title).toList(),
-          );
-          uncertain = true;
-        }
-      }
+      // A source consulted for the answer is not automatically evidence for
+      // every sentence. Keep only provider ranges overlapping this claim.
+      final overlapping = hasOffsets
+          ? allCitations
+                .where(
+                  (c) =>
+                      c.startIndex != null &&
+                      c.endIndex != null &&
+                      c.startIndex! >= 0 &&
+                      c.endIndex! <= text.length &&
+                      c.startIndex! < sentenceEnd &&
+                      c.endIndex! > sentenceStart,
+                )
+                .toList()
+          : <GroundedAnswerCitation>[];
+      citationUrls = List.unmodifiable(overlapping.map((c) => c.url).toSet());
+      citationTitles = List.unmodifiable(
+        citationUrls.map(
+          (url) => overlapping.firstWhere((c) => c.url == url).title,
+        ),
+      );
+      uncertain = overlapping.isEmpty;
 
       final id = _claimId(
         answer.providerName,
@@ -139,6 +124,8 @@ class RuleBasedClaimExtractionService implements ClaimExtractionService {
           text: formatted,
           citationUrls: citationUrls,
           citationTitles: citationTitles,
+          evidence: List.unmodifiable(overlapping),
+          evidenceMapped: true,
           sourceAnswerProvider: answer.providerName,
           sourceQuestion: answer.question,
           order: claims.length,

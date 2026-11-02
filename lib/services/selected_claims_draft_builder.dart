@@ -162,15 +162,29 @@ class SelectedClaimsDraftBuilder {
     }
 
     final sourceMetadata = NoteSourceDocument.encode(
-      usedUrls.map(
-        (url) =>
-            citations.where((c) => c.url == url).firstOrNull ??
-            GroundedAnswerCitation(
-              id: url,
-              title: titleByUrl[url] ?? url,
-              url: url,
-            ),
-      ),
+      saveable.expand((item) {
+        final refs = item.evidenceMapped
+            ? item.evidence
+            : citations
+                  .where((c) => item.citationUrls.contains(c.url))
+                  .toList();
+        return [
+          for (final url in item.citationUrls)
+            ...(() {
+              final matches = refs.where((c) => c.url == url).toList();
+              return (matches.isEmpty
+                      ? [
+                          GroundedAnswerCitation(
+                            id: url,
+                            title: titleByUrl[url] ?? url,
+                            url: url,
+                          ),
+                        ]
+                      : matches)
+                  .map((c) => c.copyWith(passage: item.text));
+            })(),
+        ];
+      }),
     );
     if (sourceMetadata.isNotEmpty) {
       buf.writeln();
