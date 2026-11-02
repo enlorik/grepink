@@ -185,12 +185,14 @@ class TextSimilarityClaimDeduplicationService
 
       final localHasUrl =
           bestMatch.sourceUrl != null && bestMatch.sourceUrl!.isNotEmpty;
-      final claimHasUrl = claim.citationUrls.isNotEmpty;
+      final claimHasUrl =
+          claim.citationUrls.isNotEmpty && !claim.citationUncertain;
       // Suppress betterSource only when EVERY claim URL is already present in
       // the matched note's text. If even one URL is missing the note is missing
       // a source, so betterSource still fires.
-      final allClaimUrlsInNote =
-          claim.citationUrls.every((url) => bestMatch!.content.contains(url));
+      final allClaimUrlsInNote = claim.citationUrls.every(
+        (url) => bestMatch!.content.contains(url),
+      );
 
       if (claimHasUrl && !localHasUrl && !allClaimUrlsInNote) {
         return ClaimDeduplicationResult(

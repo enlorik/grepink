@@ -181,7 +181,15 @@ class SelectedClaimsDraftBuilder {
                           ),
                         ]
                       : matches)
-                  .map((c) => c.copyWith(passage: item.text));
+                  .map(
+                    (c) => item.citationUncertain
+                        ? GroundedAnswerCitation(
+                            id: c.id,
+                            title: c.title,
+                            url: c.url,
+                          )
+                        : c.copyWith(passage: item.text),
+                  );
             })(),
         ];
       }),

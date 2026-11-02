@@ -90,6 +90,7 @@ class ClaimReviewMapper {
         citationTitles: List.unmodifiable(r.claim.citationTitles),
         evidence: r.claim.evidence,
         evidenceMapped: r.claim.evidenceMapped,
+        citationUncertain: r.claim.citationUncertain,
         selectedByDefault: selectedByDefault,
         reason: r.reason,
         matchedLocalEvidenceIds: List.unmodifiable(

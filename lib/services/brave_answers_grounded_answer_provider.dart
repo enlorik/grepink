@@ -124,6 +124,15 @@ class BraveAnswersGroundedAnswerProvider implements GroundedAnswerProvider {
 
       final assembled = buffer.toString();
 
+      String clean(String value) => value
+          .replaceAll(_citationTag, '')
+          .replaceAll(RegExp(r'<usage>.*?</usage>', dotAll: true), '')
+          .replaceAll(_anyTag, '');
+      int? offset(dynamic value) => value is int
+          ? value
+          : value is String
+          ? int.tryParse(value)
+          : null;
       final citations = <GroundedAnswerCitation>[];
       for (final match in _citationTag.allMatches(assembled)) {
         try {
@@ -138,9 +147,13 @@ class BraveAnswersGroundedAnswerProvider implements GroundedAnswerProvider {
                   .toString(),
               title: url,
               url: url,
-              snippet: json['snippet'] as String?,
-              startIndex: json['start_index'] as int?,
-              endIndex: json['end_index'] as int?,
+              snippet: json['snippet'] is String
+                  ? json['snippet'] as String
+                  : null,
+              // Inline placement survives absent or unusable provider ranges.
+              position: clean(assembled.substring(0, match.start)).length,
+              startIndex: offset(json['start_index']),
+              endIndex: offset(json['end_index']),
             ),
           );
         } catch (_) {
@@ -148,10 +161,7 @@ class BraveAnswersGroundedAnswerProvider implements GroundedAnswerProvider {
         }
       }
 
-      var answerText = assembled
-          .replaceAll(_citationTag, '')
-          .replaceAll(RegExp(r'<usage>.*?</usage>', dotAll: true), '')
-          .replaceAll(_anyTag, '');
+      final answerText = clean(assembled);
 
       if (answerText.trim().isEmpty) return const GroundedAnswerEmpty();
 

@@ -14,7 +14,8 @@ abstract class ClaimExtractionService {
 /// When citations have character offsets (startIndex/endIndex), only citations
 /// overlapping the sentence's character range are attached to that claim and
 /// [ExtractedClaim.citationUncertain] is false. When no overlapping citation is
-/// found (or all offsets are null), the claim carries no citations and
+/// found, inline citation placement is used; otherwise only unattributed answer
+/// links are retained without excerpts and
 /// [citationUncertain] is true.
 ///
 /// Known limitation: the sentence splitter will incorrectly fragment
@@ -33,10 +34,6 @@ class RuleBasedClaimExtractionService implements ClaimExtractionService {
     if (text.trim().isEmpty) return const [];
 
     final allCitations = answer.citations;
-    final hasOffsets = allCitations.any(
-      (c) => c.startIndex != null && c.endIndex != null,
-    );
-
     // Build sentence ranges using allMatches for position awareness.
     final sentences = <({int start, int end, String text})>[];
     int cursor = 0;
@@ -80,26 +77,52 @@ class RuleBasedClaimExtractionService implements ClaimExtractionService {
 
       // A source consulted for the answer is not automatically evidence for
       // every sentence. Keep only provider ranges overlapping this claim.
-      final overlapping = hasOffsets
+      bool validRange(GroundedAnswerCitation c) =>
+          c.startIndex != null &&
+          c.endIndex != null &&
+          c.startIndex! >= 0 &&
+          c.endIndex! > c.startIndex! &&
+          c.endIndex! <= text.length;
+      final positions = allCitations.map((c) => c.position).toSet();
+      final endCluster =
+          sentences.length > 1 &&
+          allCitations.length > 1 &&
+          positions.length == 1 &&
+          positions.single == text.trimRight().length;
+      final overlapping = allCitations.where((c) {
+        if (validRange(c)) {
+          return c.startIndex! < sentenceEnd && c.endIndex! > sentenceStart;
+        }
+        final position = c.position;
+        if (endCluster ||
+            position == null ||
+            position <= 0 ||
+            position > text.length) {
+          return false;
+        }
+        final anchor = text.substring(0, position).trimRight().length;
+        return anchor > sentenceStart && anchor <= sentenceEnd;
+      }).toList();
+      uncertain = overlapping.isEmpty;
+      // Keep answer source links reachable even when their sentence attribution
+      // is unknown, but never recycle a different claim's quote as evidence.
+      final evidence = uncertain
           ? allCitations
-                .where(
-                  (c) =>
-                      c.startIndex != null &&
-                      c.endIndex != null &&
-                      c.startIndex! >= 0 &&
-                      c.endIndex! <= text.length &&
-                      c.startIndex! < sentenceEnd &&
-                      c.endIndex! > sentenceStart,
+                .map(
+                  (c) => GroundedAnswerCitation(
+                    id: c.id,
+                    title: c.title,
+                    url: c.url,
+                  ),
                 )
                 .toList()
-          : <GroundedAnswerCitation>[];
-      citationUrls = List.unmodifiable(overlapping.map((c) => c.url).toSet());
+          : overlapping;
+      citationUrls = List.unmodifiable(evidence.map((c) => c.url).toSet());
       citationTitles = List.unmodifiable(
         citationUrls.map(
-          (url) => overlapping.firstWhere((c) => c.url == url).title,
+          (url) => evidence.firstWhere((c) => c.url == url).title,
         ),
       );
-      uncertain = overlapping.isEmpty;
 
       final id = _claimId(
         answer.providerName,
@@ -124,7 +147,7 @@ class RuleBasedClaimExtractionService implements ClaimExtractionService {
           text: formatted,
           citationUrls: citationUrls,
           citationTitles: citationTitles,
-          evidence: List.unmodifiable(overlapping),
+          evidence: List.unmodifiable(evidence),
           evidenceMapped: true,
           sourceAnswerProvider: answer.providerName,
           sourceQuestion: answer.question,
