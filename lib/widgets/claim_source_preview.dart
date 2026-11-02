@@ -13,8 +13,14 @@ class ClaimSourcePreview {
   final String url;
   final String title;
   final String? excerpt;
+  final bool unassigned;
 
-  const ClaimSourcePreview(this.url, this.title, this.excerpt);
+  const ClaimSourcePreview(
+    this.url,
+    this.title,
+    this.excerpt, {
+    this.unassigned = false,
+  });
 
   String get pageLink {
     final uri = Uri.tryParse(url);
@@ -145,9 +151,12 @@ List<ClaimSourcePreview> claimSourcePreviews(
       ClaimSourcePreview(
         url,
         title,
-        item.evidenceMapped || citation.snippet == null
+        item.citationUncertain
+            ? null
+            : item.evidenceMapped || citation.snippet == null
             ? citation.snippet
             : sourceExcerpt(citation.snippet!),
+        unassigned: item.citationUncertain,
       ),
     );
   }
@@ -222,6 +231,8 @@ class ClaimSourcePreviewPane extends StatelessWidget {
               const Divider(),
               if (sources.isEmpty)
                 const Text('No source was supplied for this claim.'),
+              if (item!.citationUncertain && sources.isNotEmpty)
+                const Text('Answer sources · not attributed to this sentence'),
               for (var i = 0; i < sources.length; i++) ...[
                 Text(
                   sources[i].title,

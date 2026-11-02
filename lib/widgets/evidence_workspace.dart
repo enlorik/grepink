@@ -183,11 +183,15 @@ class EvidencePane extends StatelessWidget {
                               if (!compact) ...[
                                 const SizedBox(height: 4),
                                 Text(
-                                  Uri.tryParse(source.url)?.host ?? '',
+                                  source.url,
                                   style: Theme.of(context).textTheme.bodySmall,
                                 ),
                               ],
                               SizedBox(height: compact ? 6 : 16),
+                              if (source.passage == null)
+                                const Text(
+                                  'Source link · sentence attribution unavailable',
+                                ),
                               SourcePageReader(
                                 url: source.url,
                                 passage: selection!.passage,

@@ -99,7 +99,7 @@ class _ClaimReviewGroupsPanelState extends State<ClaimReviewGroupsPanel> {
                 title: s.title,
                 url: s.url,
                 snippet: s.excerpt,
-                passage: item.text,
+                passage: s.unassigned ? null : item.text,
               ),
             )
             .toList(),
