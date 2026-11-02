@@ -3,6 +3,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import '../models/grounded_answer.dart';
 import '../services/source_page_loader.dart';
+import '../services/source_image_loader.dart';
 import '../theme/app_colors.dart';
 import 'source_page_reader.dart';
 
@@ -20,10 +21,10 @@ class EvidenceController extends ValueNotifier<EvidenceSelection?> {
   bool pinned = false;
 
   void inspect(String passage, List<GroundedAnswerCitation> sources) {
-    if (pinned || sources.isEmpty) return;
+    if (pinned) return;
     if (value?.passage == passage &&
-        value!.sources.map((s) => s.url).join('\n') ==
-            sources.map((s) => s.url).join('\n')) {
+        value!.sources.map((s) => '${s.url}\n${s.snippet}').join('\n') ==
+            sources.map((s) => '${s.url}\n${s.snippet}').join('\n')) {
       return;
     }
     index = 0;
@@ -32,7 +33,7 @@ class EvidenceController extends ValueNotifier<EvidenceSelection?> {
   }
 
   void select(int offset) {
-    if (value == null) return;
+    if (value == null || value!.sources.isEmpty) return;
     index = (index + offset) % value!.sources.length;
     if (scroll.hasClients) scroll.jumpTo(0);
     notifyListeners();
@@ -73,7 +74,13 @@ class EvidenceController extends ValueNotifier<EvidenceSelection?> {
 class EvidencePane extends StatelessWidget {
   final EvidenceController controller;
   final SourcePageLoader? loader;
-  const EvidencePane({super.key, required this.controller, this.loader});
+  final SourceImageLoader? imageLoader;
+  const EvidencePane({
+    super.key,
+    required this.controller,
+    this.loader,
+    this.imageLoader,
+  });
 
   @override
   Widget build(
@@ -81,7 +88,7 @@ class EvidencePane extends StatelessWidget {
   ) => ValueListenableBuilder<EvidenceSelection?>(
     valueListenable: controller,
     builder: (context, selection, _) {
-      final source = selection == null
+      final source = selection == null || selection.sources.isEmpty
           ? null
           : selection.sources[controller.index];
       return LayoutBuilder(
@@ -106,7 +113,8 @@ class EvidencePane extends StatelessWidget {
                           style: TextStyle(fontWeight: FontWeight.w600),
                         ),
                       ),
-                      if (selection != null) ...[
+                      if (selection != null &&
+                          selection.sources.isNotEmpty) ...[
                         IconButton(
                           tooltip: 'Previous source',
                           onPressed: () => controller.select(-1),
@@ -141,10 +149,12 @@ class EvidencePane extends StatelessWidget {
                 ),
                 Expanded(
                   child: source == null
-                      ? const Padding(
-                          padding: EdgeInsets.all(20),
+                      ? Padding(
+                          padding: const EdgeInsets.all(20),
                           child: Text(
-                            'Hover a sourced passage to check its evidence here.\n\nScroll over the passage to read quotes and move between sources.',
+                            selection == null
+                                ? 'Hover a sourced passage to check its evidence here.'
+                                : 'No claim-specific citation was supplied for this passage; the previous quote is not evidence for it.',
                           ),
                         )
                       : SingleChildScrollView(
@@ -183,6 +193,8 @@ class EvidencePane extends StatelessWidget {
                                 passage: selection!.passage,
                                 savedExcerpt: source.snippet,
                                 loader: loader,
+                                imageLoader: imageLoader,
+                                compact: compact,
                               ),
                               const SizedBox(height: 12),
                               TextButton.icon(

@@ -127,23 +127,37 @@ class _NoteReadingViewState extends State<NoteReadingView> {
     return result.values.toList();
   }
 
+  String _passagePlain(String markdown) => markdown
+      .replaceAll(RegExp(r'\s*\[Source(?: \d+)?\]\((?:<[^>]+>|[^)]+)\)'), '')
+      .replaceAllMapped(RegExp(r'\[([^\]]+)\]\([^)]*\)'), (m) => m[1]!)
+      .replaceFirst(RegExp(r'^\s*(?:[-+*•]|\d+[.)]|#{1,6})\s+'), '')
+      .replaceAllMapped(
+        RegExp(r'\*\*(.*?)\*\*|__(.*?)__|`([^`]+)`'),
+        (m) => m[1] ?? m[2] ?? m[3]!,
+      )
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+
   void _inspect(List<String> urls, {String? selected, String? passage}) {
-    if (urls.isEmpty) return;
-    final saved = {for (final c in _noteSources()) c.url: c};
+    if (urls.isEmpty) {
+      if (widget.evidence != null && passage != null) {
+        widget.evidence!.inspect(passage, []);
+      }
+      return;
+    }
+    final matches = NoteSourceDocument.forPassage(
+      widget.content,
+      passage ?? _passageText,
+      urls,
+    );
     if (widget.evidence != null) {
       widget.evidence!.inspect(
         passage ?? _passageText,
-        urls
-            .map(
-              (url) =>
-                  saved[url] ??
-                  GroundedAnswerCitation(
-                    id: url,
-                    title: Uri.parse(url).host,
-                    url: url,
-                  ),
-            )
-            .toList(),
+        NoteSourceDocument.forPassage(
+          widget.content,
+          passage ?? _passageText,
+          urls,
+        ),
       );
       return;
     }
@@ -154,17 +168,7 @@ class _NoteReadingViewState extends State<NoteReadingView> {
       return;
     }
     setState(() {
-      _sources = urls
-          .map(
-            (url) =>
-                saved[url] ??
-                GroundedAnswerCitation(
-                  id: url,
-                  title: Uri.parse(url).host,
-                  url: url,
-                ),
-          )
-          .toList();
+      _sources = matches;
       _sourceIndex = index < 0 ? 0 : index;
       if (passage != null) _passageText = passage;
     });
@@ -330,7 +334,7 @@ class _NoteReadingViewState extends State<NoteReadingView> {
               (url, _) => _inspect(
                 urls.isEmpty ? [url] : urls,
                 selected: url,
-                passage: sourcePlainText(body),
+                passage: _passagePlain(body),
               ),
             ),
           },
@@ -339,7 +343,7 @@ class _NoteReadingViewState extends State<NoteReadingView> {
               _inspect(
                 urls.isEmpty ? [href] : urls,
                 selected: href,
-                passage: sourcePlainText(body),
+                passage: _passagePlain(body),
               );
             }
           },
@@ -392,14 +396,14 @@ class _NoteReadingViewState extends State<NoteReadingView> {
             _hotBlock = block.start;
           });
         }
-        _inspect(urls, passage: sourcePlainText(body));
+        _inspect(urls, passage: _passagePlain(body));
       },
       onExit: (_) {
         if (mounted && _hotBlock == block.start) {
           setState(() => _hotBlock = null);
         }
       },
-      onHover: (_) => _inspect(urls, passage: sourcePlainText(body)),
+      onHover: (_) => _inspect(urls, passage: _passagePlain(body)),
       cursor: canEdit ? SystemMouseCursors.text : MouseCursor.defer,
       child: Listener(
         key: ValueKey('note-passage-$index'),

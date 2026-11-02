@@ -125,27 +125,41 @@ List<ClaimSourcePreview> claimSourcePreviews(
 ) {
   final seen = <String>{};
   final result = <ClaimSourcePreview>[];
-  for (var i = 0; i < item.citationUrls.length; i++) {
-    final url = item.citationUrls[i].trim();
-    if (url.isEmpty || !seen.add(url)) continue;
-    final matching = citations.where((c) => c.url.trim() == url);
-    var title = i < item.citationTitles.length
-        ? item.citationTitles[i].trim()
-        : '';
-    String? excerpt;
-    for (final citation in matching) {
-      if ((title.isEmpty || title == url) && citation.title.trim().isNotEmpty) {
-        title = citation.title.trim();
-      }
-      if (excerpt == null && (citation.snippet?.trim().isNotEmpty ?? false)) {
-        excerpt = sourceExcerpt(citation.snippet!);
-      }
+  final exact = item.evidence;
+  // Legacy items may only contain URLs. Do not invent a mapping for them.
+  final candidates = item.evidenceMapped
+      ? exact
+      : citations.where((c) => item.citationUrls.contains(c.url)).toList();
+  for (final citation in candidates) {
+    final url = citation.url.trim();
+    if (citation.snippet?.isNotEmpty != true &&
+        candidates.any((c) => c.url == url && c.snippet?.isNotEmpty == true)) {
+      continue;
     }
-    if (title.isEmpty || title == url) {
-      title = Uri.tryParse(url)?.host ?? '';
-      if (title.isEmpty) title = 'Source ${result.length + 1}';
+    final key = '$url\n${citation.snippet ?? ''}';
+    if (url.isEmpty || !seen.add(key)) continue;
+    final title = citation.title.trim().isEmpty || citation.title == url
+        ? (Uri.tryParse(url)?.host ?? 'Source')
+        : citation.title;
+    result.add(
+      ClaimSourcePreview(
+        url,
+        title,
+        item.evidenceMapped || citation.snippet == null
+            ? citation.snippet
+            : sourceExcerpt(citation.snippet!),
+      ),
+    );
+  }
+  if (!item.evidenceMapped) {
+    for (var i = 0; i < item.citationUrls.length; i++) {
+      final url = item.citationUrls[i];
+      if (result.any((s) => s.url == url)) continue;
+      final title = i < item.citationTitles.length
+          ? item.citationTitles[i]
+          : Uri.tryParse(url)?.host ?? 'Source';
+      result.add(ClaimSourcePreview(url, title, null));
     }
-    result.add(ClaimSourcePreview(url, title, excerpt));
   }
   return result;
 }
