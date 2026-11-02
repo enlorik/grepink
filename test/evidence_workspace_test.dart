@@ -39,12 +39,14 @@ void main() {
           title: 'First source',
           url: 'https://example.com/one',
           snippet: 'First quoted evidence.',
+          passage: 'A readable fact.',
         ),
         GroundedAnswerCitation(
           id: '2',
           title: 'Second source',
           url: 'https://example.com/two',
           snippet: 'Second quoted evidence.',
+          passage: 'A readable fact.',
         ),
       ];
       final content =

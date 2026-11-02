@@ -27,7 +27,7 @@ final _notes = [
     id: 'one',
     title: 'Rust notebook',
     content:
-        '# Types\n\n**Scalar** values represent one piece of information, such as a number or a boolean. [Source](https://example.com/types)\n\n## Compound values\n\nRust combines values without hiding how they are stored. A **tuple** can hold different types; an **array** contains values of the same type.\n\n- **Tuples** have a fixed number of elements.\n- **Arrays** have a known length and one element type.\n\n## Sized and unsized\n\n**Sized vs. Unsized:** a sized type has a size the compiler knows; slices describe a sequence whose length can vary.\n\n> Read the idea first, inspect its source, then add the missing piece to your note.\n\n${NoteSourceDocument.encode([const GroundedAnswerCitation(id: '1', title: 'Rust reference', url: 'https://example.com/types', snippet: '**Saved** explanation.')])}',
+        '# Types\n\n**Scalar** values represent one piece of information, such as a number or a boolean. [Source](https://example.com/types)\n\n## Compound values\n\nRust combines values without hiding how they are stored. A **tuple** can hold different types; an **array** contains values of the same type.\n\n- **Tuples** have a fixed number of elements.\n- **Arrays** have a known length and one element type.\n\n## Sized and unsized\n\n**Sized vs. Unsized:** a sized type has a size the compiler knows; slices describe a sequence whose length can vary.\n\n> Read the idea first, inspect its source, then add the missing piece to your note.\n\n${NoteSourceDocument.encode([const GroundedAnswerCitation(id: '1', title: 'Rust reference', url: 'https://example.com/types', snippet: '**Saved** explanation.', passage: '**Scalar** values represent one piece of information, such as a number or a boolean.')])}',
     tags: const [],
     keywords: const [],
     isPinned: false,
@@ -414,10 +414,10 @@ void main() {
       container
           .read(noteDraftReviewProvider.notifier)
           .startReview(
-            const NoteDraft(
+            NoteDraft(
               question: 'What is a tuple?',
               markdownContent:
-                  '## Tuples\n\nA **tuple** groups values of different types.',
+                  '## Tuples\n\nA **tuple** groups values of different types. [Source](https://example.com/tuples)\n\n${NoteSourceDocument.encode([const GroundedAnswerCitation(id: 'tuple', title: 'Tuple reference', url: 'https://example.com/tuples', snippet: 'Tuples combine values of different types.', passage: 'A **tuple** groups values of different types.')])}',
               action: NoteDraftAction.appendToExistingNote,
               deltas: [],
               localEvidence: [],
@@ -425,7 +425,8 @@ void main() {
             ),
           );
       await tester.pumpAndSettle();
-      expect(find.byType(NoteReadingView), findsNWidgets(2));
+      expect(find.byKey(const Key('original-note-document')), findsNothing);
+      expect(find.byType(NoteReadingView), findsOneWidget);
       if (output != null) {
         Future<void> capturePreview(String filename) async {
           final boundary =
@@ -465,7 +466,7 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(
-          find.textContaining('explanation.', findRichText: true),
+          find.textContaining('Tuples combine values', findRichText: true),
           findsWidgets,
         );
         final evidenceRect = tester.getRect(
@@ -476,16 +477,6 @@ void main() {
         );
         expect(evidenceRect.overlaps(questionRect), isFalse);
         await capturePreview('notebook-sources-workspace.png');
-        await tester.tap(
-          find.descendant(
-            of: find.byType(NoteReadingView).first,
-            matching: find.byKey(const ValueKey('note-passage-1')),
-          ),
-        );
-        await tester.pumpAndSettle();
-        await capturePreview('notebook-editing-workspace.png');
-        await tester.testTextInput.receiveAction(TextInputAction.done);
-        await tester.pumpAndSettle();
       }
       final insert = find.widgetWithText(FilledButton, 'Insert into this note');
       await tester.ensureVisible(insert);
@@ -494,10 +485,14 @@ void main() {
       final reader = tester.widget<NoteReadingView>(
         find.byType(NoteReadingView).first,
       );
+      expect(find.byKey(const Key('research-workspace')), findsNothing);
+      expect(find.byKey(const Key('original-note-document')), findsOneWidget);
       expect(reader.content, contains('## Tuples'));
       expect(reader.content, contains('[Source](https://example.com/types)'));
       expect(
-        NoteSourceDocument.sources(reader.content).single.snippet,
+        NoteSourceDocument.sources(
+          reader.content,
+        ).firstWhere((c) => c.url.endsWith('/types')).snippet,
         '**Saved** explanation.',
       );
       expect(
@@ -510,7 +505,9 @@ void main() {
       final saved = container.read(notesProvider).value!.first;
       expect(saved.content, contains('## Tuples'));
       expect(
-        NoteSourceDocument.sources(saved.content).single.snippet,
+        NoteSourceDocument.sources(
+          saved.content,
+        ).firstWhere((c) => c.url.endsWith('/types')).snippet,
         '**Saved** explanation.',
       );
       final editor = tester.state<NoteEditorScreenState>(

@@ -10,7 +10,7 @@ void main() {
     'passage hover exposes every source and wheel scrolls the bounded inspector',
     (tester) async {
       final document =
-          '**A fact** [One](https://one.example) [Two](https://two.example)\n\n${NoteSourceDocument.encode([GroundedAnswerCitation(id: '1', title: 'First source', url: 'https://one.example', snippet: List.filled(50, 'Evidence paragraph.').join('\n\n')), const GroundedAnswerCitation(id: '2', title: 'Second source', url: 'https://two.example', snippet: 'More evidence.')])}';
+          '**A fact** [One](https://one.example) [Two](https://two.example)\n\n${NoteSourceDocument.encode([GroundedAnswerCitation(id: '1', title: 'First source', url: 'https://one.example', passage: 'A fact One Two', snippet: List.filled(50, 'Evidence paragraph.').join('\n\n')), const GroundedAnswerCitation(id: '2', title: 'Second source', url: 'https://two.example', snippet: 'More evidence.', passage: 'A fact One Two')])}';
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(

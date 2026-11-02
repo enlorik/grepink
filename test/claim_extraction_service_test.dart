@@ -139,7 +139,7 @@ void main() {
       expect(claims[1].text, 'Different claim.');
     });
 
-    test('preserves citation URLs from the answer', () {
+    test('unmapped answer references are not attributed to every claim', () {
       final answer = _answer(
         answerText: 'Claim one. Claim two.',
         citations: [
@@ -151,11 +151,9 @@ void main() {
       final claims = service.extract(answer);
 
       for (final claim in claims) {
-        expect(
-          claim.citationUrls,
-          containsAll(['https://example.com/a', 'https://example.com/b']),
-        );
-        expect(claim.citationTitles, containsAll(['Source A', 'Source B']));
+        expect(claim.citationUrls, isEmpty);
+        expect(claim.evidence, isEmpty);
+        expect(claim.citationUncertain, isTrue);
       }
     });
 
@@ -334,7 +332,7 @@ void main() {
       );
 
       test(
-        'sentence with no overlapping citation falls back to all citations with citationUncertain true',
+        'sentence without an overlapping citation has no attributed sources',
         () {
           // Citation covers only sentence 1 (chars 0–10); sentence 2 (11–21) has no
           // overlapping citation. All citations are attached conservatively to preserve
@@ -349,7 +347,7 @@ void main() {
           final claims = service.extract(answer);
 
           expect(claims[1].text, 'Claim two.');
-          expect(claims[1].citationUrls, equals(['https://one.example']));
+          expect(claims[1].citationUrls, isEmpty);
           expect(claims[1].citationUncertain, isTrue);
         },
       );

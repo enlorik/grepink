@@ -34,9 +34,9 @@ List<int> _buildSseBody(List<String> contents) {
     final frame = jsonEncode({
       'choices': [
         {
-          'delta': {'content': content}
-        }
-      ]
+          'delta': {'content': content},
+        },
+      ],
     });
     buffer.write('data: $frame\n\n');
   }
@@ -44,14 +44,15 @@ List<int> _buildSseBody(List<String> contents) {
   return utf8.encode(buffer.toString());
 }
 
-http.StreamedResponse _sseResponse(List<int> bytes,
-        {bool splitBytes = false}) =>
-    http.StreamedResponse(
-      splitBytes
-          ? Stream<List<int>>.fromIterable(bytes.map((b) => [b]))
-          : Stream.value(bytes),
-      200,
-    );
+http.StreamedResponse _sseResponse(
+  List<int> bytes, {
+  bool splitBytes = false,
+}) => http.StreamedResponse(
+  splitBytes
+      ? Stream<List<int>>.fromIterable(bytes.map((b) => [b]))
+      : Stream.value(bytes),
+  200,
+);
 
 http.StreamedResponse _statusResponse(int statusCode) =>
     http.StreamedResponse(Stream<List<int>>.fromIterable(const []), statusCode);
@@ -59,190 +60,237 @@ http.StreamedResponse _statusResponse(int statusCode) =>
 BraveAnswersGroundedAnswerProvider _provider(
   Future<http.StreamedResponse> Function(http.BaseRequest) handler, {
   String apiKey = 'test-api-key',
-}) =>
-    BraveAnswersGroundedAnswerProvider(
-      apiKey: apiKey,
-      client: _FakeStreamingClient(handler),
-    );
+}) => BraveAnswersGroundedAnswerProvider(
+  apiKey: apiKey,
+  client: _FakeStreamingClient(handler),
+);
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 void main() {
   group('BraveAnswersGroundedAnswerProvider', () {
     group('successful SSE responses', () {
-      test('full SSE stream returns correct answerText and citation fields',
-          () async {
-        final citationJson = jsonEncode({
-          'number': 1,
-          'url': 'https://example.com/a',
-          'snippet': 'A snippet.',
-          'start_index': 0,
-          'end_index': 10,
-        });
-        final body = _buildSseBody(
-            ['Claim one. Claim two.<citation>$citationJson</citation>']);
-
-        final result = await _provider((_) async => _sseResponse(body))
-            .fetchGroundedAnswer('What is X?');
-
-        expect(result, isA<GroundedAnswerSuccess>());
-        final answer = (result as GroundedAnswerSuccess).answer;
-        expect(answer.answerText, 'Claim one. Claim two.');
-        expect(answer.citations, hasLength(1));
-        final c = answer.citations.first;
-        expect(c.url, 'https://example.com/a');
-        expect(c.snippet, 'A snippet.');
-        expect(c.startIndex, 0);
-        expect(c.endIndex, 10);
-      });
+      test(
+        'leading whitespace stays aligned with provider citation offsets',
+        () async {
+          final tag = jsonEncode({
+            'number': 1,
+            'url': 'https://example.com',
+            'snippet': 'Source words.',
+            'start_index': 2,
+            'end_index': 12,
+          });
+          final result = await _provider(
+            (_) async => _sseResponse(
+              _buildSseBody(['  Claim one.<citation>$tag</citation>']),
+            ),
+          ).fetchGroundedAnswer('q');
+          final answer = (result as GroundedAnswerSuccess).answer;
+          expect(answer.answerText, '  Claim one.');
+          expect(
+            answer.answerText.substring(
+              answer.citations.single.startIndex!,
+              answer.citations.single.endIndex!,
+            ),
+            'Claim one.',
+          );
+        },
+      );
 
       test(
-          'citation tag split across SSE chunks is parsed from assembled string',
-          () async {
-        final citationJson = jsonEncode({
-          'number': 1,
-          'url': 'https://split.example.com',
-          'start_index': 0,
-          'end_index': 12,
-        });
-        final mid = citationJson.length ~/ 2;
-        final body = _buildSseBody([
-          'Answer text.<citation>${citationJson.substring(0, mid)}',
-          '${citationJson.substring(mid)}</citation>',
-        ]);
+        'full SSE stream returns correct answerText and citation fields',
+        () async {
+          final citationJson = jsonEncode({
+            'number': 1,
+            'url': 'https://example.com/a',
+            'snippet': 'A snippet.',
+            'start_index': 0,
+            'end_index': 10,
+          });
+          final body = _buildSseBody([
+            'Claim one. Claim two.<citation>$citationJson</citation>',
+          ]);
 
-        final result =
-            await _provider((_) async => _sseResponse(body, splitBytes: true))
-                .fetchGroundedAnswer('test?');
+          final result = await _provider(
+            (_) async => _sseResponse(body),
+          ).fetchGroundedAnswer('What is X?');
 
-        expect(result, isA<GroundedAnswerSuccess>());
-        final answer = (result as GroundedAnswerSuccess).answer;
-        expect(answer.answerText, 'Answer text.');
-        expect(answer.citations, hasLength(1));
-        expect(answer.citations.first.url, 'https://split.example.com');
-        expect(answer.citations.first.startIndex, 0);
-        expect(answer.citations.first.endIndex, 12);
-      });
+          expect(result, isA<GroundedAnswerSuccess>());
+          final answer = (result as GroundedAnswerSuccess).answer;
+          expect(answer.answerText, 'Claim one. Claim two.');
+          expect(answer.citations, hasLength(1));
+          final c = answer.citations.first;
+          expect(c.url, 'https://example.com/a');
+          expect(c.snippet, 'A snippet.');
+          expect(c.startIndex, 0);
+          expect(c.endIndex, 10);
+        },
+      );
 
       test(
-          'malformed citation JSON skips that citation but returns answer text',
-          () async {
-        final body =
-            _buildSseBody(['Answer text.<citation>NOT_VALID_JSON</citation>']);
+        'citation tag split across SSE chunks is parsed from assembled string',
+        () async {
+          final citationJson = jsonEncode({
+            'number': 1,
+            'url': 'https://split.example.com',
+            'start_index': 0,
+            'end_index': 12,
+          });
+          final mid = citationJson.length ~/ 2;
+          final body = _buildSseBody([
+            'Answer text.<citation>${citationJson.substring(0, mid)}',
+            '${citationJson.substring(mid)}</citation>',
+          ]);
 
-        final result = await _provider((_) async => _sseResponse(body))
-            .fetchGroundedAnswer('test?');
+          final result = await _provider(
+            (_) async => _sseResponse(body, splitBytes: true),
+          ).fetchGroundedAnswer('test?');
 
-        expect(result, isA<GroundedAnswerSuccess>());
-        final answer = (result as GroundedAnswerSuccess).answer;
-        expect(answer.answerText, 'Answer text.');
-        expect(answer.citations, isEmpty);
-      });
+          expect(result, isA<GroundedAnswerSuccess>());
+          final answer = (result as GroundedAnswerSuccess).answer;
+          expect(answer.answerText, 'Answer text.');
+          expect(answer.citations, hasLength(1));
+          expect(answer.citations.first.url, 'https://split.example.com');
+          expect(answer.citations.first.startIndex, 0);
+          expect(answer.citations.first.endIndex, 12);
+        },
+      );
 
-      test('<usage> and unknown tags are stripped silently from answer text',
-          () async {
-        final body = _buildSseBody([
-          'The answer is here.',
-          '<usage>{"input_tokens":50,"output_tokens":50}</usage>',
-          '<think>internal reasoning</think>',
-        ]);
+      test(
+        'malformed citation JSON skips that citation but returns answer text',
+        () async {
+          final body = _buildSseBody([
+            'Answer text.<citation>NOT_VALID_JSON</citation>',
+          ]);
 
-        final result = await _provider((_) async => _sseResponse(body))
-            .fetchGroundedAnswer('test?');
+          final result = await _provider(
+            (_) async => _sseResponse(body),
+          ).fetchGroundedAnswer('test?');
 
-        expect(result, isA<GroundedAnswerSuccess>());
-        final answer = (result as GroundedAnswerSuccess).answer;
-        expect(answer.answerText, 'The answer is here.');
-      });
+          expect(result, isA<GroundedAnswerSuccess>());
+          final answer = (result as GroundedAnswerSuccess).answer;
+          expect(answer.answerText, 'Answer text.');
+          expect(answer.citations, isEmpty);
+        },
+      );
 
-      test('answer empty after stripping tags returns GroundedAnswerEmpty',
-          () async {
-        final body = _buildSseBody([
-          '<citation>${jsonEncode({
-                'number': 1,
-                'url': 'https://x.com'
-              })}</citation>',
-          '<usage>{"tokens":5}</usage>',
-        ]);
+      test(
+        '<usage> and unknown tags are stripped silently from answer text',
+        () async {
+          final body = _buildSseBody([
+            'The answer is here.',
+            '<usage>{"input_tokens":50,"output_tokens":50}</usage>',
+            '<think>internal reasoning</think>',
+          ]);
 
-        final result = await _provider((_) async => _sseResponse(body))
-            .fetchGroundedAnswer('test?');
+          final result = await _provider(
+            (_) async => _sseResponse(body),
+          ).fetchGroundedAnswer('test?');
 
-        expect(result, isA<GroundedAnswerEmpty>());
-      });
+          expect(result, isA<GroundedAnswerSuccess>());
+          final answer = (result as GroundedAnswerSuccess).answer;
+          expect(answer.answerText, 'The answer is here.');
+        },
+      );
+
+      test(
+        'answer empty after stripping tags returns GroundedAnswerEmpty',
+        () async {
+          final body = _buildSseBody([
+            '<citation>${jsonEncode({'number': 1, 'url': 'https://x.com'})}</citation>',
+            '<usage>{"tokens":5}</usage>',
+          ]);
+
+          final result = await _provider(
+            (_) async => _sseResponse(body),
+          ).fetchGroundedAnswer('test?');
+
+          expect(result, isA<GroundedAnswerEmpty>());
+        },
+      );
 
       test('providerName is set to Brave Answers', () async {
         final body = _buildSseBody(['An answer.']);
 
-        final result = await _provider((_) async => _sseResponse(body))
-            .fetchGroundedAnswer('test?');
+        final result = await _provider(
+          (_) async => _sseResponse(body),
+        ).fetchGroundedAnswer('test?');
 
         expect(result, isA<GroundedAnswerSuccess>());
-        expect((result as GroundedAnswerSuccess).answer.providerName,
-            'Brave Answers');
-      });
-
-      test('API key does not appear in any field of the returned answer',
-          () async {
-        const apiKey = 'super-secret-brave-key-xyz';
-        final body = _buildSseBody(['Normal answer text.']);
-        final provider = BraveAnswersGroundedAnswerProvider(
-          apiKey: apiKey,
-          client: _FakeStreamingClient((_) async => _sseResponse(body)),
+        expect(
+          (result as GroundedAnswerSuccess).answer.providerName,
+          'Brave Answers',
         );
-
-        final result = await provider.fetchGroundedAnswer('test?');
-
-        expect(result, isA<GroundedAnswerSuccess>());
-        final answer = (result as GroundedAnswerSuccess).answer;
-        expect(answer.answerText, isNot(contains(apiKey)));
-        expect(answer.question, isNot(contains(apiKey)));
-        expect(answer.providerName, isNot(contains(apiKey)));
-        for (final c in answer.citations) {
-          expect(c.url, isNot(contains(apiKey)));
-          expect(c.title, isNot(contains(apiKey)));
-          expect(c.snippet ?? '', isNot(contains(apiKey)));
-        }
       });
+
+      test(
+        'API key does not appear in any field of the returned answer',
+        () async {
+          const apiKey = 'super-secret-brave-key-xyz';
+          final body = _buildSseBody(['Normal answer text.']);
+          final provider = BraveAnswersGroundedAnswerProvider(
+            apiKey: apiKey,
+            client: _FakeStreamingClient((_) async => _sseResponse(body)),
+          );
+
+          final result = await provider.fetchGroundedAnswer('test?');
+
+          expect(result, isA<GroundedAnswerSuccess>());
+          final answer = (result as GroundedAnswerSuccess).answer;
+          expect(answer.answerText, isNot(contains(apiKey)));
+          expect(answer.question, isNot(contains(apiKey)));
+          expect(answer.providerName, isNot(contains(apiKey)));
+          for (final c in answer.citations) {
+            expect(c.url, isNot(contains(apiKey)));
+            expect(c.title, isNot(contains(apiKey)));
+            expect(c.snippet ?? '', isNot(contains(apiKey)));
+          }
+        },
+      );
     });
 
     group('HTTP error status codes', () {
       test('HTTP 402 returns GroundedAnswerPlanUnavailable', () async {
         expect(
-          await _provider((_) async => _statusResponse(402))
-              .fetchGroundedAnswer('test?'),
+          await _provider(
+            (_) async => _statusResponse(402),
+          ).fetchGroundedAnswer('test?'),
           isA<GroundedAnswerPlanUnavailable>(),
         );
       });
 
       test('HTTP 403 returns GroundedAnswerUnauthorized', () async {
         expect(
-          await _provider((_) async => _statusResponse(403))
-              .fetchGroundedAnswer('test?'),
+          await _provider(
+            (_) async => _statusResponse(403),
+          ).fetchGroundedAnswer('test?'),
           isA<GroundedAnswerUnauthorized>(),
         );
       });
 
       test('HTTP 429 returns GroundedAnswerRateLimited', () async {
         expect(
-          await _provider((_) async => _statusResponse(429))
-              .fetchGroundedAnswer('test?'),
+          await _provider(
+            (_) async => _statusResponse(429),
+          ).fetchGroundedAnswer('test?'),
           isA<GroundedAnswerRateLimited>(),
         );
       });
 
       test('HTTP 500 returns GroundedAnswerNetworkFailure', () async {
         expect(
-          await _provider((_) async => _statusResponse(500))
-              .fetchGroundedAnswer('test?'),
+          await _provider(
+            (_) async => _statusResponse(500),
+          ).fetchGroundedAnswer('test?'),
           isA<GroundedAnswerNetworkFailure>(),
         );
       });
 
       test('HTTP 503 returns GroundedAnswerNetworkFailure', () async {
         expect(
-          await _provider((_) async => _statusResponse(503))
-              .fetchGroundedAnswer('test?'),
+          await _provider(
+            (_) async => _statusResponse(503),
+          ).fetchGroundedAnswer('test?'),
           isA<GroundedAnswerNetworkFailure>(),
         );
       });
