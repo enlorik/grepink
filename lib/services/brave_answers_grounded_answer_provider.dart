@@ -18,17 +18,20 @@ class BraveAnswersGroundedAnswerProvider implements GroundedAnswerProvider {
     required String apiKey,
     BraveSafeSearch safeSearch = BraveSafeSearch.moderate,
     http.Client? client,
-  })  : _apiKey = apiKey,
-        _safeSearch = safeSearch,
-        _client = client ?? http.Client();
+  }) : _apiKey = apiKey,
+       _safeSearch = safeSearch,
+       _client = client ?? http.Client();
 
-  static final _citationTag =
-      RegExp(r'<citation>(.*?)</citation>', dotAll: true);
+  static final _citationTag = RegExp(
+    r'<citation>(.*?)</citation>',
+    dotAll: true,
+  );
   static final _anyTag = RegExp(r'<[^>]+>.*?</[^>]+>', dotAll: true);
 
   @override
   Future<GroundedAnswerProviderOutcome> fetchGroundedAnswer(
-      String question) async {
+    String question,
+  ) async {
     if (_apiKey.trim().isEmpty) return const GroundedAnswerNotConfigured();
     try {
       final request = http.Request(
@@ -46,13 +49,14 @@ class BraveAnswersGroundedAnswerProvider implements GroundedAnswerProvider {
         'enable_citations': true,
         'web_search_options': {'safesearch': _safeSearch.name},
         'messages': [
-          {'role': 'user', 'content': question}
+          {'role': 'user', 'content': question},
         ],
       });
 
       request.followRedirects = false;
-      final response =
-          await _client.send(request).timeout(const Duration(seconds: 30));
+      final response = await _client
+          .send(request)
+          .timeout(const Duration(seconds: 30));
 
       switch (response.statusCode) {
         case 402:
@@ -74,9 +78,10 @@ class BraveAnswersGroundedAnswerProvider implements GroundedAnswerProvider {
       final buffer = StringBuffer();
       var remainder = '';
 
-      await for (final chunk in response.stream
-          .transform(utf8.decoder)
-          .timeout(const Duration(seconds: 30))) {
+      await for (final chunk
+          in response.stream
+              .transform(utf8.decoder)
+              .timeout(const Duration(seconds: 30))) {
         remainder += chunk;
         final frames = remainder.split('\n\n');
         remainder = frames.removeLast();
@@ -119,6 +124,15 @@ class BraveAnswersGroundedAnswerProvider implements GroundedAnswerProvider {
 
       final assembled = buffer.toString();
 
+      String clean(String value) => value
+          .replaceAll(_citationTag, '')
+          .replaceAll(RegExp(r'<usage>.*?</usage>', dotAll: true), '')
+          .replaceAll(_anyTag, '');
+      int? offset(dynamic value) => value is int
+          ? value
+          : value is String
+          ? int.tryParse(value)
+          : null;
       final citations = <GroundedAnswerCitation>[];
       for (final match in _citationTag.allMatches(assembled)) {
         try {
@@ -127,35 +141,39 @@ class BraveAnswersGroundedAnswerProvider implements GroundedAnswerProvider {
           // Skip citations without a valid URL — an empty URL would produce
           // a broken [Source]() link in saved notes.
           if (url.trim().isEmpty) continue;
-          citations.add(GroundedAnswerCitation(
-            id: (json['number'] ?? json['id'] ?? citations.length + 1)
-                .toString(),
-            title: url,
-            url: url,
-            snippet: json['snippet'] as String?,
-            startIndex: json['start_index'] as int?,
-            endIndex: json['end_index'] as int?,
-          ));
+          citations.add(
+            GroundedAnswerCitation(
+              id: (json['number'] ?? json['id'] ?? citations.length + 1)
+                  .toString(),
+              title: url,
+              url: url,
+              snippet: json['snippet'] is String
+                  ? json['snippet'] as String
+                  : null,
+              // Inline placement survives absent or unusable provider ranges.
+              position: clean(assembled.substring(0, match.start)).length,
+              startIndex: offset(json['start_index']),
+              endIndex: offset(json['end_index']),
+            ),
+          );
         } catch (_) {
           // skip malformed citation
         }
       }
 
-      var answerText = assembled
-          .replaceAll(_citationTag, '')
-          .replaceAll(RegExp(r'<usage>.*?</usage>', dotAll: true), '')
-          .replaceAll(_anyTag, '')
-          .trim();
+      final answerText = clean(assembled);
 
-      if (answerText.isEmpty) return const GroundedAnswerEmpty();
+      if (answerText.trim().isEmpty) return const GroundedAnswerEmpty();
 
-      return GroundedAnswerSuccess(GroundedAnswer(
-        question: question,
-        answerText: answerText,
-        citations: citations,
-        providerName: 'Brave Answers',
-        generatedAt: DateTime.now().toUtc(),
-      ));
+      return GroundedAnswerSuccess(
+        GroundedAnswer(
+          question: question,
+          answerText: answerText,
+          citations: citations,
+          providerName: 'Brave Answers',
+          generatedAt: DateTime.now().toUtc(),
+        ),
+      );
     } on SocketException {
       return const GroundedAnswerNetworkFailure();
     } on IOException {

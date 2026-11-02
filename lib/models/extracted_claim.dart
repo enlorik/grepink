@@ -1,8 +1,12 @@
+import 'grounded_answer.dart';
+
 class ExtractedClaim {
   final String id;
   final String text;
   final List<String> citationUrls;
   final List<String> citationTitles;
+  final List<GroundedAnswerCitation> evidence;
+  final bool evidenceMapped;
   final String sourceAnswerProvider;
   final String sourceQuestion;
   final double? confidence;
@@ -14,6 +18,8 @@ class ExtractedClaim {
     required this.text,
     required this.citationUrls,
     required this.citationTitles,
+    this.evidence = const [],
+    this.evidenceMapped = false,
     required this.sourceAnswerProvider,
     required this.sourceQuestion,
     this.confidence,
@@ -26,6 +32,8 @@ class ExtractedClaim {
     String? text,
     List<String>? citationUrls,
     List<String>? citationTitles,
+    List<GroundedAnswerCitation>? evidence,
+    bool? evidenceMapped,
     String? sourceAnswerProvider,
     String? sourceQuestion,
     double? confidence,
@@ -37,6 +45,8 @@ class ExtractedClaim {
       text: text ?? this.text,
       citationUrls: citationUrls ?? this.citationUrls,
       citationTitles: citationTitles ?? this.citationTitles,
+      evidence: evidence ?? this.evidence,
+      evidenceMapped: evidenceMapped ?? this.evidenceMapped,
       sourceAnswerProvider: sourceAnswerProvider ?? this.sourceAnswerProvider,
       sourceQuestion: sourceQuestion ?? this.sourceQuestion,
       confidence: confidence ?? this.confidence,

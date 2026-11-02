@@ -14,7 +14,8 @@ abstract class ClaimExtractionService {
 /// When citations have character offsets (startIndex/endIndex), only citations
 /// overlapping the sentence's character range are attached to that claim and
 /// [ExtractedClaim.citationUncertain] is false. When no overlapping citation is
-/// found (or all offsets are null), the claim carries no citations and
+/// found, inline citation placement is used; otherwise only unattributed answer
+/// links are retained without excerpts and
 /// [citationUncertain] is true.
 ///
 /// Known limitation: the sentence splitter will incorrectly fragment
@@ -33,13 +34,18 @@ class RuleBasedClaimExtractionService implements ClaimExtractionService {
     if (text.trim().isEmpty) return const [];
 
     final allCitations = answer.citations;
-    final hasOffsets =
-        allCitations.any((c) => c.startIndex != null && c.endIndex != null);
-
     // Build sentence ranges using allMatches for position awareness.
     final sentences = <({int start, int end, String text})>[];
     int cursor = 0;
     for (final match in _sentenceEnd.allMatches(text)) {
+      // A sentence boundary inside emphasis or code is not a safe render boundary.
+      final prefix = text.substring(0, match.start);
+      if (RegExp(r'```|~~~').allMatches(prefix).length.isOdd ||
+          RegExp(r'(?<!\\)\*\*').allMatches(prefix).length.isOdd ||
+          RegExp(r'(?<!\\)__').allMatches(prefix).length.isOdd ||
+          RegExp(r'(?<!`)`(?!`)').allMatches(prefix).length.isOdd) {
+        continue;
+      }
       final segment = text.substring(cursor, match.start);
       if (segment.trim().isNotEmpty) {
         sentences.add((start: cursor, end: match.start, text: segment));
@@ -69,51 +75,86 @@ class RuleBasedClaimExtractionService implements ClaimExtractionService {
       final List<String> citationTitles;
       final bool uncertain;
 
-      if (!hasOffsets) {
-        // No citation offset data — attach all citations and mark uncertain.
-        // When citations are present, uncertainty prevents saving without a
-        // verifiable source. When there are no citations at all, marking uncertain
-        // ensures claims from unannotated answers are not saved as sourced facts.
-        citationUrls =
-            List.unmodifiable(allCitations.map((c) => c.url).toList());
-        citationTitles =
-            List.unmodifiable(allCitations.map((c) => c.title).toList());
-        uncertain = true;
-      } else {
-        final overlapping = allCitations.where((c) {
-          if (c.startIndex == null || c.endIndex == null) return false;
+      // A source consulted for the answer is not automatically evidence for
+      // every sentence. Keep only provider ranges overlapping this claim.
+      bool validRange(GroundedAnswerCitation c) =>
+          c.startIndex != null &&
+          c.endIndex != null &&
+          c.startIndex! >= 0 &&
+          c.endIndex! > c.startIndex! &&
+          c.endIndex! <= text.length;
+      final positions = allCitations.map((c) => c.position).toSet();
+      final endCluster =
+          sentences.length > 1 &&
+          allCitations.length > 1 &&
+          positions.length == 1 &&
+          positions.single == text.trimRight().length;
+      final overlapping = allCitations.where((c) {
+        if (validRange(c)) {
           return c.startIndex! < sentenceEnd && c.endIndex! > sentenceStart;
-        }).toList();
-        if (overlapping.isNotEmpty) {
-          citationUrls =
-              List.unmodifiable(overlapping.map((c) => c.url).toList());
-          citationTitles =
-              List.unmodifiable(overlapping.map((c) => c.title).toList());
-          uncertain = false;
-        } else {
-          // No citation range covers this sentence; attach all citations
-          // conservatively so saved claims still carry a source URL.
-          citationUrls =
-              List.unmodifiable(allCitations.map((c) => c.url).toList());
-          citationTitles =
-              List.unmodifiable(allCitations.map((c) => c.title).toList());
-          uncertain = true;
         }
-      }
+        final position = c.position;
+        if (endCluster ||
+            position == null ||
+            position <= 0 ||
+            position > text.length) {
+          return false;
+        }
+        final anchor = text.substring(0, position).trimRight().length;
+        return anchor > sentenceStart && anchor <= sentenceEnd;
+      }).toList();
+      uncertain = overlapping.isEmpty;
+      // Keep answer source links reachable even when their sentence attribution
+      // is unknown, but never recycle a different claim's quote as evidence.
+      final evidence = uncertain
+          ? allCitations
+                .map(
+                  (c) => GroundedAnswerCitation(
+                    id: c.id,
+                    title: c.title,
+                    url: c.url,
+                  ),
+                )
+                .toList()
+          : overlapping;
+      citationUrls = List.unmodifiable(evidence.map((c) => c.url).toSet());
+      citationTitles = List.unmodifiable(
+        citationUrls.map(
+          (url) => evidence.firstWhere((c) => c.url == url).title,
+        ),
+      );
 
-      final id = _claimId(answer.providerName, answer.question, trimmed,
-          claims.length, answer.generatedAt);
+      final id = _claimId(
+        answer.providerName,
+        answer.question,
+        trimmed,
+        claims.length,
+        answer.generatedAt,
+      );
 
-      claims.add(ExtractedClaim(
-        id: id,
-        text: trimmed,
-        citationUrls: citationUrls,
-        citationTitles: citationTitles,
-        sourceAnswerProvider: answer.providerName,
-        sourceQuestion: answer.question,
-        order: claims.length,
-        citationUncertain: uncertain,
-      ));
+      final contentStart = sentence.start + sentence.text.indexOf(trimmed);
+      final lineStart =
+          text.lastIndexOf('\n', contentStart == 0 ? 0 : contentStart - 1) + 1;
+      final indentation = text.substring(lineStart, contentStart);
+      final formatted =
+          RegExp(r'^[ \t]*$').hasMatch(indentation) &&
+              RegExp(r'^(?:[-+*•●◦▪]|\d+[.)])\s').hasMatch(trimmed)
+          ? '$indentation$trimmed'
+          : trimmed;
+      claims.add(
+        ExtractedClaim(
+          id: id,
+          text: formatted,
+          citationUrls: citationUrls,
+          citationTitles: citationTitles,
+          evidence: List.unmodifiable(evidence),
+          evidenceMapped: true,
+          sourceAnswerProvider: answer.providerName,
+          sourceQuestion: answer.question,
+          order: claims.length,
+          citationUncertain: uncertain,
+        ),
+      );
     }
 
     return List.unmodifiable(claims);
@@ -124,12 +165,19 @@ class RuleBasedClaimExtractionService implements ClaimExtractionService {
   /// [generatedAt] scopes the ID to the specific answer instance so that two
   /// answers to the same question at different times never share claim IDs,
   /// even when provider/question/text are identical.
-  static String _claimId(String provider, String question, String claimText,
-      int index, DateTime generatedAt) {
+  static String _claimId(
+    String provider,
+    String question,
+    String claimText,
+    int index,
+    DateTime generatedAt,
+  ) {
     final qKey = question.length > 40 ? question.substring(0, 40) : question;
     final tKey = claimText.length > 40 ? claimText.substring(0, 40) : claimText;
     final tsKey = generatedAt.millisecondsSinceEpoch.toRadixString(36);
-    return '${provider}_ts:${tsKey}_q:${qKey}_i:${index}_t:$tKey'
-        .replaceAll(RegExp(r'\s+'), '_');
+    return '${provider}_ts:${tsKey}_q:${qKey}_i:${index}_t:$tKey'.replaceAll(
+      RegExp(r'\s+'),
+      '_',
+    );
   }
 }

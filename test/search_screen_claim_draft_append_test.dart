@@ -1,3 +1,4 @@
+import 'package:grepink/services/note_source_document.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -306,7 +307,9 @@ void main() {
       expect(repo.updatedNotes, hasLength(1));
       final updatedContent = repo.updatedNotes.single.content;
       expect(updatedContent, contains('Old content here.'));
-      expect(updatedContent, contains(generatedMarkdown.trim()));
+      expect(generatedMarkdown, contains('A brand new claim.'));
+      expect(updatedContent, contains('A brand new claim.'));
+      expect(updatedContent, isNot(contains('## New knowledge')));
     });
 
     testWidgets('append inserts a separator between old and new content',
@@ -347,13 +350,12 @@ void main() {
 
       final updatedContent = repo.updatedNotes.single.content;
       final oldIndex = updatedContent.indexOf('Old content here.');
-      final separatorIndex = updatedContent.indexOf('---');
-      final draftIndex = updatedContent.indexOf(
-          container.read(claimReviewProvider).draft!.markdownContent.trim());
-
+      final additionIndex = updatedContent.indexOf('A brand new claim.');
       expect(oldIndex, greaterThanOrEqualTo(0));
-      expect(separatorIndex, greaterThan(oldIndex));
-      expect(draftIndex, greaterThan(separatorIndex));
+      expect(additionIndex, greaterThan(oldIndex));
+      expect(updatedContent, isNot(contains('## New knowledge')));
+      expect(updatedContent, isNot(contains('---')));
+
     });
 
     testWidgets('repeated append calls do not duplicate the content',
@@ -1879,7 +1881,8 @@ void main() {
       await _tapAppend(tester);
 
       expect(repo.updatedNotes, hasLength(1));
-      expect(repo.updatedNotes.first.content, contains('$claimTitle — $url'));
+      expect(repo.updatedNotes.first.content, contains(url));
+      expect(NoteSourceDocument.sources(repo.updatedNotes.first.content).single.title, claimTitle);
     });
   });
 }
