@@ -335,8 +335,7 @@ void main() {
         'sentence without an overlapping citation has no attributed sources',
         () {
           // Citation covers only sentence 1 (chars 0–10); sentence 2 (11–21) has no
-          // overlapping citation. All citations are attached conservatively to preserve
-          // source URLs on saved claims.
+          // overlapping citation, so it must not inherit sentence 1's evidence.
           final answer = _answer(
             answerText: 'Claim one. Claim two.',
             citations: [

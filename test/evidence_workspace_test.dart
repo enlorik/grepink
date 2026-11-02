@@ -8,6 +8,34 @@ import 'package:grepink/widgets/evidence_workspace.dart';
 import 'package:grepink/widgets/note_reading_view.dart';
 
 void main() {
+  testWidgets('unmapped passage clears the previous claim quote', (
+    tester,
+  ) async {
+    final evidence = EvidenceController();
+    addTearDown(evidence.dispose);
+    evidence.inspect('A mapped claim.', [
+      const GroundedAnswerCitation(
+        id: '1',
+        title: 'Page',
+        url: 'https://example.com',
+        snippet: 'The prior exact quote.',
+      ),
+    ]);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: EvidencePane(controller: evidence)),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('The prior exact quote.'), findsOneWidget);
+    evidence.inspect('An unmapped claim.', []);
+    evidence.select(1);
+    await tester.pumpAndSettle();
+    expect(find.text('The prior exact quote.'), findsNothing);
+    expect(find.textContaining('No claim-specific citation'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   test(
     'topic labels and additions remove question/report wrappers but preserve evidence and warnings',
     () {

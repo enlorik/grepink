@@ -173,6 +173,15 @@ void main() {
       expect(find.byKey(const Key('page-passage-highlight')), findsOneWidget);
       expect(find.byType(SourceFigure), findsOneWidget);
       expect(find.byType(Image), findsOneWidget);
+      // Decode the exact provider used by the widget before capturing pixels.
+      final renderedImage = tester.widget<Image>(find.byType(Image));
+      await tester.runAsync(
+        () => precacheImage(
+          renderedImage.image,
+          tester.element(find.byType(Image)),
+        ),
+      );
+      await tester.pumpAndSettle();
       expect(find.text('Cited text located in this page'), findsOneWidget);
       if (output != null) {
         final boundary =
