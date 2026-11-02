@@ -492,9 +492,10 @@ class ClaimReviewNotifier extends StateNotifier<ClaimReviewSessionState> {
 
   String _appendDraftMarkdown(String existingContent, ClaimDraftResult draft) {
     final sources = {
-      for (final s in NoteSourceDocument.sources(existingContent)) s.url: s,
+      for (final s in NoteSourceDocument.sources(existingContent))
+        NoteSourceDocument.identity(s): s,
       for (final s in NoteSourceDocument.sources(draft.markdownContent))
-        s.url: s,
+        NoteSourceDocument.identity(s): s,
     };
     final body = insertNoteDraft(
       NoteSourceDocument.withoutMetadata(existingContent, trim: false),
