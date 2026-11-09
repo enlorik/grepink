@@ -302,16 +302,21 @@ SourcePage parseSourcePage(
   Uri? baseUrl,
 }) {
   final document = html.parse(source);
-  final title = document.querySelector('title')?.text.trim();
+  final articleRoot =
+      document.querySelector('article') ?? document.querySelector('main');
+  final title =
+      articleRoot?.querySelector('h1')?.text.trim() ??
+      document
+          .querySelector('meta[property="og:title"]')
+          ?.attributes['content']
+          ?.trim() ??
+      document.querySelector('title')?.text.trim();
   for (final element in document.querySelectorAll(
-    'script,style,noscript,nav,header,footer,aside,form,button,svg,iframe',
+    'script,style,noscript,nav,footer,aside,form,button,svg,iframe',
   )) {
     element.remove();
   }
-  final root =
-      document.querySelector('main') ??
-      document.querySelector('article') ??
-      document.body;
+  final root = articleRoot ?? document.body;
   final sections = <SourcePageSection>[];
   final images = <SourcePageImage>[];
   final seenImages = <String>{};
@@ -359,6 +364,29 @@ SourcePage parseSourcePage(
           })
           .join('\n');
     }
+    if (e.localName == 'table') {
+      final rows = e
+          .querySelectorAll('tr')
+          .map(
+            (row) => row.children
+                .where((cell) => ['th', 'td'].contains(cell.localName))
+                .map((cell) => inline(cell).trim().replaceAll('|', r'\|'))
+                .toList(),
+          )
+          .where((row) => row.isNotEmpty)
+          .toList();
+      if (rows.isEmpty) return '';
+      final width = rows
+          .map((row) => row.length)
+          .reduce((a, b) => a > b ? a : b);
+      String render(List<String> row) =>
+          '| ${[...row, ...List.filled(width - row.length, '')].join(' | ')} |';
+      return [
+        render(rows.first),
+        render(List.filled(width, '---')),
+        ...rows.skip(1).map(render),
+      ].join('\n');
+    }
     final value = inline(e).trim();
     if (RegExp(r'^h[1-6]$').hasMatch(e.localName ?? '')) {
       return '${'#' * int.parse(e.localName![1])} $value';
@@ -369,14 +397,38 @@ SourcePage parseSourcePage(
 
   void addImage(dom.Element image) {
     if (images.length >= 8) return;
-    final raw = image.attributes['data-src'] ?? image.attributes['src'];
+    // Prefer a real lazy image, then a bounded responsive candidate, then src.
+    final srcset =
+        image.attributes['data-srcset'] ?? image.attributes['srcset'];
+    final candidates = <({String url, int width})>[];
+    for (final part in (srcset ?? '').split(',')) {
+      final match = RegExp(r'^\s*(\S+)\s+(\d+)w\s*$').firstMatch(part);
+      if (match != null)
+        candidates.add((url: match[1]!, width: int.parse(match[2]!)));
+    }
+    candidates.sort((a, b) => a.width.compareTo(b.width));
+    final suitable = candidates
+        .where((c) => c.width >= 640 && c.width <= 1600)
+        .toList();
+    final responsive = suitable.isNotEmpty
+        ? suitable.first.url
+        : candidates.isNotEmpty
+        ? candidates.last.url
+        : null;
+    final raw =
+        image.attributes['data-src'] ??
+        image.attributes['data-original'] ??
+        responsive ??
+        image.attributes['src'];
     if (raw == null) return;
     final uri = baseUrl?.resolve(raw) ?? Uri.tryParse(raw);
     if (uri == null || !HttpSourcePageLoader.isPublicPage(uri)) return;
+    dom.Element? figure = image.parent;
+    while (figure != null && figure.localName != 'figure') {
+      figure = figure.parent;
+    }
     final label =
-        (image.parent?.localName == 'figure'
-            ? image.parent?.querySelector('figcaption')?.text
-            : null) ??
+        figure?.querySelector('figcaption')?.text ??
         image.attributes['alt'] ??
         '';
     final width = int.tryParse(image.attributes['width'] ?? '');
