@@ -243,35 +243,38 @@ class _SourcePageReaderState extends State<SourcePageReader> {
             ),
           ],
           const SizedBox(height: 8),
-          ExpansionTile(
-            key: ValueKey('article-context-${widget.url}-${widget.passage}'),
-            tilePadding: EdgeInsets.zero,
-            childrenPadding: const EdgeInsets.only(bottom: 12),
-            title: const Text(
-              'Read article context',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-            ),
-            subtitle: const Text(
-              'Reader view · original site styling omitted',
-              style: TextStyle(fontSize: 11),
-            ),
-            children: [
-              if (index != null && hasQuote)
-                Container(
-                  key: const Key('source-page-quote'),
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: exact == null
-                      ? _markdown(page.sections[index].markdown)
-                      : _pageParagraph(page.sections[index]),
-                ),
-              _markdown(
-                page.sections
-                    .skip(index == null ? 0 : index + 1)
-                    .take(10)
-                    .map((s) => s.markdown)
-                    .join('\n\n'),
+          Material(
+            type: MaterialType.transparency,
+            child: ExpansionTile(
+              key: ValueKey('article-context-${widget.url}-${widget.passage}'),
+              tilePadding: EdgeInsets.zero,
+              childrenPadding: const EdgeInsets.only(bottom: 12),
+              title: const Text(
+                'Read article context',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
               ),
-            ],
+              subtitle: const Text(
+                'Reader view · original site styling omitted',
+                style: TextStyle(fontSize: 11),
+              ),
+              children: [
+                if (index != null && hasQuote)
+                  Container(
+                    key: const Key('source-page-quote'),
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: exact == null
+                        ? _markdown(page.sections[index].markdown)
+                        : _pageParagraph(page.sections[index]),
+                  ),
+                _markdown(
+                  page.sections
+                      .skip(index == null ? 0 : index + 1)
+                      .take(10)
+                      .map((s) => s.markdown)
+                      .join('\n\n'),
+                ),
+              ],
+            ),
           ),
         ],
         if (hasQuote && !widget.compact)
