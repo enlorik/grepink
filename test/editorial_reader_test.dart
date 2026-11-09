@@ -22,6 +22,11 @@ void main() {
       );
       expect(page.title, 'A field guide');
       expect(
+        page.excerptIndex('# A field guide\n\nDistinct Rust tuple fields.'),
+        0,
+      );
+      expect(sourceTextKey('C# and snake_case'), 'c# and snake_case');
+      expect(
         page.sections.any((s) => s.text.contains('Navigation introduction')),
         isFalse,
       );
