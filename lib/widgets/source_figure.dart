@@ -60,16 +60,19 @@ class _SourceFigureState extends State<SourceFigure> {
                 child: Center(child: Text('Loading article image…')),
               );
             }
-            return ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.memory(
-                snapshot.data!,
-                cacheWidth: 1000,
-                height: 220,
-                fit: BoxFit.contain,
-                semanticLabel: widget.figure.caption,
-                errorBuilder: (_, error, stack) =>
-                    const Text('This article image could not be displayed.'),
+            return ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 240),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.memory(
+                  snapshot.data!,
+                  cacheWidth: 1000,
+                  width: double.infinity,
+                  fit: BoxFit.contain,
+                  semanticLabel: widget.figure.caption,
+                  errorBuilder: (_, error, stack) =>
+                      const Text('This article image could not be displayed.'),
+                ),
               ),
             );
           },
