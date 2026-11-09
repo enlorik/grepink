@@ -114,12 +114,15 @@ class _SourcePageReaderState extends State<SourcePageReader> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          host.replaceFirst(RegExp(r'^www\.'), ''),
-          key: const Key('source-domain'),
-          style: Theme.of(
-            context,
-          ).textTheme.labelMedium?.copyWith(color: AppColors.primaryAccent),
+        Tooltip(
+          message: widget.url,
+          child: Text(
+            host.replaceFirst(RegExp(r'^www\.'), ''),
+            key: const Key('source-domain'),
+            style: Theme.of(
+              context,
+            ).textTheme.labelMedium?.copyWith(color: AppColors.primaryAccent),
+          ),
         ),
         const SizedBox(height: 6),
         Text(

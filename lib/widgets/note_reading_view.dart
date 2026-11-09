@@ -496,18 +496,10 @@ class _NoteReadingViewState extends State<NoteReadingView> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    source.title,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    Uri.parse(source.url).host,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: 20),
                   SourcePageReader(
                     url: source.url,
+                    sourceTitle: source.title,
+                    imageLoader: widget.imageLoader,
                     passage: _passageText,
                     savedExcerpt: source.snippet,
                     loader: widget.sourceLoader,
