@@ -364,8 +364,15 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Padding(
-                            padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
-                            child: _buildTitleField(),
+                            padding: const EdgeInsets.fromLTRB(24, 8, 24, 4),
+                            child: Center(
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(
+                                  maxWidth: 720,
+                                ),
+                                child: _buildTitleField(),
+                              ),
+                            ),
                           ),
                           const Divider(
                             height: 1,
