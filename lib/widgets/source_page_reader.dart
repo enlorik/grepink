@@ -110,7 +110,13 @@ class _SourcePageReaderState extends State<SourcePageReader> {
         : index == null
         ? page.images.take(1).toList()
         : page.imagesNear(index);
-    final quote = hasQuote ? _markdown(excerpt!) : null;
+    var displayExcerpt = excerpt ?? '';
+    final heading = RegExp(r'^#{1,6}\s+([^\n]+)\n+').firstMatch(displayExcerpt);
+    if (heading != null && sourceTextKey(heading[1]!) == sourceTextKey(title)) {
+      final body = displayExcerpt.substring(heading.end).trim();
+      if (body.isNotEmpty) displayExcerpt = body;
+    }
+    final quote = hasQuote ? _markdown(displayExcerpt) : null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -122,7 +128,7 @@ class _SourcePageReaderState extends State<SourcePageReader> {
               key: const Key('source-domain'),
               style: Theme.of(
                 context,
-              ).textTheme.labelMedium?.copyWith(color: AppColors.primaryAccent),
+              ).textTheme.labelMedium?.copyWith(color: AppColors.primaryAction),
             ),
           ),
         SizedBox(height: widget.compact ? 0 : 6),
