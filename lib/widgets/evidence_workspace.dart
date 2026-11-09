@@ -166,34 +166,13 @@ class EvidencePane extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              if (!compact) ...[
-                                Text(
-                                  selection!.passage,
-                                  maxLines: 3,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context).textTheme.bodySmall
-                                      ?.copyWith(fontStyle: FontStyle.italic),
-                                ),
-                                const SizedBox(height: 12),
-                              ],
-                              Text(
-                                source.title,
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                              if (!compact) ...[
-                                const SizedBox(height: 4),
-                                Text(
-                                  source.url,
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                              ],
-                              SizedBox(height: compact ? 6 : 16),
                               if (source.passage == null)
                                 const Text(
                                   'Source link · sentence attribution unavailable',
                                 ),
                               SourcePageReader(
                                 url: source.url,
+                                sourceTitle: source.title,
                                 passage: selection!.passage,
                                 savedExcerpt: source.snippet,
                                 loader: loader,

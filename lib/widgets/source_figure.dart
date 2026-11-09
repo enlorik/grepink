@@ -6,7 +6,13 @@ import '../services/source_page_loader.dart';
 class SourceFigure extends StatefulWidget {
   final SourcePageImage figure;
   final SourceImageLoader? loader;
-  const SourceFigure({super.key, required this.figure, this.loader});
+  final String attribution;
+  const SourceFigure({
+    super.key,
+    required this.figure,
+    this.loader,
+    this.attribution = 'Article visual · not independent proof',
+  });
   @override
   State<SourceFigure> createState() => _SourceFigureState();
 }
@@ -73,10 +79,7 @@ class _SourceFigureState extends State<SourceFigure> {
           widget.figure.caption,
           style: Theme.of(context).textTheme.bodySmall,
         ),
-        Text(
-          'Article visual · not independent proof',
-          style: Theme.of(context).textTheme.labelSmall,
-        ),
+        Text(widget.attribution, style: Theme.of(context).textTheme.labelSmall),
       ],
     ),
   );

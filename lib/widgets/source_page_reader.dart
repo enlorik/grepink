@@ -5,12 +5,14 @@ import '../services/source_page_loader.dart';
 import '../services/source_image_loader.dart';
 import '../theme/app_colors.dart';
 import 'source_figure.dart';
+import 'reading_markdown_style.dart';
 
-/// Cited excerpts are kept distinct from locally matched page context.
+/// A single article card: provenance, cited words, figures, optional context.
 class SourcePageReader extends StatefulWidget {
   final String url;
   final String passage;
   final String? savedExcerpt;
+  final String? sourceTitle;
   final SourcePageLoader? loader;
   final SourceImageLoader? imageLoader;
   final bool compact;
@@ -19,6 +21,7 @@ class SourcePageReader extends StatefulWidget {
     required this.url,
     required this.passage,
     this.savedExcerpt,
+    this.sourceTitle,
     this.loader,
     this.imageLoader,
     this.compact = false,
@@ -31,6 +34,7 @@ class _SourcePageReaderState extends State<SourcePageReader> {
   SourcePage? _page;
   bool _loading = false;
   bool _failed = false;
+  bool _expandedQuote = false;
   int _generation = 0;
   @override
   void initState() {
@@ -41,6 +45,9 @@ class _SourcePageReaderState extends State<SourcePageReader> {
   @override
   void didUpdateWidget(SourcePageReader old) {
     super.didUpdateWidget(old);
+    if (old.savedExcerpt != widget.savedExcerpt || old.url != widget.url) {
+      _expandedQuote = false;
+    }
     if (old.url != widget.url || old.loader != widget.loader) {
       _page = null;
       _load();
@@ -73,38 +80,15 @@ class _SourcePageReaderState extends State<SourcePageReader> {
     data: text,
     selectable: true,
     sizedImageBuilder: (config) => Text(config.alt ?? 'Image'),
-    styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
-      p: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.6),
-    ),
+    styleSheet: readingMarkdownStyle(context, compact: true),
   );
 
-  Widget _pageParagraph(String text, String? quote) {
-    final clean = quote == null ? '' : sourceTextKey(quote);
-    final at = clean.isEmpty ? -1 : text.toLowerCase().indexOf(clean);
-    if (at < 0) {
-      return SelectableText(
-        text,
-        key: const Key('page-passage'),
-        style: const TextStyle(height: 1.6),
-      );
-    }
-    return SelectableText.rich(
-      TextSpan(
-        children: [
-          TextSpan(text: text.substring(0, at)),
-          TextSpan(
-            text: text.substring(at, at + clean.length),
-            style: TextStyle(
-              backgroundColor: AppColors.primaryAccent.withValues(alpha: .25),
-            ),
-          ),
-          TextSpan(text: text.substring(at + clean.length)),
-        ],
-      ),
-      key: const Key('page-passage-highlight'),
-      style: const TextStyle(height: 1.6),
-    );
-  }
+  Widget _pageParagraph(SourcePageSection section) => Container(
+    key: const Key('page-passage-highlight'),
+    padding: const EdgeInsets.all(10),
+    color: AppColors.primaryAccent.withValues(alpha: .08),
+    child: _markdown(section.markdown),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -113,26 +97,82 @@ class _SourcePageReaderState extends State<SourcePageReader> {
     final hasQuote = excerpt?.isNotEmpty == true;
     final exact = hasQuote ? page?.excerptIndex(excerpt!) : null;
     final index = exact ?? page?.candidateIndex(widget.passage);
+    final host = Uri.tryParse(widget.url)?.host ?? widget.url;
+    final supplied = widget.sourceTitle?.trim();
+    final title =
+        page?.title ??
+        (supplied != null && supplied.isNotEmpty && !supplied.startsWith('http')
+            ? supplied
+            : host);
+    final longQuote = (excerpt?.length ?? 0) > 500;
+    final figures = page == null
+        ? <SourcePageImage>[]
+        : index == null
+        ? page.images.take(1).toList()
+        : page.imagesNear(index);
+    final quote = hasQuote ? _markdown(excerpt!) : null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Text(
+          host.replaceFirst(RegExp(r'^www\.'), ''),
+          key: const Key('source-domain'),
+          style: Theme.of(
+            context,
+          ).textTheme.labelMedium?.copyWith(color: AppColors.primaryAccent),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          title,
+          key: const Key('source-article-title'),
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            fontSize: 19,
+            fontWeight: FontWeight.w600,
+            height: 1.3,
+            letterSpacing: -.3,
+          ),
+        ),
+        const SizedBox(height: 16),
         if (hasQuote) ...[
           Text(
             'Provider-cited excerpt',
-            style: Theme.of(context).textTheme.labelLarge,
+            style: Theme.of(context).textTheme.labelSmall,
           ),
           const SizedBox(height: 8),
           Container(
             key: const Key('provider-cited-excerpt'),
-            padding: EdgeInsets.all(widget.compact ? 8 : 12),
+            padding: const EdgeInsets.fromLTRB(12, 4, 0, 4),
             decoration: BoxDecoration(
-              color: AppColors.primaryAccent.withValues(alpha: .12),
-              borderRadius: BorderRadius.circular(8),
+              border: Border(
+                left: BorderSide(
+                  color: AppColors.primaryAccent.withValues(alpha: .5),
+                  width: 2,
+                ),
+              ),
             ),
-            child: _markdown(excerpt!),
+            child: longQuote && !_expandedQuote
+                ? LimitedBox(
+                    maxHeight: widget.compact ? 90 : 160,
+                    child: SingleChildScrollView(
+                      physics: const NeverScrollableScrollPhysics(),
+                      child: quote,
+                    ),
+                  )
+                : quote,
           ),
-          const SizedBox(height: 8),
-          if (page != null && !widget.compact)
+          if (longQuote)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: () =>
+                    setState(() => _expandedQuote = !_expandedQuote),
+                child: Text(_expandedQuote ? 'Less excerpt' : 'Full excerpt'),
+              ),
+            ),
+          if (page != null && !widget.compact) ...[
+            const SizedBox(height: 8),
             Text(
               exact != null
                   ? 'Cited text located in this page'
@@ -140,27 +180,20 @@ class _SourcePageReaderState extends State<SourcePageReader> {
               key: const Key('excerpt-location-status'),
               style: Theme.of(context).textTheme.bodySmall,
             ),
-          if (!widget.compact)
-            TextButton.icon(
-              onPressed: () => Clipboard.setData(
-                ClipboardData(
-                  text:
-                      '${Uri.parse(widget.url).removeFragment()}#:~:text=${Uri.encodeComponent(sourceTextKey(excerpt))}',
-                ),
-              ),
-              icon: const Icon(Icons.link, size: 16),
-              label: const Text('Copy link to cited text'),
-            ),
+          ],
         ] else ...[
           const Text(
             'No exact excerpt was supplied for this passage.',
             key: Key('missing-cited-excerpt'),
           ),
-          const SizedBox(height: 8),
         ],
         if (_loading)
-          const Text('Loading source page…', key: Key('source-page-loading')),
+          const LinearProgressIndicator(
+            key: Key('source-page-loading'),
+            minHeight: 1,
+          ),
         if (_failed) ...[
+          const SizedBox(height: 8),
           const Text(
             'The page could not be fetched; any cited excerpt above is retained.',
             key: Key('source-page-error'),
@@ -173,53 +206,81 @@ class _SourcePageReaderState extends State<SourcePageReader> {
             child: const Text('Retry source page'),
           ),
         ],
-        if (page != null && index == null) ...[
-          const Text(
-            'No matching passage found on this page.',
-            key: Key('no-page-match'),
-          ),
-          const SizedBox(height: 12),
-        ],
-        if (page != null && index != null && !widget.compact) ...[
-          const SizedBox(height: 16),
-          Text(page.title, style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 12),
-          Text(
-            exact != null
-                ? 'Cited passage in context'
-                : 'Related page text · not verified evidence',
-            style: Theme.of(context).textTheme.labelLarge,
-          ),
-          const SizedBox(height: 8),
-          // Keep the quote's precise paragraph visible, not the first page section.
-          Container(
-            key: const Key('source-page-quote'),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              border: Border.all(color: AppColors.dividerBorder),
-              borderRadius: BorderRadius.circular(8),
+        if (!widget.compact && page != null) ...[
+          if (index == null)
+            const Padding(
+              padding: EdgeInsets.only(top: 12),
+              child: Text(
+                'No matching passage found on this page.',
+                key: Key('no-page-match'),
+              ),
             ),
-            child: _pageParagraph(
-              page.sections[index].text,
-              exact == null ? null : excerpt,
-            ),
-          ),
-          const SizedBox(height: 16),
-          for (final figure in page.imagesNear(index))
+          // Figures remain accessible even when an exact cited quote cannot be found.
+          for (final figure in figures) ...[
+            const SizedBox(height: 16),
             SourceFigure(figure: figure, loader: widget.imageLoader),
-          _markdown(
-            page.sections
-                .skip(index + 1)
-                .take(4)
-                .map((s) => s.markdown)
-                .join('\n\n'),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Article text and figures · scripts and original styling omitted',
-            style: Theme.of(context).textTheme.bodySmall,
+          ],
+          if (index != null && !hasQuote) ...[
+            const SizedBox(height: 12),
+            Text(
+              'Related page text · not verified evidence',
+              style: Theme.of(context).textTheme.labelSmall,
+            ),
+            Container(
+              key: const Key('source-page-quote'),
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: _markdown(page.sections[index].markdown),
+            ),
+          ],
+          const SizedBox(height: 8),
+          ExpansionTile(
+            key: ValueKey('article-context-${widget.url}-${widget.passage}'),
+            tilePadding: EdgeInsets.zero,
+            childrenPadding: const EdgeInsets.only(bottom: 12),
+            title: const Text(
+              'Read article context',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+            ),
+            subtitle: const Text(
+              'Reader view · original site styling omitted',
+              style: TextStyle(fontSize: 11),
+            ),
+            children: [
+              if (index != null && hasQuote)
+                Container(
+                  key: const Key('source-page-quote'),
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: exact == null
+                      ? _markdown(page.sections[index].markdown)
+                      : _pageParagraph(page.sections[index]),
+                ),
+              _markdown(
+                page.sections
+                    .skip(index == null ? 0 : index + 1)
+                    .take(10)
+                    .map((s) => s.markdown)
+                    .join('\n\n'),
+              ),
+            ],
           ),
         ],
+        if (hasQuote && !widget.compact)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => Clipboard.setData(
+                ClipboardData(
+                  text:
+                      '${Uri.parse(widget.url).removeFragment()}#:~:text=${Uri.encodeComponent(sourceTextKey(excerpt!))}',
+                ),
+              ),
+              icon: const Icon(Icons.link, size: 14),
+              label: const Text(
+                'Copy link to cited text',
+                style: TextStyle(fontSize: 12),
+              ),
+            ),
+          ),
       ],
     );
   }

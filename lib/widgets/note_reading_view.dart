@@ -9,6 +9,9 @@ import '../services/note_document_blocks.dart';
 import '../services/markdown_list_lines.dart';
 import '../services/source_page_loader.dart';
 import 'source_page_reader.dart';
+import 'source_figure.dart';
+import '../services/source_image_loader.dart';
+import 'reading_markdown_style.dart';
 import 'evidence_workspace.dart';
 import '../services/note_source_document.dart';
 import '../theme/app_colors.dart';
@@ -20,6 +23,7 @@ class NoteReadingView extends StatefulWidget {
   final bool editable;
   final ValueChanged<String>? onChanged;
   final SourcePageLoader? sourceLoader;
+  final SourceImageLoader? imageLoader;
   final EvidenceController? evidence;
   final ValueChanged<int>? onAddBelow;
   const NoteReadingView({
@@ -28,6 +32,7 @@ class NoteReadingView extends StatefulWidget {
     this.editable = false,
     this.onChanged,
     this.sourceLoader,
+    this.imageLoader,
     this.evidence,
     this.onAddBelow,
   });
@@ -278,7 +283,7 @@ class _NoteReadingViewState extends State<NoteReadingView> {
     final urls = _urls(body);
     final editing = _editing?.start == block.start;
     final canEdit = widget.editable && widget.onChanged != null;
-    final style = Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.65);
+    final style = readingMarkdownStyle(context).p;
     final emptyMarker = RegExp(r'^\s*[-+*•●◦▪]\s*$').hasMatch(block.markdown);
     if (emptyMarker && !editing) return const SizedBox.shrink();
     Widget content;
@@ -346,21 +351,19 @@ class _NoteReadingViewState extends State<NoteReadingView> {
               );
             }
           },
-          sizedImageBuilder: (config) => Text(config.alt ?? 'Image'),
-          styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
-            p: style,
-            blockSpacing: 14,
-            blockquoteDecoration: const BoxDecoration(
-              color: AppColors.codeBackground,
-              border: Border(
-                left: BorderSide(color: AppColors.dividerBorder, width: 3),
+          sizedImageBuilder: (config) => ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: SourceFigure(
+              figure: SourcePageImage(
+                config.uri.toString(),
+                config.alt ?? 'Note image',
+                0,
               ),
-            ),
-            codeblockDecoration: BoxDecoration(
-              color: AppColors.codeBackground,
-              borderRadius: BorderRadius.circular(8),
+              loader: widget.imageLoader,
+              attribution: 'Note image · ${config.uri.host}',
             ),
           ),
+          styleSheet: readingMarkdownStyle(context),
         ),
       );
     }
@@ -379,6 +382,8 @@ class _NoteReadingViewState extends State<NoteReadingView> {
               child: IconButton(
                 tooltip: 'Add information below this passage',
                 visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                padding: const EdgeInsets.all(6),
                 onPressed: () => widget.onAddBelow!(block.end),
                 icon: const Icon(Icons.add, size: 16),
               ),
@@ -409,7 +414,7 @@ class _NoteReadingViewState extends State<NoteReadingView> {
         behavior: HitTestBehavior.opaque,
         onPointerSignal: urls.isEmpty ? null : _wheel,
         child: Padding(
-          padding: EdgeInsets.fromLTRB(indent * 8.0, 6, 0, 6),
+          padding: EdgeInsets.fromLTRB(indent * 8.0, 4, 0, 4),
           child: list == null
               ? content
               : Row(

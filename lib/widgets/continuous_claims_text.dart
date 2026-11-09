@@ -60,8 +60,8 @@ class _ContinuousClaimsTextState extends State<ContinuousClaimsText> {
     final theme = Theme.of(context);
     return theme.textTheme.bodyLarge!.copyWith(
       fontSize: 16,
-      height: 1.6,
-      letterSpacing: 0.1,
+      height: 1.5,
+      letterSpacing: 0,
       decoration: widget.selectedIds.contains(item.id)
           ? TextDecoration.none
           : TextDecoration.lineThrough,
