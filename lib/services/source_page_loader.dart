@@ -403,8 +403,9 @@ SourcePage parseSourcePage(
     final candidates = <({String url, int width})>[];
     for (final part in (srcset ?? '').split(',')) {
       final match = RegExp(r'^\s*(\S+)\s+(\d+)w\s*$').firstMatch(part);
-      if (match != null)
+      if (match != null) {
         candidates.add((url: match[1]!, width: int.parse(match[2]!)));
+      }
     }
     candidates.sort((a, b) => a.width.compareTo(b.width));
     final suitable = candidates
