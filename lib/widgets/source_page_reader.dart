@@ -114,30 +114,31 @@ class _SourcePageReaderState extends State<SourcePageReader> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Tooltip(
-          message: widget.url,
-          child: Text(
-            host.replaceFirst(RegExp(r'^www\.'), ''),
-            key: const Key('source-domain'),
-            style: Theme.of(
-              context,
-            ).textTheme.labelMedium?.copyWith(color: AppColors.primaryAccent),
+        if (!widget.compact)
+          Tooltip(
+            message: widget.url,
+            child: Text(
+              host.replaceFirst(RegExp(r'^www\.'), ''),
+              key: const Key('source-domain'),
+              style: Theme.of(
+                context,
+              ).textTheme.labelMedium?.copyWith(color: AppColors.primaryAccent),
+            ),
           ),
-        ),
-        const SizedBox(height: 6),
+        SizedBox(height: widget.compact ? 0 : 6),
         Text(
           title,
           key: const Key('source-article-title'),
-          maxLines: 3,
+          maxLines: widget.compact ? 1 : 3,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            fontSize: 19,
+          style: TextStyle(
+            fontSize: widget.compact ? 14 : 19,
             fontWeight: FontWeight.w600,
             height: 1.3,
             letterSpacing: -.3,
           ),
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: widget.compact ? 6 : 16),
         if (hasQuote) ...[
           Text(
             'Provider-cited excerpt',
