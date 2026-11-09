@@ -107,6 +107,12 @@ void main() {
             ).readAsBytes(),
           );
           await (FontLoader('Inter')..addFont(Future.value(bytes))).load();
+          final mono = ByteData.sublistView(
+            await File(
+              Platform.environment['GREPINK_PREVIEW_MONO']!,
+            ).readAsBytes(),
+          );
+          await (FontLoader('monospace')..addFont(Future.value(mono))).load();
           await (FontLoader('MaterialIcons')
                 ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf')))
               .load();
