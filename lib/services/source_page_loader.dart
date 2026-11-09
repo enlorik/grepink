@@ -24,6 +24,7 @@ class SourcePageImage {
 }
 
 String sourceTextKey(String text) => text
+    .replaceAll(RegExp(r'^[ \t]{0,3}#{1,6}[ \t]+', multiLine: true), '')
     .replaceAllMapped(RegExp(r'\[([^\]]+)\]\([^)]*\)'), (m) => m[1]!)
     .replaceAllMapped(
       RegExp(r'\*\*(.*?)\*\*|__(.*?)__|`([^`]+)`'),
