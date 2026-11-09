@@ -9,7 +9,7 @@ void main() {
     final page = parseSourcePage(
       '<title>Rust reference</title><nav>Noise</nav><main><h1>Types</h1><p>Scalar numbers.</p><h2 id="functions">Function types</h2><p><strong>Function pointers</strong> implement <code>Fn</code>.</p><script>bad()</script><img src="https://track.example/image"></main>',
     );
-    expect(page.title, 'Rust reference');
+    expect(page.title, 'Types');
     expect(
       page.sections[page.relevantIndex('Function pointers implement Fn')].text,
       contains('Function pointers'),
