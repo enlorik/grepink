@@ -10,6 +10,7 @@ import 'package:grepink/services/source_page_loader.dart';
 import 'package:grepink/services/source_image_loader.dart';
 import 'package:grepink/widgets/source_page_reader.dart';
 import 'package:grepink/widgets/source_figure.dart';
+import 'package:grepink/widgets/note_reading_view.dart';
 import 'article_figure_fixture.dart';
 
 class _PageLoader implements SourcePageLoader {
@@ -122,30 +123,11 @@ void main() {
               body: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.all(32),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Research workspace',
-                            style: TextStyle(
-                              fontSize: 26,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          SizedBox(height: 32),
-                          Text(
-                            'Tuples group distinct fields.',
-                            style: TextStyle(fontSize: 20, height: 1.6),
-                          ),
-                          SizedBox(height: 12),
-                          Text(
-                            'Hover a claim to inspect its cited words and source figures.',
-                          ),
-                        ],
-                      ),
+                  Expanded(
+                    child: NoteReadingView(
+                      content:
+                          '# Rust\n\n## Tuples, at a glance\n\nA tuple groups values with different types into one fixed-size value.\n\n- **Fields keep their own types**, so a name and a count can live together.\n- Access fields by position: `value.0` and `value.1`.\n\n### A small example\n\n```rust\nlet item: (&str, u32) = ("paper", 24);\nlet count = item.1;\n```\n\n![Two distinct tuple fields](https://example.com/diagram.png)\n\nChoose tuples for short groups of values; name longer-lived structures with a struct.',
+                      imageLoader: _Images(),
                     ),
                   ),
                   const VerticalDivider(width: 1),
@@ -170,15 +152,24 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('provider-cited-excerpt')), findsOneWidget);
+      expect(find.byKey(const Key('page-passage-highlight')), findsNothing);
+      await tester.tap(find.text('Read article context'));
+      await tester.pumpAndSettle();
       expect(find.byKey(const Key('page-passage-highlight')), findsOneWidget);
-      expect(find.byType(SourceFigure), findsOneWidget);
-      expect(find.byType(Image), findsOneWidget);
+      expect(find.byType(SourceFigure), findsNWidgets(2));
+      expect(find.byType(Image), findsNWidgets(2));
       // Decode the exact provider used by the widget before capturing pixels.
-      final renderedImage = tester.widget<Image>(find.byType(Image));
+      final renderedImage = tester.widget<Image>(find.byType(Image).last);
       await tester.runAsync(
         () => precacheImage(
           renderedImage.image,
-          tester.element(find.byType(Image)),
+          tester.element(find.byType(Image).last),
+        ),
+      );
+      await tester.runAsync(
+        () => precacheImage(
+          tester.widget<Image>(find.byType(Image).first).image,
+          tester.element(find.byType(Image).first),
         ),
       );
       await tester.pumpAndSettle();
@@ -223,5 +214,29 @@ void main() {
       findsOneWidget,
     );
     expect(find.byKey(const Key('missing-cited-excerpt')), findsOneWidget);
+  });
+  testWidgets('an unmatched excerpt does not hide available article figures', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: SourcePageReader(
+              url: 'https://example.com/guide',
+              passage: 'Unrelated material.',
+              savedExcerpt: 'A quote absent from this page.',
+              loader: _PageLoader(article),
+              imageLoader: _Images(),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(SourceFigure), findsOneWidget);
+    expect(find.byKey(const Key('no-page-match')), findsOneWidget);
+    expect(find.byKey(const Key('page-passage-highlight')), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 }

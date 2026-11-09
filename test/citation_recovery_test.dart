@@ -228,7 +228,7 @@ void main() {
         tester.getCenter(find.byKey(const ValueKey('note-passage-0'))),
       );
       await tester.pumpAndSettle();
-      expect(find.text('https://example.com/source'), findsOneWidget);
+      expect(find.byTooltip('https://example.com/source'), findsOneWidget);
       expect(
         find.text('Source link · sentence attribution unavailable'),
         findsOneWidget,
