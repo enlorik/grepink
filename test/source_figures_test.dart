@@ -12,6 +12,7 @@ import 'package:grepink/widgets/source_page_reader.dart';
 import 'package:grepink/widgets/source_figure.dart';
 import 'package:grepink/widgets/note_reading_view.dart';
 import 'article_figure_fixture.dart';
+import 'package:grepink/theme/app_colors.dart';
 
 class _PageLoader implements SourcePageLoader {
   final SourcePage page;
@@ -124,7 +125,16 @@ void main() {
           key: capture,
           child: MaterialApp(
             debugShowCheckedModeBanner: false,
-            theme: ThemeData(fontFamily: 'Inter'),
+            theme: ThemeData(
+              fontFamily: 'Inter',
+              scaffoldBackgroundColor: AppColors.surface,
+              colorScheme: const ColorScheme.light(
+                primary: AppColors.primaryAction,
+                surface: AppColors.surface,
+                onSurface: AppColors.bodyText,
+                surfaceContainerLow: AppColors.codeBackground,
+              ),
+            ),
             home: Scaffold(
               body: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -91,8 +91,8 @@ void main() {
       final markdown = tester.widgetList<MarkdownBody>(
         find.byType(MarkdownBody),
       );
-      expect(markdown.first.styleSheet!.h1!.fontSize, 26);
-      expect(markdown.first.styleSheet!.p!.height, 1.5);
+      expect(markdown.first.styleSheet!.h1!.fontSize, 24);
+      expect(markdown.first.styleSheet!.p!.height, 1.45);
       expect(changed, isNull);
       expect(tester.takeException(), isNull);
     },
