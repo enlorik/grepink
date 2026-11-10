@@ -1,11 +1,18 @@
+import 'grounded_answer.dart';
 import 'claim_deduplication_result.dart';
 
 class ClaimReviewItem {
   final String id;
   final String text;
+
+  /// Position in the original answer, before novelty grouping.
+  final int? sourceOrder;
   final ClaimNoveltyClassification classification;
   final List<String> citationUrls;
   final List<String> citationTitles;
+  final List<GroundedAnswerCitation> evidence;
+  final bool evidenceMapped;
+  final bool citationUncertain;
   final bool selectedByDefault;
   final String reason;
   final List<String> matchedLocalEvidenceIds;
@@ -15,9 +22,13 @@ class ClaimReviewItem {
   const ClaimReviewItem({
     required this.id,
     required this.text,
+    this.sourceOrder,
     required this.classification,
     required this.citationUrls,
     required this.citationTitles,
+    this.evidence = const [],
+    this.evidenceMapped = false,
+    this.citationUncertain = false,
     required this.selectedByDefault,
     required this.reason,
     required this.matchedLocalEvidenceIds,

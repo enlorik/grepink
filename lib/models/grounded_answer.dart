@@ -3,6 +3,7 @@ class GroundedAnswerCitation {
   final String title;
   final String url;
   final String? snippet;
+  final String? passage;
   final int? position;
   final int? startIndex;
   final int? endIndex;
@@ -12,6 +13,7 @@ class GroundedAnswerCitation {
     required this.title,
     required this.url,
     this.snippet,
+    this.passage,
     this.position,
     this.startIndex,
     this.endIndex,
@@ -22,6 +24,7 @@ class GroundedAnswerCitation {
     String? title,
     String? url,
     String? snippet,
+    String? passage,
     int? position,
     int? startIndex,
     int? endIndex,
@@ -31,6 +34,7 @@ class GroundedAnswerCitation {
       title: title ?? this.title,
       url: url ?? this.url,
       snippet: snippet ?? this.snippet,
+      passage: passage ?? this.passage,
       position: position ?? this.position,
       startIndex: startIndex ?? this.startIndex,
       endIndex: endIndex ?? this.endIndex,
@@ -45,10 +49,14 @@ class GroundedAnswerCitation {
           id == other.id &&
           url == other.url &&
           startIndex == other.startIndex &&
-          endIndex == other.endIndex;
+          endIndex == other.endIndex &&
+          position == other.position &&
+          snippet == other.snippet &&
+          passage == other.passage;
 
   @override
-  int get hashCode => Object.hash(id, url, startIndex, endIndex);
+  int get hashCode =>
+      Object.hash(id, url, startIndex, endIndex, position, snippet, passage);
 }
 
 class GroundedAnswer {
@@ -97,11 +105,11 @@ class GroundedAnswer {
 
   @override
   int get hashCode => Object.hash(
-        question,
-        answerText,
-        providerName,
-        generatedAt,
-        rawSourceLabel,
-        Object.hashAll(citations),
-      );
+    question,
+    answerText,
+    providerName,
+    generatedAt,
+    rawSourceLabel,
+    Object.hashAll(citations),
+  );
 }

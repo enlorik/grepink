@@ -85,12 +85,12 @@ void main() {
       expect(c.position, isNull);
     });
 
-    test('equality is keyed on id and url, not position', () {
+    test('different inline positions have different citation identities', () {
       const a = GroundedAnswerCitation(
           id: 'c1', title: 'T', url: 'https://x.com', position: 1);
       const b = GroundedAnswerCitation(
           id: 'c1', title: 'T', url: 'https://x.com', position: 99);
-      expect(a, equals(b));
+      expect(a, isNot(equals(b)));
     });
 
     test('equality by id and url ignores title differences', () {

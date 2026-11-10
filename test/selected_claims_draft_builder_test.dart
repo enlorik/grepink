@@ -15,18 +15,17 @@ ClaimReviewItem _item({
   List<String> citationTitles = const [],
   bool canBeSaved = true,
   bool selectedByDefault = true,
-}) =>
-    ClaimReviewItem(
-      id: id,
-      text: text,
-      classification: classification,
-      citationUrls: citationUrls,
-      citationTitles: citationTitles,
-      selectedByDefault: selectedByDefault,
-      reason: 'test',
-      matchedLocalEvidenceIds: const [],
-      canBeSaved: canBeSaved,
-    );
+}) => ClaimReviewItem(
+  id: id,
+  text: text,
+  classification: classification,
+  citationUrls: citationUrls,
+  citationTitles: citationTitles,
+  selectedByDefault: selectedByDefault,
+  reason: 'test',
+  matchedLocalEvidenceIds: const [],
+  canBeSaved: canBeSaved,
+);
 
 GroundedAnswerCitation _citation(String id, String url, String title) =>
     GroundedAnswerCitation(id: id, title: title, url: url);
@@ -37,6 +36,44 @@ void main() {
   const builder = SelectedClaimsDraftBuilder();
 
   group('SelectedClaimsDraftBuilder', () {
+    test(
+      'saves normal nested Markdown markers without duplicate Unicode bullets',
+      () {
+        final result = builder.build(
+          question: 'Types',
+          providerName: 'test',
+          citations: const [],
+          selected: [
+            _item(id: '1', text: '- Parent.'),
+            _item(id: '2', text: '    - • Child.'),
+          ],
+        );
+        expect(result.markdownContent, contains('- Parent.\n\n    - Child.'));
+        expect(result.markdownContent, isNot(contains('•')));
+      },
+    );
+
+    test(
+      'preserves all inline sources and does not manufacture nested bullets',
+      () {
+        final result = builder.build(
+          question: 'Q',
+          selected: [
+            _item(
+              text: '**Sized vs. Unsized:** types.',
+              citationUrls: ['https://one.example/a', 'https://two.example/b'],
+            ),
+          ],
+          providerName: 'test',
+          citations: const [],
+        );
+        final body = result.markdownContent.split('## Sources').first;
+        expect(body, contains('[Source](<https://one.example/a>)'));
+        expect(body, contains('[Source 2](<https://two.example/b>)'));
+        expect(body, isNot(contains('- **Sized')));
+      },
+    );
+
     test('selected new claims appear in markdown', () {
       final result = builder.build(
         question: 'What is gravity?',
@@ -92,7 +129,7 @@ void main() {
       final result = builder.build(
         question: 'q',
         selected: [
-          _item(citationUrls: [url])
+          _item(citationUrls: [url]),
         ],
         providerName: 'test',
         citations: [_citation('c1', url, 'Example')],
@@ -135,19 +172,23 @@ void main() {
     });
 
     test(
-        'markdown does not include raw full answer content beyond selected claims',
-        () {
-      final result = builder.build(
-        question: 'What is gravity?',
-        selected: [_item(text: 'Gravity pulls objects.')],
-        providerName: 'test',
-        citations: const [],
-      );
+      'markdown does not include raw full answer content beyond selected claims',
+      () {
+        final result = builder.build(
+          question: 'What is gravity?',
+          selected: [_item(text: 'Gravity pulls objects.')],
+          providerName: 'test',
+          citations: const [],
+        );
 
-      // Should only contain the selected claim, not any extra answer text.
-      expect(result.markdownContent, contains('Gravity pulls objects.'));
-      expect(result.markdownContent.split('Gravity pulls objects.').length, 2);
-    });
+        // Should only contain the selected claim, not any extra answer text.
+        expect(result.markdownContent, contains('Gravity pulls objects.'));
+        expect(
+          result.markdownContent.split('Gravity pulls objects.').length,
+          2,
+        );
+      },
+    );
 
     test('markdown does not include API keys or secrets', () {
       final result = builder.build(
@@ -163,21 +204,22 @@ void main() {
     });
 
     test(
-        'output is valid when citation title is missing (URL used as fallback)',
-        () {
-      const url = 'https://no-title.com';
-      final result = builder.build(
-        question: 'q',
-        selected: [
-          _item(citationUrls: [url])
-        ],
-        providerName: 'test',
-        citations: [_citation('c1', url, '')],
-      );
+      'output is valid when citation title is missing (URL used as fallback)',
+      () {
+        const url = 'https://no-title.com';
+        final result = builder.build(
+          question: 'q',
+          selected: [
+            _item(citationUrls: [url]),
+          ],
+          providerName: 'test',
+          citations: [_citation('c1', url, '')],
+        );
 
-      expect(result.markdownContent, contains(url));
-      expect(result.markdownContent, isNotEmpty);
-    });
+        expect(result.markdownContent, contains(url));
+        expect(result.markdownContent, isNotEmpty);
+      },
+    );
 
     test('output is valid when URL is missing but claim was selected', () {
       final result = builder.build(
@@ -191,7 +233,7 @@ void main() {
       expect(result.markdownContent, contains('Claim without URL.'));
     });
 
-    test('question is used as markdown title', () {
+    test('question becomes a topic rather than an interrogative title', () {
       final result = builder.build(
         question: 'What is photosynthesis?',
         selected: [_item(text: 'Plants use sunlight.')],
@@ -199,7 +241,7 @@ void main() {
         citations: const [],
       );
 
-      expect(result.markdownContent, contains('# What is photosynthesis?'));
+      expect(result.markdownContent, contains('# Photosynthesis'));
     });
 
     test('sourceCount reflects deduplicated URL count', () {
@@ -221,21 +263,23 @@ void main() {
 
     // ─── Claim-level citation title fallback ──────────────────────────────────
 
-    test('claim-level title is used when URL is absent from provider citations',
-        () {
-      const url = 'https://claim-only.example.com';
-      const claimTitle = 'Claim Only Source';
-      final result = builder.build(
-        question: 'q',
-        selected: [
-          _item(citationUrls: [url], citationTitles: [claimTitle]),
-        ],
-        providerName: 'test',
-        citations: const [], // URL not present in provider citations
-      );
+    test(
+      'claim-level title is used when URL is absent from provider citations',
+      () {
+        const url = 'https://claim-only.example.com';
+        const claimTitle = 'Claim Only Source';
+        final result = builder.build(
+          question: 'q',
+          selected: [
+            _item(citationUrls: [url], citationTitles: [claimTitle]),
+          ],
+          providerName: 'test',
+          citations: const [], // URL not present in provider citations
+        );
 
-      expect(result.markdownContent, contains('$claimTitle — $url'));
-    });
+        expect(result.markdownContent, contains('$claimTitle — $url'));
+      },
+    );
 
     test('provider-level title wins over a conflicting claim-level title', () {
       const url = 'https://shared.example.com';
@@ -290,32 +334,35 @@ void main() {
     });
 
     test(
-        'duplicate URLs across claims remain listed once in Sources with claim title',
-        () {
-      const url = 'https://shared-claim.example.com';
-      const claimTitle = 'Shared Claim Source';
-      final result = builder.build(
-        question: 'q',
-        selected: [
-          _item(
+      'duplicate URLs across claims remain listed once in Sources with claim title',
+      () {
+        const url = 'https://shared-claim.example.com';
+        const claimTitle = 'Shared Claim Source';
+        final result = builder.build(
+          question: 'q',
+          selected: [
+            _item(
               id: 'i1',
               text: 'Claim one.',
               citationUrls: [url],
-              citationTitles: [claimTitle]),
-          _item(
+              citationTitles: [claimTitle],
+            ),
+            _item(
               id: 'i2',
               text: 'Claim two.',
               citationUrls: [url],
-              citationTitles: [claimTitle]),
-        ],
-        providerName: 'test',
-        citations: const [],
-      );
+              citationTitles: [claimTitle],
+            ),
+          ],
+          providerName: 'test',
+          citations: const [],
+        );
 
-      final sourcesSection = result.markdownContent.split('## Sources').last;
-      expect(url.allMatches(sourcesSection).length, 1);
-      expect(result.sourceCount, 1);
-    });
+        final sourcesSection = result.markdownContent.split('## Sources').last;
+        expect(url.allMatches(sourcesSection).length, 1);
+        expect(result.sourceCount, 1);
+      },
+    );
 
     test('sourceCount is deduplicated when claim-level titles are mixed', () {
       final result = builder.build(

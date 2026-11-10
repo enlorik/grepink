@@ -1,3 +1,4 @@
+import '../services/note_addition.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/note_draft.dart';
@@ -31,18 +32,16 @@ class NotesNotifierNoteDraftReviewRepository
 }
 
 final noteDraftReviewRepositoryProvider = Provider<NoteDraftReviewRepository>(
-  (ref) => NotesNotifierNoteDraftReviewRepository(
-    ref.read(notesProvider.notifier),
-  ),
+  (ref) =>
+      NotesNotifierNoteDraftReviewRepository(ref.read(notesProvider.notifier)),
 );
 
 class NoteDraftReviewNotifier extends StateNotifier<NoteDraftReviewState> {
   final NoteDraftReviewRepository _repository;
 
-  NoteDraftReviewNotifier({
-    required NoteDraftReviewRepository repository,
-  })  : _repository = repository,
-        super(const NoteDraftReviewState());
+  NoteDraftReviewNotifier({required NoteDraftReviewRepository repository})
+    : _repository = repository,
+      super(const NoteDraftReviewState());
 
   void startReview(NoteDraft noteDraft) {
     state = NoteDraftReviewState(
@@ -196,11 +195,7 @@ class NoteDraftReviewNotifier extends StateNotifier<NoteDraftReviewState> {
   }
 
   String _titleFor(NoteDraft draft) {
-    final compactQuestion =
-        draft.question.replaceAll(RegExp(r'\s+'), ' ').trim();
-    if (compactQuestion.isEmpty) return 'Generated note';
-    if (compactQuestion.length <= 80) return compactQuestion;
-    return '${compactQuestion.substring(0, 77)}...';
+    return noteTopicTitle(draft.question, draft.markdownContent);
   }
 
   String _buildGeneratedNoteMarkdown(
@@ -264,7 +259,7 @@ source_count: $sourceCount
 
 final noteDraftReviewProvider =
     StateNotifierProvider<NoteDraftReviewNotifier, NoteDraftReviewState>(
-  (ref) => NoteDraftReviewNotifier(
-    repository: ref.watch(noteDraftReviewRepositoryProvider),
-  ),
-);
+      (ref) => NoteDraftReviewNotifier(
+        repository: ref.watch(noteDraftReviewRepositoryProvider),
+      ),
+    );

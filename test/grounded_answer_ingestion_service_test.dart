@@ -166,7 +166,15 @@ void main() {
         provider: _FakeProvider(
           _answer(
             text: 'Gravity pulls objects.',
-            citations: [_citation('c1', 'https://example.com/gravity')],
+            citations: [
+              const GroundedAnswerCitation(
+                id: 'c1',
+                title: 'Gravity',
+                url: 'https://example.com/gravity',
+                startIndex: 0,
+                endIndex: 22,
+              ),
+            ],
           ),
         ),
       );
