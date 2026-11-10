@@ -17,8 +17,11 @@ class AppTheme {
         onSecondary: AppColors.surface,
         surface: AppColors.surface,
         onSurface: AppColors.bodyText,
+        surfaceContainerLow: AppColors.codeBackground,
+        surfaceContainerHighest: AppColors.panelSurface,
         error: AppColors.error,
       ),
+      visualDensity: VisualDensity.compact,
       scaffoldBackgroundColor: AppColors.backgroundStart,
       textTheme: GoogleFonts.interTextTheme().copyWith(
         displayLarge: AppTextStyles.displayLarge,
@@ -54,11 +57,15 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide:
-              const BorderSide(color: AppColors.primaryAccent, width: 2),
+          borderSide: const BorderSide(
+            color: AppColors.primaryAccent,
+            width: 2,
+          ),
         ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
       ),
       appBarTheme: AppBarTheme(
         backgroundColor: Colors.transparent,
@@ -81,8 +88,9 @@ class AppTheme {
       chipTheme: ChipThemeData(
         backgroundColor: AppColors.tagBackground,
         side: const BorderSide(color: AppColors.tagBorder),
-        labelStyle:
-            AppTextStyles.bodySmall.copyWith(color: AppColors.deepAction),
+        labelStyle: AppTextStyles.bodySmall.copyWith(
+          color: AppColors.deepAction,
+        ),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         shape: const StadiumBorder(),
       ),
@@ -90,11 +98,13 @@ class AppTheme {
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primaryAction,
           foregroundColor: AppColors.surface,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          textStyle:
-              AppTextStyles.titleMedium.copyWith(color: AppColors.surface),
+          textStyle: AppTextStyles.titleMedium.copyWith(
+            color: AppColors.surface,
+          ),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -115,8 +125,9 @@ class AppTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: AppColors.deepAction,
-        contentTextStyle:
-            AppTextStyles.bodyMedium.copyWith(color: AppColors.surface),
+        contentTextStyle: AppTextStyles.bodyMedium.copyWith(
+          color: AppColors.surface,
+        ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         behavior: SnackBarBehavior.floating,
       ),
