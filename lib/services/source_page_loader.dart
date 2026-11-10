@@ -297,12 +297,53 @@ class HttpSourcePageLoader implements SourcePageLoader {
   }
 }
 
+// A static reader must choose one representation, rather than concatenating
+// MathML, raw TeX annotations and KaTeX's hidden visual duplicate.
+String _mathText(dom.Node node) {
+  if (node is dom.Text) return node.text.replaceAll('⁡', '');
+  if (node is! dom.Element) return '';
+  String part(int i) =>
+      i < node.children.length ? _mathText(node.children[i]) : '';
+  return switch (node.localName) {
+    'annotation' || 'annotation-xml' => '',
+    'semantics' => part(0),
+    'msup' => '${part(0)}^(${part(1)})',
+    'msub' => '${part(0)}_(${part(1)})',
+    'msubsup' => '${part(0)}_(${part(1)})^(${part(2)})',
+    'mfrac' => '(${part(0)})/(${part(1)})',
+    'msqrt' => 'sqrt(${node.nodes.map(_mathText).join()})',
+    'mspace' => ' ',
+    'mfenced' =>
+      '${node.attributes['open'] ?? '('}${node.children.map(_mathText).join(node.attributes['separators'] ?? ',')}${node.attributes['close'] ?? ')'}',
+    _ => node.nodes.map(_mathText).join(),
+  };
+}
+
+void _normalizeSourceMath(dom.Document document) {
+  for (final wrapper in document.querySelectorAll('.katex')) {
+    final math = wrapper.querySelector('math');
+    final value = math == null
+        ? wrapper.querySelector('.katex-html')?.text
+        : _mathText(math);
+    if (value != null && value.trim().isNotEmpty) {
+      wrapper.replaceWith(dom.Element.tag('code')..text = value.trim());
+    }
+  }
+  for (final math in document.querySelectorAll('math')) {
+    final value = _mathText(math).trim();
+    if (value.isNotEmpty) {
+      math.replaceWith(dom.Element.tag('code')..text = value);
+    }
+  }
+}
+
 SourcePage parseSourcePage(
   String source, {
   String fallbackTitle = 'Source page',
   Uri? baseUrl,
 }) {
   final document = html.parse(source);
+  _normalizeSourceMath(document);
   final articleRoot =
       document.querySelector('article') ?? document.querySelector('main');
   final title =
@@ -313,7 +354,7 @@ SourcePage parseSourcePage(
           ?.trim() ??
       document.querySelector('title')?.text.trim();
   for (final element in document.querySelectorAll(
-    'script,style,noscript,nav,footer,aside,form,button,svg,iframe',
+    'script,style,noscript,nav,footer,aside,form,button,svg,iframe,annotation,annotation-xml,[aria-hidden="true"]',
   )) {
     element.remove();
   }

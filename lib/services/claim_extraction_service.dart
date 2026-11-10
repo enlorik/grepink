@@ -24,7 +24,9 @@ abstract class ClaimExtractionService {
 class RuleBasedClaimExtractionService implements ClaimExtractionService {
   const RuleBasedClaimExtractionService();
 
-  static final _sentenceEnd = RegExp(r'(?<=[.!?])\s+');
+  static final _sentenceEnd = RegExp(
+    r'(?<=[.!?])(?:\*{1,2}|_{1,2})?(?:\[\d+\])*\s+',
+  );
 
   @override
   List<ExtractedClaim> extract(GroundedAnswer answer) {
@@ -33,31 +35,115 @@ class RuleBasedClaimExtractionService implements ClaimExtractionService {
     final text = answer.answerText;
     if (text.trim().isEmpty) return const [];
 
-    final allCitations = answer.citations;
-    // Build sentence ranges using allMatches for position awareness.
-    final sentences = <({int start, int end, String text})>[];
-    int cursor = 0;
-    for (final match in _sentenceEnd.allMatches(text)) {
-      // A sentence boundary inside emphasis or code is not a safe render boundary.
-      final prefix = text.substring(0, match.start);
-      if (RegExp(r'```|~~~').allMatches(prefix).length.isOdd ||
-          RegExp(r'(?<!\\)\*\*').allMatches(prefix).length.isOdd ||
-          RegExp(r'(?<!\\)__').allMatches(prefix).length.isOdd ||
-          RegExp(r'(?<!`)`(?!`)').allMatches(prefix).length.isOdd) {
+    bool validRange(GroundedAnswerCitation c) =>
+        c.startIndex != null &&
+        c.endIndex != null &&
+        c.startIndex! >= 0 &&
+        c.endIndex! > c.startIndex! &&
+        c.endIndex! <= text.length;
+    final codeRanges = RegExp(
+      r'```[\s\S]*?(?:```|$)|~~~[\s\S]*?(?:~~~|$)|`[^`\n]*`',
+    ).allMatches(text).toList();
+    bool inCode(int at) => codeRanges.any((r) => at >= r.start && at < r.end);
+    final allCitations = <GroundedAnswerCitation>[];
+    final explicit = Set<GroundedAnswerCitation>.identity();
+    // Recover references explicitly written by the provider, without searching
+    // for new sources or treating answer-level references as sentence proof.
+    for (final c in answer.citations) {
+      final markers = RegExp(r'^\d+$').hasMatch(c.id)
+          ? RegExp(
+              '\\[${RegExp.escape(c.id)}\\](?![(:])',
+            ).allMatches(text).where((m) => !inCode(m.start)).toList()
+          : <RegExpMatch>[];
+      if (markers.isEmpty || validRange(c)) {
+        allCitations.add(c);
+      } else {
+        for (final marker in markers) {
+          final anchored = c.copyWith(position: marker.end);
+          allCitations.add(anchored);
+          explicit.add(anchored);
+        }
+      }
+    }
+    final links = RegExp(
+      r'\[([^\]\n]+)\]\((?:<(https?://[^>\s]+)>|(https?://[^\s)]+))\)',
+    ).allMatches(text).toList();
+    for (final link in links) {
+      if (inCode(link.start) ||
+          link.start > 0 && text[link.start - 1] == r'\') {
         continue;
       }
-      final segment = text.substring(cursor, match.start);
+      final url = link[2] ?? link[3]!;
+      if (allCitations.any((c) => c.url == url && c.position == link.end)) {
+        continue;
+      }
+      final anchored = GroundedAnswerCitation(
+        id: 'inline-${link.start}',
+        title: link[1]!,
+        url: url,
+        position: link.end,
+      );
+      allCitations.add(anchored);
+      explicit.add(anchored);
+    }
+    final formatting = [
+      ...RegExp(
+        r'(?<![\w\\*])\*(?![\s*])[\s\S]*?(?<!\s)\*(?!\*)',
+      ).allMatches(text),
+      ...RegExp(
+        r'(?<![\w\\])_(?![\s_])[\s\S]*?(?<!\s)_(?![\w_])',
+      ).allMatches(text),
+      ...links,
+    ];
+    final sentences = <({int start, int end, String text})>[];
+    var cursor = 0;
+    for (final match in _sentenceEnd.allMatches(text)) {
+      if (match.start < cursor) continue;
+      final boundary = match.start + match[0]!.trimRight().length;
+      if (formatting.any((r) => boundary > r.start && boundary < r.end)) {
+        continue;
+      }
+      final prefix = text.substring(0, boundary);
+      if (inCode(match.start) ||
+          RegExp(r'(?<!\\)\*\*').allMatches(prefix).length.isOdd ||
+          RegExp(r'(?<!\\)__').allMatches(prefix).length.isOdd) {
+        continue;
+      }
+      // A trailing citation belongs to this sentence, not the next sentence.
+      var end = boundary;
+      var next = match.end;
+      var whitespace = match[0]!;
+      final reference = RegExp(
+        r'^(?:\[\d+\](?![(:])|\[[^\]\n]+\]\((?:<https?://[^>\s]+>|https?://[^\s)]+)\))',
+      );
+      while (!RegExp(r'\n[ \t]*\n').hasMatch(whitespace)) {
+        final suffix = reference.firstMatch(text.substring(next));
+        if (suffix == null) break;
+        end = next + suffix.end;
+        next = end;
+        final gap = RegExp(r'^\s*').firstMatch(text.substring(next))!;
+        whitespace = gap[0]!;
+        next += gap.end;
+      }
+      final segment = text.substring(cursor, end);
       if (segment.trim().isNotEmpty) {
-        sentences.add((start: cursor, end: match.start, text: segment));
+        sentences.add((start: cursor, end: end, text: segment));
       }
-      cursor = match.end;
+      cursor = next;
     }
-    if (cursor < text.length) {
-      final tail = text.substring(cursor);
-      if (tail.trim().isNotEmpty) {
-        sentences.add((start: cursor, end: text.length, text: tail));
-      }
+    if (cursor < text.length && text.substring(cursor).trim().isNotEmpty) {
+      sentences.add((
+        start: cursor,
+        end: text.length,
+        text: text.substring(cursor),
+      ));
     }
+    final positions = answer.citations.map((c) => c.position).toSet();
+    final endCluster =
+        sentences.length > 1 &&
+        answer.citations.length > 1 &&
+        positions.length == 1 &&
+        positions.single == text.trimRight().length;
 
     final seen = <String>{};
     final claims = <ExtractedClaim>[];
@@ -77,24 +163,12 @@ class RuleBasedClaimExtractionService implements ClaimExtractionService {
 
       // A source consulted for the answer is not automatically evidence for
       // every sentence. Keep only provider ranges overlapping this claim.
-      bool validRange(GroundedAnswerCitation c) =>
-          c.startIndex != null &&
-          c.endIndex != null &&
-          c.startIndex! >= 0 &&
-          c.endIndex! > c.startIndex! &&
-          c.endIndex! <= text.length;
-      final positions = allCitations.map((c) => c.position).toSet();
-      final endCluster =
-          sentences.length > 1 &&
-          allCitations.length > 1 &&
-          positions.length == 1 &&
-          positions.single == text.trimRight().length;
       final overlapping = allCitations.where((c) {
         if (validRange(c)) {
           return c.startIndex! < sentenceEnd && c.endIndex! > sentenceStart;
         }
         final position = c.position;
-        if (endCluster ||
+        if (endCluster && !explicit.contains(c) ||
             position == null ||
             position <= 0 ||
             position > text.length) {

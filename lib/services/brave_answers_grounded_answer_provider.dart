@@ -26,7 +26,11 @@ class BraveAnswersGroundedAnswerProvider implements GroundedAnswerProvider {
     r'<citation>(.*?)</citation>',
     dotAll: true,
   );
-  static final _anyTag = RegExp(r'<[^>]+>.*?</[^>]+>', dotAll: true);
+  // Provider metadata is not arbitrary angle-bracket text: templates are code.
+  static final _controlBlock = RegExp(
+    r'<(think|analysis|usage)\b[^>]*>.*?(?:</\1>|$)',
+    dotAll: true,
+  );
 
   @override
   Future<GroundedAnswerProviderOutcome> fetchGroundedAnswer(
@@ -124,10 +128,8 @@ class BraveAnswersGroundedAnswerProvider implements GroundedAnswerProvider {
 
       final assembled = buffer.toString();
 
-      String clean(String value) => value
-          .replaceAll(_citationTag, '')
-          .replaceAll(RegExp(r'<usage>.*?</usage>', dotAll: true), '')
-          .replaceAll(_anyTag, '');
+      String clean(String value) =>
+          value.replaceAll(_citationTag, '').replaceAll(_controlBlock, '');
       int? offset(dynamic value) => value is int
           ? value
           : value is String
@@ -145,7 +147,7 @@ class BraveAnswersGroundedAnswerProvider implements GroundedAnswerProvider {
             GroundedAnswerCitation(
               id: (json['number'] ?? json['id'] ?? citations.length + 1)
                   .toString(),
-              title: url,
+              title: json['title'] is String ? json['title'] as String : url,
               url: url,
               snippet: json['snippet'] is String
                   ? json['snippet'] as String
