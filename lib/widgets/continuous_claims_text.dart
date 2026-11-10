@@ -59,8 +59,8 @@ class _ContinuousClaimsTextState extends State<ContinuousClaimsText> {
   TextStyle _style(ClaimReviewItem item) {
     final theme = Theme.of(context);
     return theme.textTheme.bodyLarge!.copyWith(
-      fontSize: 16,
-      height: 1.5,
+      fontSize: 15,
+      height: 1.45,
       letterSpacing: 0,
       decoration: widget.selectedIds.contains(item.id)
           ? TextDecoration.none
@@ -220,7 +220,7 @@ class _ContinuousClaimsTextState extends State<ContinuousClaimsText> {
         children: [
           for (var i = 0; i < entries.length; i++)
             Padding(
-              padding: const EdgeInsets.only(bottom: 6),
+              padding: const EdgeInsets.only(bottom: 4),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -356,12 +356,12 @@ class _ContinuousClaimsTextState extends State<ContinuousClaimsText> {
       if (paragraph.isEmpty) return;
       blocks.add(
         Padding(
-          padding: const EdgeInsets.only(bottom: 14),
+          padding: const EdgeInsets.only(bottom: 10),
           child: Text.rich(
             TextSpan(children: paragraph),
             style: Theme.of(
               context,
-            ).textTheme.bodyLarge!.copyWith(fontSize: 16, height: 1.6),
+            ).textTheme.bodyLarge!.copyWith(fontSize: 15, height: 1.6),
           ),
         ),
       );
@@ -393,7 +393,7 @@ class _ContinuousClaimsTextState extends State<ContinuousClaimsText> {
           blocks.add(
             Padding(
               padding: EdgeInsets.only(
-                bottom: 10,
+                bottom: 6,
                 left: (MarkdownListLine.parse(item.text)?.indent ?? 0) * 8.0,
               ),
               child: node is md.Element

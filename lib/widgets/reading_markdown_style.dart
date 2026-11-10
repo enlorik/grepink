@@ -8,8 +8,8 @@ MarkdownStyleSheet readingMarkdownStyle(
 }) {
   final theme = Theme.of(context);
   final body = theme.textTheme.bodyLarge!.copyWith(
-    fontSize: compact ? 14 : 16,
-    height: 1.5,
+    fontSize: compact ? 14 : 15,
+    height: 1.45,
     letterSpacing: 0,
     color: theme.colorScheme.onSurface,
   );
@@ -21,9 +21,9 @@ MarkdownStyleSheet readingMarkdownStyle(
   );
   return MarkdownStyleSheet.fromTheme(theme).copyWith(
     p: body,
-    h1: heading(compact ? 19 : 26),
-    h2: heading(compact ? 17 : 21),
-    h3: heading(compact ? 16 : 18),
+    h1: heading(compact ? 18 : 24),
+    h2: heading(compact ? 16 : 20),
+    h3: heading(compact ? 15 : 17),
     h4: heading(16),
     h5: heading(15),
     h6: heading(14),

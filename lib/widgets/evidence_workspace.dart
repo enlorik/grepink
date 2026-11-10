@@ -97,7 +97,7 @@ class EvidencePane extends StatelessWidget {
           return Container(
             key: const Key('workspace-evidence'),
             decoration: const BoxDecoration(
-              color: AppColors.backgroundStart,
+              color: AppColors.panelSurface,
               border: Border(left: BorderSide(color: AppColors.dividerBorder)),
             ),
             child: Column(
@@ -169,10 +169,15 @@ class EvidencePane extends StatelessWidget {
                               if (source.passage == null)
                                 const Text(
                                   'Source link · sentence attribution unavailable',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.secondaryText,
+                                  ),
                                 ),
                               SourcePageReader(
                                 url: source.url,
                                 sourceTitle: source.title,
+                                showMissingExcerpt: source.passage != null,
                                 passage: selection!.passage,
                                 savedExcerpt: source.snippet,
                                 loader: loader,

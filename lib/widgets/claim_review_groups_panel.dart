@@ -147,6 +147,11 @@ class _ClaimReviewGroupsPanelState extends State<ClaimReviewGroupsPanel> {
   }
 
   Widget _readingView(List<ClaimReviewItem> items, ClaimReviewItem? active) {
+    final sourced = items
+        .where(
+          (item) => !item.citationUncertain && item.citationUrls.isNotEmpty,
+        )
+        .length;
     final current = active ?? items.first;
     final index = items.indexWhere((item) => item.id == current.id);
     final group = widget.groups.firstWhere(
@@ -156,6 +161,19 @@ class _ClaimReviewGroupsPanelState extends State<ClaimReviewGroupsPanel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Tooltip(
+          message:
+              'Mapped references belong to the passage; this count does not certify that a source proves the claim.',
+          child: Text(
+            'Sources · $sourced/${items.length} passages',
+            key: const Key('citation-coverage'),
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.primaryAction,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
         Text(
           'Click a sentence to ignore it; click again to include it. Hover for sources and scroll to read them.',
           style: AppTextStyles.bodySmall,

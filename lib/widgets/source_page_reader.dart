@@ -16,6 +16,7 @@ class SourcePageReader extends StatefulWidget {
   final SourcePageLoader? loader;
   final SourceImageLoader? imageLoader;
   final bool compact;
+  final bool showMissingExcerpt;
   const SourcePageReader({
     super.key,
     required this.url,
@@ -25,6 +26,7 @@ class SourcePageReader extends StatefulWidget {
     this.loader,
     this.imageLoader,
     this.compact = false,
+    this.showMissingExcerpt = true,
   });
   @override
   State<SourcePageReader> createState() => _SourcePageReaderState();
@@ -191,7 +193,7 @@ class _SourcePageReaderState extends State<SourcePageReader> {
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
-        ] else ...[
+        ] else if (widget.showMissingExcerpt) ...[
           const Text(
             'No exact excerpt was supplied for this passage.',
             key: Key('missing-cited-excerpt'),
