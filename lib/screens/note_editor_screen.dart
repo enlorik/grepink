@@ -452,6 +452,11 @@ class NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                               isExpanded: true,
                               decoration: const InputDecoration(
                                 labelText: 'Insert reviewed answer',
+                                isDense: true,
+                                contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 10,
+                                ),
                               ),
                               items: [
                                 if (_insertOffset >= 0 &&
