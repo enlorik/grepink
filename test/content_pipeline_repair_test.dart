@@ -52,14 +52,14 @@ void main() {
           'Arrays store values. [1]\n\nStrings contain characters.[2] Next fact has no reference.';
       final claims = extract.extract(
         answer(text, [
-          GroundedAnswerCitation(
+          const GroundedAnswerCitation(
             id: '1',
             title: 'Arrays',
             url: 'https://example.com/arrays',
             snippet: 'An array excerpt.',
             position: text.length,
           ),
-          GroundedAnswerCitation(
+          const GroundedAnswerCitation(
             id: '2',
             title: 'Strings',
             url: 'https://example.com/strings',
@@ -95,14 +95,14 @@ void main() {
       const text = 'One fact. [Guide](https://example.com/a)\n\nAnother fact.';
       final claims = extract.extract(
         answer(text, [
-          GroundedAnswerCitation(
+          const GroundedAnswerCitation(
             id: '1',
             title: 'One',
             url: 'https://example.com/one',
             snippet: 'Unassigned one.',
             position: text.length,
           ),
-          GroundedAnswerCitation(
+          const GroundedAnswerCitation(
             id: '2',
             title: 'Two',
             url: 'https://example.com/two',
